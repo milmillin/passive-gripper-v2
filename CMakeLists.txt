@@ -13,12 +13,18 @@ endif()
 
 
 # Add your project files
-file(GLOB_RECURSE SRCFILES "src/*.cpp")
+file(GLOB_RECURSE CORE_SRCFILES "src/core/*.cpp")
+file(GLOB_RECURSE UI_SRCFILES "src/ui/*.cpp")
 
 if (MSVC)
   # For Microsoft compiler
   set_source_files_properties(
-    ${SRCFILES}
+    ${CORE_SRCFILES}
+    PROPERTIES
+    COMPILE_FLAGS "/W4"
+  )
+  set_source_files_properties(
+    ${UI_SRCFILES}
     PROPERTIES
     COMPILE_FLAGS "/W4"
   )
@@ -36,7 +42,12 @@ if (MSVC)
 else()
   # For other compilers
   set_source_files_properties(
-    ${SRCFILES}
+    ${CORE_SRCFILES}
+    PROPERTIES
+    COMPILE_FLAGS "-Wall -Wextra -pedantic"
+  )
+  set_source_files_properties(
+    ${UI_SRCFILES}
     PROPERTIES
     COMPILE_FLAGS "-Wall -Wextra -pedantic"
   )
@@ -64,22 +75,6 @@ option(LIBIGL_WITH_CGAL              "Use CGAL"           ON)
 
 find_package(LIBIGL REQUIRED QUIET)
 
-# TODO fixme
-include_directories(external/dxflib/include)
-set(SRCFILES ${SRCFILES} 
-    external/dxflib/include/dxflib/src/dl_dxf.cpp
-    external/dxflib/include/dxflib/src/dl_writer_ascii.cpp
-)
-
-# ikfast
-include_directories(external/ikfast/include)
-set(SRCFILES ${SRCFILES}
-    external/ikfast/include/src/ikfast61.cpp
-)
-
-# cxxopts
-include_directories(external/cxxopts/include)
-
 # Link Embree
 find_package(embree 3 CONFIG REQUIRED)
 
@@ -92,12 +87,17 @@ find_package(NLopt CONFIG REQUIRED)
 find_package(CGAL CONFIG REQUIRED)
 
 # Linking
-set(LINK_LIBS igl::core igl::opengl_glfw igl::opengl_glfw_imgui igl::embree igl::png igl::cgal embree lapack Qhull::qhullcpp Qhull::qhull_r CGAL::CGAL)
+set(CORE_LINK_LIBS igl::core igl::embree igl::png igl::cgal embree lapack Qhull::qhullcpp Qhull::qhull_r CGAL::CGAL)
 if (NOT MSVC)
-    list(APPEND LINK_LIBS stdc++fs nlopt) # Not sure if neccessary here
+    list(APPEND CORE_LINK_LIBS stdc++fs nlopt) # Not sure if neccessary here
 else()
-    list(APPEND LINK_LIBS NLopt::nlopt)
+    list(APPEND CORE_LINK_LIBS NLopt::nlopt)
 endif()
 
-add_executable(${PROJECT_NAME} ${SRCFILES})
-target_link_libraries(${PROJECT_NAME} ${LINK_LIBS})
+add_library(core ${CORE_SRCFILES})
+target_link_libraries(core ${CORE_LINK_LIBS})
+
+set(UI_LINK_LIBS core igl::core igl::opengl_glfw igl::opengl_glfw_imgui)
+
+add_executable(${PROJECT_NAME} ${UI_SRCFILES})
+target_link_libraries(${PROJECT_NAME} ${UI_LINK_LIBS})
