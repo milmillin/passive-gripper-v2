@@ -1,0 +1,103 @@
+cmake_minimum_required(VERSION 3.14)
+project(passive-gripper)
+set (CMAKE_CXX_STANDARD 17)
+
+include(FetchContent)
+
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+
+# Set build type
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
+
+
+# Add your project files
+file(GLOB_RECURSE SRCFILES "src/*.cpp")
+
+if (MSVC)
+  # For Microsoft compiler
+  set_source_files_properties(
+    ${SRCFILES}
+    PROPERTIES
+    COMPILE_FLAGS "/W4"
+  )
+
+  # Find LAPACK
+  set(LAPACK_DIR "external/lapack")
+  find_package(LAPACK CONFIG REQUIRED)
+
+  # Copy shared libraries to binary directory
+  file(GLOB LAPACK_DLLS ${LAPACK_DIR}/*.dll)
+  foreach (lapack_lib ${LAPACK_DLLS})
+    message(STATUS "Copying ${lapack_lib} to build directory")
+    file(COPY ${lapack_lib} DESTINATION ${PROJECT_BINARY_DIR})
+  endforeach()
+else()
+  # For other compilers
+  set_source_files_properties(
+    ${SRCFILES}
+    PROPERTIES
+    COMPILE_FLAGS "-Wall -Wextra -pedantic"
+  )
+  set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+
+  find_package(LAPACK)
+endif()
+
+# Link OpenMP
+find_package(OpenMP)
+if (OPENMP_FOUND)
+    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+    set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
+endif()
+
+# Link libigl
+option(LIBIGL_WITH_OPENGL            "Use OpenGL"         ON)
+option(LIBIGL_WITH_PNG               "Use PNG"            ON)
+option(LIBIGL_WITH_OPENGL_GLFW       "Use GLFW"           ON)
+option(LIBIGL_WITH_OPENGL_GLFW_IMGUI "Use IMGUI"          ON)
+option(LIBIGL_WITH_EMBREE            "Use Embree"         ON)
+option(LIBIGL_WITH_CGAL              "Use CGAL"           ON)
+
+
+find_package(LIBIGL REQUIRED QUIET)
+
+# TODO fixme
+include_directories(external/dxflib/include)
+set(SRCFILES ${SRCFILES} 
+    external/dxflib/include/dxflib/src/dl_dxf.cpp
+    external/dxflib/include/dxflib/src/dl_writer_ascii.cpp
+)
+
+# ikfast
+include_directories(external/ikfast/include)
+set(SRCFILES ${SRCFILES}
+    external/ikfast/include/src/ikfast61.cpp
+)
+
+# cxxopts
+include_directories(external/cxxopts/include)
+
+# Link Embree
+find_package(embree 3 CONFIG REQUIRED)
+
+# Qhull
+find_package(Qhull CONFIG REQUIRED)
+
+# NLOPT
+find_package(NLopt CONFIG REQUIRED)
+
+find_package(CGAL CONFIG REQUIRED)
+
+# Linking
+set(LINK_LIBS igl::core igl::opengl_glfw igl::opengl_glfw_imgui igl::embree igl::png igl::cgal embree lapack Qhull::qhullcpp Qhull::qhull_r CGAL::CGAL)
+if (NOT MSVC)
+    list(APPEND LINK_LIBS stdc++fs nlopt) # Not sure if neccessary here
+else()
+    list(APPEND LINK_LIBS NLopt::nlopt)
+endif()
+
+add_executable(${PROJECT_NAME} ${SRCFILES})
+target_link_libraries(${PROJECT_NAME} ${LINK_LIBS})
