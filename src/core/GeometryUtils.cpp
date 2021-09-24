@@ -100,29 +100,24 @@ double DoubleTriangleArea(const Eigen::Vector3d& A,
   return (B - A).cross(C - A).norm();
 }
 
-std::vector<ContactPoint> GenerateContactCones(
-    const std::vector<ContactPoint>& contactPoints,
-    size_t coneRes,
-    double friction) {
+std::vector<ContactPoint> GenerateContactCone(const ContactPoint& contactPoint,
+                                              size_t coneRes,
+                                              double friction) {
   std::vector<ContactPoint> contactCones;
-
-  size_t nContacts = contactPoints.size();
-  contactCones.resize(nContacts * coneRes);
+  contactCones.resize(coneRes);
   Eigen::Vector3d B;
   Eigen::Vector3d T;
   double stepSize = EIGEN_PI * 2 / coneRes;
   double curStep;
-  for (size_t i = 0; i < nContacts; i++) {
-    const auto& cp = contactPoints[i];
-    GetPerp(cp.normal, B, T);
-    double coeff = std::max(cp.normal.dot(Eigen::Vector3d::UnitY()), 1e-3);
-    B *= friction * coeff;
-    T *= friction * coeff;
-    for (size_t j = 0; j < coneRes; j++) {
-      curStep = j * stepSize;
-      contactCones[i * coneRes + j] = ContactPoint{
-          cp.position, cp.normal + B * cos(curStep) + T * sin(curStep), cp.fid};
-    }
+  const auto& cp = contactPoint;
+  GetPerp(cp.normal, B, T);
+  double coeff = std::max(cp.normal.dot(Eigen::Vector3d::UnitY()), 1e-3);
+  B *= friction * coeff;
+  T *= friction * coeff;
+  for (size_t j = 0; j < coneRes; j++) {
+    curStep = j * stepSize;
+    contactCones[j] = ContactPoint{
+        cp.position, cp.normal + B * cos(curStep) + T * sin(curStep), cp.fid};
   }
 
   return contactCones;

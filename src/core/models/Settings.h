@@ -11,6 +11,9 @@ struct Settings {
   double friction = 0.5;
   size_t cone_res = 4;
 
+  // Trajectory
+  size_t n_keyframes = 4;
+
   // Floor
   double floor = 0.01;
 

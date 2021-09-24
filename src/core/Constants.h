@@ -20,6 +20,8 @@ const double kRobotAlpha[] = {kHalfPi, 0, 0, kHalfPi, -kHalfPi, 0};
 typedef std::array<double, kNumDOFs> Pose;
 typedef std::vector<Pose> Trajectory;
 
+const Pose kInitPose = {-kHalfPi, -2., -2., 4., -kHalfPi, 0.};
+
 // Quality Metric
 // small float to make quadratic program positive semidefinite
 static constexpr double kWrenchReg = 1e-10;

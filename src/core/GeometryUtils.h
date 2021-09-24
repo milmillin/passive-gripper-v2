@@ -1,5 +1,9 @@
 #pragma once
 
+#include <Eigen/Core>
+#include <Eigen/Geometry>
+#include <vector>
+
 #include "Constants.h"
 #include "models/ContactPoint.h"
 
@@ -26,8 +30,7 @@ double DoubleTriangleArea(const Eigen::Vector3d& A,
 // (can be positive or negative)
 double AngularDistance(double a, double b);
 
-double SumSquaredAngularDistance(const Pose& a,
-                                 const Pose& b);
+double SumSquaredAngularDistance(const Pose& a, const Pose& b);
 
 // a, b: list of angles in radians
 // Fix angle in b so that it takes the least distance
@@ -35,9 +38,8 @@ Pose FixAngles(const Pose& a, const Pose& b);
 
 void FixTrajectory(Trajectory& t);
 
-std::vector<ContactPoint> GenerateContactCones(
-    const std::vector<ContactPoint>& contact_points,
-    size_t cone_res,
-    double friction);
+std::vector<ContactPoint> GenerateContactCone(const ContactPoint& contact_point,
+                                              size_t cone_res,
+                                              double friction);
 
 }  // namespace psg
