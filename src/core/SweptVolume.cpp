@@ -10,6 +10,7 @@
 #include "swept_volume/sparse_continuation.h"
 
 namespace psg {
+namespace core {
 
 Eigen::Quaternion<double> logq(const Eigen::Quaternion<double>& q) {
   double exp_w = q.norm();
@@ -393,4 +394,5 @@ void SweptVolume(const Eigen::MatrixXd& V,
       V, F, Transformations, f, out_CI, out_CV, out_CS, eps, num_seeds);
 }
 
+}  // namespace core
 }  // namespace psg

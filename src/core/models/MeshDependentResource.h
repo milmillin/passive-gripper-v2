@@ -4,9 +4,10 @@
 #include <igl/embree/EmbreeIntersector.h>
 #include <Eigen/Core>
 
-#include "../Constants.h"
+#include "../../Constants.h"
 
 namespace psg {
+namespace core {
 namespace models {
 
 struct MeshDependentResource {
@@ -34,4 +35,5 @@ struct MeshDependentResource {
 };
 
 }  // namespace models
+}  // namespace core
 }  // namespace psg

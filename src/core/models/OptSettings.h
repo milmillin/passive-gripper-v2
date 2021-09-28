@@ -1,8 +1,9 @@
 #pragma once
 
-#include "../Constants.h"
+#include "../../Constants.h"
 
 namespace psg {
+namespace core {
 namespace models {
 
 struct OptSettings {
@@ -18,4 +19,5 @@ struct OptSettings {
 };
 
 }  // namespace models
+}  // namespace core
 }  // namespace psg

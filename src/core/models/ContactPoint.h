@@ -3,6 +3,7 @@
 #include <Eigen/Core>
 
 namespace psg {
+namespace core {
 namespace models {
 
 struct ContactPoint {
@@ -12,4 +13,5 @@ struct ContactPoint {
 };
 
 }  // namespace models
+}  // namespace core
 }  // namespace psg

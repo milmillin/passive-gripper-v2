@@ -5,29 +5,18 @@
 #include <vector>
 
 #include "../core/models/ContactPoint.h"
-#include "../core/models/Gripper.h"
+#include "../core/models/GripperSettings.h"
 #include "../core/models/MeshDependentResource.h"
 
 namespace psg {
 
 using namespace models;
 
-class ViewModel {
+class PassiveGripper {
  public:
-  enum class Layers : int {
-    kMesh = 0,
-    kCenterOfMass,
-    kContactPoints,
-    kFingers,
-    kTrajectory,
-    kAxis,
-    kSweptSurface,
-    kRobot,
-    kMax
-  };
   typedef std::function<void(Layers)> LayerInvalidatedDelegate;
 
-  ViewModel();
+  PassiveGripper();
 
   inline void RegisterLayerInvalidatedDelegate(
       const LayerInvalidatedDelegate& d) {
@@ -72,11 +61,15 @@ class ViewModel {
   }
 
   // Settings
+  void SetContactSettings(const ContactSettings& settings);
   void SetFingerSettings(const FingerSettings& finger_settings);
   void SetTrajectorySettings(const TrajectorySettings& finger_settings);
   void SetOptSettings(const OptSettings& finger_settings);
   void SetTopoOptSettings(const TopoOptSettings& finger_settings);
   void SetCostSettings(const CostSettings& finger_settings);
+  inline const ContactSettings& GetContactSettings() const {
+    return gripper_.contact_settings;
+  }
   inline const FingerSettings& GetFingerSettings() const {
     return gripper_.finger_settings;
   }
@@ -125,6 +118,7 @@ class ViewModel {
 
   // state dependency
   bool mesh_changed_ = false;
+  bool contact_settings_changed_ = false;
   bool finger_settings_changed_ = false;
   bool trajectory_settings_changed_ = false;
   bool opt_settings_changed_ = false;
@@ -142,6 +136,7 @@ class ViewModel {
 
   // To be called by Invalidate()
   void InvalidateMesh();
+  void InvalidateContactSettings();
   void InvalidateFingerSettings();
   void InvalidateTrajectorySettings();
   void InvalidateCostSettings();

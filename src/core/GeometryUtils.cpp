@@ -7,6 +7,7 @@
 #include <libqhullcpp/RboxPoints.h>
 
 namespace psg {
+namespace core {
 
 bool ComputeConvexHull(const Eigen::MatrixXd& points,
                        std::vector<size_t>& out_hullIndices,
@@ -122,4 +123,6 @@ std::vector<ContactPoint> GenerateContactCone(const ContactPoint& contactPoint,
 
   return contactCones;
 }
+
+}  // namespace core
 }  // namespace psg

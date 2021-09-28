@@ -5,6 +5,7 @@
 #include "models/MeshDependentResource.h"
 
 namespace psg {
+namespace core {
 
 using namespace models;
 
@@ -17,4 +18,5 @@ Trajectory InitializeTrajectory(const std::vector<Eigen::MatrixXd>& fingers,
                                 const Pose& init_pose,
                                 size_t n_keyframes);
 
+}  // namespace core
 }  // namespace psg

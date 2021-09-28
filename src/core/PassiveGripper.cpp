@@ -1,10 +1,10 @@
-#include "ViewModel.h"
+#include "PassiveGripper.h"
 
-#include "../core/CostFunctions.h"
-#include "../core/GeometryUtils.h"
-#include "../core/Initialization.h"
-#include "../core/QualityMetric.h"
-#include "../core/robots/Robots.h"
+#include "CostFunctions.h"
+#include "GeometryUtils.h"
+#include "Initialization.h"
+#include "QualityMetric.h"
+#include "robots/Robots.h"
 
 namespace psg {
 
@@ -37,8 +37,8 @@ void ViewModel::AddContactPoint(const ContactPoint& contact_point) {
   gripper_.params.fingers.push_back(finger);
   std::vector<ContactPoint>&& cone =
       GenerateContactCone(contact_point,
-                          gripper_.finger_settings.cone_res,
-                          gripper_.finger_settings.friction);
+                          gripper_.contact_settings.cone_res,
+                          gripper_.contact_settings.friction);
   contact_cones_.insert(contact_cones_.end(), cone.begin(), cone.end());
 
   contact_changed_ = true;
@@ -49,9 +49,9 @@ void ViewModel::RemoveContactPoint(size_t index) {
   gripper_.contact_points.erase(gripper_.contact_points.begin() + index);
   gripper_.params.fingers.erase(gripper_.params.fingers.begin() + index);
   contact_cones_.erase(
-      contact_cones_.begin() + (index * gripper_.finger_settings.cone_res),
+      contact_cones_.begin() + (index * gripper_.contact_settings.cone_res),
       contact_cones_.begin() +
-          ((index + 1) * gripper_.finger_settings.cone_res));
+          ((index + 1) * gripper_.contact_settings.cone_res));
   contact_changed_ = true;
   Invalidate();
 }
@@ -89,6 +89,12 @@ void ViewModel::ClearKeyframe() {
   Invalidate();
 }
 
+void ViewModel::SetContactSettings(const ContactSettings& settings) {
+  gripper_.contact_settings = settings;
+  contact_settings_changed_ = true;
+  Invalidate();
+}
+
 void ViewModel::SetFingerSettings(const FingerSettings& settings) {
   gripper_.finger_settings = settings;
   finger_settings_changed_ = true;
@@ -123,7 +129,7 @@ void ViewModel::SetCostSettings(const CostSettings& settings) {
 
 // [] -> [Mesh]
 // [] -> [Settings]
-// [Mesh] -> [Contact]
+// [Mesh, ContactSettings] -> [Contact]
 // [Contact] -> [Quality]
 // [Contact, FingerSettings] -> [Finger]
 // [Finger, TrajectorySettings] -> [Trajectory]
@@ -131,6 +137,7 @@ void ViewModel::SetCostSettings(const CostSettings& settings) {
 
 void ViewModel::Invalidate() {
   if (mesh_changed_) InvalidateMesh();
+  if (contact_settings_changed_) InvalidateContactSettings();
   if (contact_changed_) InvalidateContact();
   if (finger_settings_changed_) InvalidateFingerSettings();
   if (trajectory_settings_changed_) InvalidateTrajectorySettings();
@@ -159,6 +166,21 @@ void ViewModel::InvalidateMesh() {
   gripper_.params.fingers.clear();
   InvokeLayerInvalidated(Layers::kMesh);
   InvokeLayerInvalidated(Layers::kCenterOfMass);
+  contact_changed_ = true;
+}
+
+void ViewModel::InvalidateContactSettings() {
+  contact_settings_changed_ = false;
+  contact_cones_.clear();
+  contact_cones_.reserve(gripper_.contact_settings.cone_res *
+                         gripper_.contact_points.size());
+  for (size_t i = 0; i < gripper_.contact_points.size(); i++) {
+    std::vector<ContactPoint>&& cones =
+        GenerateContactCone(gripper_.contact_points[i],
+                            gripper_.contact_settings.cone_res,
+                            gripper_.contact_settings.friction);  
+    contact_cones_.insert(contact_cones_.end(), cones.begin(), cones.end());
+  }
   contact_changed_ = true;
 }
 

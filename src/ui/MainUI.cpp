@@ -7,8 +7,7 @@
 
 namespace psg {
 
-MainUI::MainUI() {
-}
+MainUI::MainUI() {}
 
 void MainUI::init(igl::opengl::glfw::Viewer* viewer_) {
   using namespace std::placeholders;
@@ -162,13 +161,18 @@ void MainUI::DrawContactPointPanel() {
   static char buf_[32];
   float w = ImGui::GetContentRegionAvailWidth();
   if (ImGui::CollapsingHeader("Options", ImGuiTreeNodeFlags_DefaultOpen)) {
-    FingerSettings settings = vm_.GetFingerSettings();
-    bool update = false;
-    update |=
-        ImGui::InputDouble("Friction Coeff", &settings.friction, 0.1, 0.5);
-    update |= ImGui::InputInt("Cone Resolution", (int*)&settings.cone_res);
-    update |= ImGui::InputInt("Finger Joints", (int*)&settings.n_finger_joints);
-    if (update) vm_.SetFingerSettings(settings);
+    FingerSettings finger_settings = vm_.GetFingerSettings();
+    ContactSettings contact_settings = vm_.GetContactSettings();
+    bool contact_update = false;
+    bool finger_update = false;
+    contact_update |= ImGui::InputDouble(
+        "Friction Coeff", &contact_settings.friction, 0.1, 0.5);
+    contact_update |=
+        ImGui::InputInt("Cone Resolution", (int*)&contact_settings.cone_res);
+    finger_update |= ImGui::InputInt("Finger Joints",
+                                     (int*)&finger_settings.n_finger_joints);
+    if (finger_update) vm_.SetFingerSettings(finger_settings);
+    if (contact_update) vm_.SetContactSettings(contact_settings);
   }
   if (ImGui::CollapsingHeader("Contact Points",
                               ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -303,7 +307,7 @@ void MainUI::OnCenterOfMassInvalidated() {
   auto& comLayer = GetLayer(ViewModel::Layers::kCenterOfMass);
   comLayer.clear();
   comLayer.set_points(vm_.GetCenterOfMass().transpose(),
-                     Eigen::RowVector3d(0.7, 0.2, 0));
+                      Eigen::RowVector3d(0.7, 0.2, 0));
 }
 
 void MainUI::OnContactPointsInvalidated() {
@@ -312,11 +316,11 @@ void MainUI::OnContactPointsInvalidated() {
 
   const auto& contact_points = vm_.GetContactPoints();
   const auto& contact_cones = vm_.GetContactCones();
-  const auto& finger_settings = vm_.GetFingerSettings();
+  const auto& contact_settings = vm_.GetContactSettings();
 
   size_t nContacts = contact_points.size();
-  Eigen::MatrixXd V(nContacts * finger_settings.cone_res * 2, 3);
-  Eigen::MatrixXi VE(nContacts * finger_settings.cone_res * 3, 2);
+  Eigen::MatrixXd V(nContacts * contact_settings.cone_res * 2, 3);
+  Eigen::MatrixXi VE(nContacts * contact_settings.cone_res * 3, 2);
   Eigen::MatrixXd PL(nContacts, 3);
   std::vector<std::string> labels(nContacts);
   size_t tmp;
@@ -324,18 +328,18 @@ void MainUI::OnContactPointsInvalidated() {
   for (size_t i = 0; i < contact_points.size(); i++) {
     PL.row(i) = contact_points[i].position + contact_points[i].normal * 0.01;
     labels[i] = "C" + std::to_string(i);
-    for (size_t j = 0; j < finger_settings.cone_res; j++) {
-      const auto& cp = contact_cones[i * finger_settings.cone_res + j];
-      tmp = i * finger_settings.cone_res * 2 + j * 2;
-      tmp2 = i * finger_settings.cone_res * 2 +
-             ((j + 1) % finger_settings.cone_res) * 2;
+    for (size_t j = 0; j < contact_settings.cone_res; j++) {
+      const auto& cp = contact_cones[i * contact_settings.cone_res + j];
+      tmp = i * contact_settings.cone_res * 2 + j * 2;
+      tmp2 = i * contact_settings.cone_res * 2 +
+             ((j + 1) % contact_settings.cone_res) * 2;
       V.row(tmp) = cp.position + 0.02 * cp.normal;
       V.row(tmp + 1) = cp.position;  // + 0.02 * cp.normal;
-      VE.row(i * finger_settings.cone_res * 3 + j * 3) =
+      VE.row(i * contact_settings.cone_res * 3 + j * 3) =
           Eigen::RowVector2i(tmp, tmp + 1);
-      VE.row(i * finger_settings.cone_res * 3 + j * 3 + 1) =
+      VE.row(i * contact_settings.cone_res * 3 + j * 3 + 1) =
           Eigen::RowVector2i(tmp, tmp2);
-      VE.row(i * finger_settings.cone_res * 3 + j * 3 + 2) =
+      VE.row(i * contact_settings.cone_res * 3 + j * 3 + 2) =
           Eigen::RowVector2i(tmp + 1, tmp2 + 1);
     }
   }

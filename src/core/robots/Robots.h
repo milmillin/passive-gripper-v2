@@ -7,6 +7,7 @@
 #include "../Constants.h"
 
 namespace psg {
+namespace core {
 namespace robots {
 
 Eigen::Affine3d Forward(const Pose& jointConfig);
@@ -17,4 +18,5 @@ void ForwardIntermediate(const Pose& jointConfig,
                          std::vector<Eigen::Affine3d>& out_trans);
 
 }  // namespace robots
+}  // namespace core
 }  // namespace psg

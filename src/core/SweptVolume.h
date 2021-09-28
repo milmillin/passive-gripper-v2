@@ -5,6 +5,7 @@
 #include <vector>
 
 namespace psg {
+namespace core {
 
 // Compute Swept Volume of the box minus swept volume of mesh and floor
 // V, F        : Mesh
@@ -33,4 +34,5 @@ void SweptVolume(const Eigen::MatrixXd& V,
                  const double eps = 0.005,
                  const int num_seeds = 100);
 
-}
+}  // namespace core
+}  // namespace psg

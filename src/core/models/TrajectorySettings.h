@@ -1,8 +1,7 @@
 #pragma once
 
-#include "../Constants.h"
-
 namespace psg {
+namespace core {
 namespace models {
 
 struct TrajectorySettings {
@@ -10,4 +9,5 @@ struct TrajectorySettings {
 };
 
 }  // namespace models
+}  // namespace core
 }  // namespace psg

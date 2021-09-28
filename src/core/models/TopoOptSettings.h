@@ -1,8 +1,7 @@
 #pragma once
 
-#include "../Constants.h"
-
 namespace psg {
+namespace core {
 namespace models {
 
 struct TopoOptSettings {
@@ -18,4 +17,5 @@ struct TopoOptSettings {
 };
 
 }  // namespace models
+}  // namespace core
 }  // namespace psg

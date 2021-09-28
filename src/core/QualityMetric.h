@@ -3,10 +3,11 @@
 #include <Eigen/Core>
 #include <vector>
 
-#include "Constants.h"
+#include "../Constants.h"
 #include "models/ContactPoint.h"
 
 namespace psg {
+namespace core {
 
 using namespace models;
 
@@ -36,4 +37,5 @@ double ComputePartialMinWrenchQP(const std::vector<ContactPoint>& contactCones,
                                  const Eigen::Vector3d& extForce,
                                  const Eigen::Vector3d& extTorque);
 
+}  // namespace core
 }  // namespace psg

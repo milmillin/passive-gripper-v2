@@ -1,8 +1,7 @@
 #pragma once
 
-#include "../Constants.h"
-
 namespace psg {
+namespace core {
 namespace models {
 
 struct CostSettings {
@@ -12,4 +11,5 @@ struct CostSettings {
 };
 
 }  // namespace models
+}  // namespace core
 }  // namespace psg

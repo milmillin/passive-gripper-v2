@@ -4,10 +4,11 @@
 #include <Eigen/Geometry>
 #include <vector>
 
-#include "Constants.h"
+#include "../Constants.h"
 #include "models/ContactPoint.h"
 
 namespace psg {
+namespace core {
 
 using namespace models;
 
@@ -92,4 +93,5 @@ const Eigen::Matrix<int, 3, 2> axis_E = (Eigen::Matrix<int, 3, 2>() <<
   0, 3).finished();
 // clang-format on
 
+}  // namespace core
 }  // namespace psg

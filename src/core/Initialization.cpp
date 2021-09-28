@@ -4,6 +4,7 @@
 #include "robots/Robots.h"
 
 namespace psg {
+namespace core {
 
 // Distance from p to line ab
 static bool PointToLineDist(const Eigen::Vector3d& a,
@@ -228,4 +229,6 @@ Trajectory InitializeTrajectory(const std::vector<Eigen::MatrixXd>& fingers,
   }
   return result;
 }
+
+}  // namespace core
 }  // namespace psg

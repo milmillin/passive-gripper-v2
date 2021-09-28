@@ -1,10 +1,12 @@
 #pragma once
 
-#include "Constants.h"
-#include "models/Gripper.h"
+#include "../Constants.h"
+#include "models/GripperParams.h"
+#include "models/GripperSettings.h"
 #include "models/MeshDependentResource.h"
 
 namespace psg {
+namespace core {
 
 using namespace models;
 
@@ -12,6 +14,9 @@ double EvalAt(const Eigen::Vector3d& p,
               const CostSettings& settings,
               const MeshDependentResource& mdr);
 
-double ComputeCost(const Gripper& gripper, const MeshDependentResource& mdr);
+double ComputeCost(const GripperParams& params,
+                   const GripperSettings& settings,
+                   const MeshDependentResource& mdr);
 
+}  // namespace core
 }  // namespace psg

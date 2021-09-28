@@ -4,6 +4,7 @@
 #include "robots/Robots.h"
 
 namespace psg {
+namespace core {
 
 // See CHOMP paper page 4
 static double PotentialSDF(double s) {
@@ -26,15 +27,18 @@ double EvalAt(const Eigen::Vector3d& p,
   return PotentialSDF(std::min(s, sFloor));
 }
 
-double ComputeCost(const Gripper& gripper, const MeshDependentResource& mdr) {
-  static const size_t nTrajectorySteps = gripper.cost_settings.n_trajectory_steps;
-  static const size_t nFingerSteps = gripper.cost_settings.n_finger_steps;
+double ComputeCost(const GripperParams& params,
+                   const GripperSettings& settings,
+                   const MeshDependentResource& mdr) {
+  static const size_t nTrajectorySteps =
+      settings.cost.n_trajectory_steps;
+  static const size_t nFingerSteps = settings.cost.n_finger_steps;
   static const double trajectoryStep = 1. / nTrajectorySteps;
   static const double fingerStep = 1. / nFingerSteps;
 
-  const size_t nKeyframes = gripper.params.trajectory.size();
-  const size_t nFingers = gripper.params.fingers.size();
-  const size_t nFingerJoints = gripper.finger_settings.n_finger_joints;
+  const size_t nKeyframes = params.trajectory.size();
+  const size_t nFingers = params.fingers.size();
+  const size_t nFingerJoints = settings.finger.n_finger_joints;
   const size_t nEvalsPerFingerPerFrame = (nFingerJoints - 1) * nFingerSteps + 1;
 
   std::vector<std::vector<double>> lastEval(
@@ -47,18 +51,18 @@ double ComputeCost(const Gripper& gripper, const MeshDependentResource& mdr) {
       nFingers, std::vector<Eigen::Vector3d>(nEvalsPerFingerPerFrame));
 
   Eigen::Affine3d fingerTransInv =
-      robots::Forward(gripper.params.trajectory.front()).inverse();
+      robots::Forward(params.trajectory.front()).inverse();
 
   {
     Eigen::Affine3d curTrans =
-        robots::Forward(gripper.params.trajectory.front()) * fingerTransInv;
+        robots::Forward(params.trajectory.front()) * fingerTransInv;
     for (size_t i = 0; i < nFingers; i++) {
-      const Eigen::MatrixXd& finger = gripper.params.fingers[i];
+      const Eigen::MatrixXd& finger = params.fingers[i];
       Eigen::MatrixXd transformedFinger =
           (curTrans * finger.transpose().colwise().homogeneous()).transpose();
       lastFinger[i][0] = transformedFinger.row(0).transpose();
-      lastEval[i][0] =
-          EvalAt(transformedFinger.row(0).transpose(), gripper.cost_settings, mdr);
+      lastEval[i][0] = EvalAt(
+          transformedFinger.row(0).transpose(), settings.cost, mdr);
       for (size_t joint = 1; joint < nFingerJoints; joint++) {
         for (size_t kk = 1; kk <= nFingerSteps; kk++) {
           double fingerT = kk * fingerStep;
@@ -68,7 +72,7 @@ double ComputeCost(const Gripper& gripper, const MeshDependentResource& mdr) {
           lastFinger[i][(joint - 1) * nFingerSteps + kk] =
               lerpedFinger.transpose();
           lastEval[i][(joint - 1) * nFingerSteps + kk] =
-              EvalAt(lerpedFinger.transpose(), gripper.cost_settings, mdr);
+              EvalAt(lerpedFinger.transpose(), settings.cost, mdr);
         }
       }
     }
@@ -81,18 +85,18 @@ double ComputeCost(const Gripper& gripper, const MeshDependentResource& mdr) {
       double trajectoryT = j * trajectoryStep;
       for (size_t k = 0; k < kNumDOFs; k++) {
         t_lerpedKeyframe[k] =
-            gripper.params.trajectory[iKf - 1][k] * (1 - trajectoryT) +
-            gripper.params.trajectory[iKf][k] * trajectoryT;
+            params.trajectory[iKf - 1][k] * (1 - trajectoryT) +
+            params.trajectory[iKf][k] * trajectoryT;
       }
       Eigen::Affine3d curTrans =
           robots::Forward(t_lerpedKeyframe) * fingerTransInv;
       for (size_t i = 0; i < nFingers; i++) {
-        const Eigen::MatrixXd& finger = gripper.params.fingers[i];
+        const Eigen::MatrixXd& finger = params.fingers[i];
         Eigen::MatrixXd transformedFinger =
             (curTrans * finger.transpose().colwise().homogeneous()).transpose();
         curFinger[i][0] = transformedFinger.row(0).transpose();
-        curEval[i][0] =
-            EvalAt(transformedFinger.row(0).transpose(), gripper.cost_settings, mdr);
+        curEval[i][0] = EvalAt(
+            transformedFinger.row(0).transpose(), settings.cost, mdr);
 #pragma omp parallel for
         for (long long jj = 1; jj < nEvalsPerFingerPerFrame; jj++) {
           long long kk = (jj - 1) % nFingerSteps + 1;
@@ -103,7 +107,7 @@ double ComputeCost(const Gripper& gripper, const MeshDependentResource& mdr) {
               transformedFinger.row(joint) * fingerT;
           curFinger[i][jj] = lerpedFinger.transpose();
           curEval[i][jj] =
-              EvalAt(lerpedFinger.transpose(), gripper.cost_settings, mdr);
+              EvalAt(lerpedFinger.transpose(), settings.cost, mdr);
         }
         double curCost = 0.;
 #pragma omp parallel for reduction(+ : curCost)
@@ -127,4 +131,5 @@ double ComputeCost(const Gripper& gripper, const MeshDependentResource& mdr) {
   totalCost /= 6.;
   return totalCost;
 }
+}  // namespace core
 }  // namespace psg

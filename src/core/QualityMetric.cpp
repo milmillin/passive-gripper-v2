@@ -14,6 +14,7 @@ typedef CGAL::MP_Float ET;
 // #endif
 
 namespace psg {
+namespace core {
 static Eigen::MatrixXd CreateGraspMatrix(
     const std::vector<ContactPoint>& contactCones,
     const Eigen::Vector3d& centerOfMass) {
@@ -21,8 +22,8 @@ static Eigen::MatrixXd CreateGraspMatrix(
   Eigen::MatrixXd G(6, nContacts);
   for (size_t i = 0; i < nContacts; i++) {
     G.block<3, 1>(0, i) = -contactCones[i].normal;
-    G.block<3, 1>(3, i) =
-        (contactCones[i].position - centerOfMass).cross(-contactCones[i].normal);
+    G.block<3, 1>(3, i) = (contactCones[i].position - centerOfMass)
+                              .cross(-contactCones[i].normal);
   }
   return G;
 }
@@ -207,4 +208,5 @@ double ComputePartialMinWrenchQP(const std::vector<ContactPoint>& contactCones,
   return 0.0;
 }
 
+}  // namespace core
 }  // namespace psg

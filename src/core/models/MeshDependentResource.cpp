@@ -1,10 +1,12 @@
 #include "MeshDependentResource.h"
+
 #include <igl/per_edge_normals.h>
 #include <igl/per_face_normals.h>
 #include <igl/per_vertex_normals.h>
 #include <igl/signed_distance.h>
 
 namespace psg {
+namespace core {
 namespace models {
 void MeshDependentResource::init(const Eigen::MatrixXd& V_,
                                  const Eigen::MatrixXi& F_) {
@@ -45,4 +47,5 @@ size_t MeshDependentResource::ComputeClosestFacet(
   return fid;
 }
 }  // namespace models
+}  // namespace core
 }  // namespace psg
