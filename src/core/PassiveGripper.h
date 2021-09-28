@@ -4,24 +4,25 @@
 #include <functional>
 #include <vector>
 
-#include "../core/models/ContactPoint.h"
-#include "../core/models/GripperSettings.h"
-#include "../core/models/MeshDependentResource.h"
+#include "models/ContactPoint.h"
+#include "models/GripperSettings.h"
+#include "models/MeshDependentResource.h"
 
 namespace psg {
+namespace core {
 
 using namespace models;
 
 class PassiveGripper {
  public:
-  typedef std::function<void(Layers)> LayerInvalidatedDelegate;
+  enum class InvalidatedReason { kMesh, kContactPoints, kFingers, kTrajectory };
+  typedef std::function<void(InvalidatedReason)>
+      InvalidatedDelegate;
 
   PassiveGripper();
 
-  inline void RegisterLayerInvalidatedDelegate(
-      const LayerInvalidatedDelegate& d) {
-    LayerInvalidated_ = d;
-    ForceInvalidateAll();
+  inline void RegisterInvalidatedDelegate(const InvalidatedDelegate& d) {
+    Invalidated_ = d;
   }
 
   // Mesh
@@ -40,7 +41,7 @@ class PassiveGripper {
   void RemoveContactPoint(size_t index);
   void ClearContactPoint();
   inline const std::vector<ContactPoint>& GetContactPoints() const {
-    return gripper_.contact_points;
+    return params_.contact_points;
   }
   inline const std::vector<ContactPoint>& GetContactCones() const {
     return contact_cones_;
@@ -48,7 +49,7 @@ class PassiveGripper {
 
   // Fingers
   inline const std::vector<Eigen::MatrixXd>& GetFingers() const {
-    return gripper_.params.fingers;
+    return params_.fingers;
   }
 
   // Trajectory
@@ -56,9 +57,7 @@ class PassiveGripper {
   void EditKeyframe(size_t index, const Pose& pose);
   void RemoveKeyframe(size_t index);
   void ClearKeyframe();
-  inline const Trajectory& GetTrajectory() const {
-    return gripper_.params.trajectory;
-  }
+  inline const Trajectory& GetTrajectory() const { return params_.trajectory; }
 
   // Settings
   void SetContactSettings(const ContactSettings& settings);
@@ -68,23 +67,19 @@ class PassiveGripper {
   void SetTopoOptSettings(const TopoOptSettings& finger_settings);
   void SetCostSettings(const CostSettings& finger_settings);
   inline const ContactSettings& GetContactSettings() const {
-    return gripper_.contact_settings;
+    return settings_.contact;
   }
   inline const FingerSettings& GetFingerSettings() const {
-    return gripper_.finger_settings;
+    return settings_.finger;
   }
   inline const TrajectorySettings& GetTrajectorySettings() const {
-    return gripper_.trajectory_settings;
+    return settings_.trajectory;
   }
-  inline const OptSettings& GetOptSettings() const {
-    return gripper_.opt_settings;
-  }
+  inline const OptSettings& GetOptSettings() const { return settings_.opt; }
   inline const TopoOptSettings& GetTopoOptSettings() const {
-    return gripper_.topo_opt_settings;
+    return settings_.topo_opt;
   }
-  inline const CostSettings& GetCostSettings() const {
-    return gripper_.cost_settings;
-  }
+  inline const CostSettings& GetCostSettings() const { return settings_.cost; }
 
   // Quality Metric
   inline bool GetIsForceClosure() const { return is_force_closure_; }
@@ -101,9 +96,9 @@ class PassiveGripper {
   bool reinit_trajectory = true;
 
  private:
-  Gripper gripper_;
+  GripperParams params_;
+  GripperSettings settings_;
   MeshDependentResource mdr_;
-  LayerInvalidatedDelegate LayerInvalidated_;
   std::vector<ContactPoint> contact_cones_;
 
   bool mesh_loaded_ = false;
@@ -130,9 +125,11 @@ class PassiveGripper {
   bool quality_changed_ = false;
   bool cost_changed_ = false;
 
+  InvalidatedDelegate Invalidated_;
+
   void Invalidate();
   void ForceInvalidateAll();
-  void InvokeLayerInvalidated(Layers layer);
+  void InvokeInvalidated(InvalidatedReason reason);
 
   // To be called by Invalidate()
   void InvalidateMesh();
@@ -147,4 +144,5 @@ class PassiveGripper {
   void InvalidateCost();
 };
 
+}  // namespace core
 }  // namespace psg

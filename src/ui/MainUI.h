@@ -3,9 +3,10 @@
 #include <igl/opengl/glfw/imgui/ImGuiMenu.h>
 #include <igl/opengl/glfw/imgui/ImGuizmoPlugin.h>
 
-#include "ViewModel.h"
+#include "Layers.h"
 
 namespace psg {
+namespace ui {
 
 class MainUI : public igl::opengl::glfw::imgui::ImGuiMenu {
  public:
@@ -18,12 +19,11 @@ class MainUI : public igl::opengl::glfw::imgui::ImGuiMenu {
   // UI Menu
   void draw_viewer_window() override;
   void draw_viewer_menu() override;
+
  private:
-  inline igl::opengl::ViewerData& GetLayer(ViewModel::Layers layer) {
+  inline igl::opengl::ViewerData& GetLayer(Layers layer) {
     return viewer->data_list[(int)layer];
   }
-
-  ViewModel vm_;
 
   enum class Tools {
     kNone,
@@ -33,7 +33,6 @@ class MainUI : public igl::opengl::glfw::imgui::ImGuiMenu {
     kOptimization
   };
   Tools selected_tools_ = Tools::kNone;
-
 
   // Load Mesh Options
   bool is_millimeter_ = false;
@@ -50,18 +49,19 @@ class MainUI : public igl::opengl::glfw::imgui::ImGuiMenu {
   void DrawGuizmoOptionPanel();
 
   // Draw Component
-  void DrawLayerOptions(ViewModel::Layers layer, const char* id);
+  void DrawLayerOptions(Layers layer, const char* id);
   void DrawToolButton(const char* label, Tools thisTool, float width);
 
   // Button Callback
   void OnLoadMeshClicked();
 
   // Layer Invalidation
-  void OnLayerInvalidated(ViewModel::Layers layer);
+  void OnLayerInvalidated(Layers layer);
   void OnMeshInvalidated();
   void OnCenterOfMassInvalidated();
   void OnContactPointsInvalidated();
   void OnFingersInvalidated();
 };
 
+}  // namespace ui
 }  // namespace psg

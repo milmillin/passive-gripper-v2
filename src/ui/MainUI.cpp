@@ -2,10 +2,15 @@
 
 #include <igl/remove_duplicate_vertices.h>
 #include <igl/unproject_onto_mesh.h>
+
 #include "../core/GeometryUtils.h"
 #include "../core/robots/Robots.h"
+#include "../core/models/GripperSettings.h"
+
+using namespace psg::core;
 
 namespace psg {
+namespace ui {
 
 MainUI::MainUI() {}
 
@@ -13,11 +18,11 @@ void MainUI::init(igl::opengl::glfw::Viewer* viewer_) {
   using namespace std::placeholders;
   igl::opengl::glfw::imgui::ImGuiMenu::init(viewer_);
 
-  for (int i = 1; i < (int)ViewModel::Layers::kMax; i++) {
+  for (int i = 1; i < (int)Layers::kMax; i++) {
     viewer->data_list.emplace_back();
     viewer->data_list.back().id = i;
   }
-  viewer->next_data_id = (int)ViewModel::Layers::kMax;
+  viewer->next_data_id = (int)Layers::kMax;
 
   viewer->core().orthographic = true;
   viewer->core().is_animating = true;
@@ -25,7 +30,7 @@ void MainUI::init(igl::opengl::glfw::Viewer* viewer_) {
   vm_.RegisterLayerInvalidatedDelegate(
       std::bind(&MainUI::OnLayerInvalidated, this, _1));
 
-  auto& axisLayer = GetLayer(ViewModel::Layers::kAxis);
+  auto& axisLayer = GetLayer(Layers::kAxis);
   axisLayer.set_edges(axis_V * 0.1, axis_E, Eigen::Matrix3d::Identity());
   axisLayer.line_width = 2;
 }
@@ -46,7 +51,7 @@ bool MainUI::mouse_down(int button, int modifier) {
 
   if (modifier & IGL_MOD_CONTROL) {
     if (vm_.IsMeshLoaded() && selected_tools_ == Tools::kContactPoint) {
-      const auto& meshLayer = GetLayer(ViewModel::Layers::kMesh);
+      const auto& meshLayer = GetLayer(Layers::kMesh);
       const auto& V = meshLayer.V;
       const auto& F = meshLayer.F;
       const auto& N = meshLayer.F_normals;
@@ -204,7 +209,7 @@ void MainUI::DrawViewPanel() {}
 
 void MainUI::DrawGuizmoOptionPanel() {}
 
-void MainUI::DrawLayerOptions(ViewModel::Layers layer, const char* id) {}
+void MainUI::DrawLayerOptions(Layers layer, const char* id) {}
 
 void MainUI::DrawToolButton(const char* label, Tools thisTool, float width) {
   bool disabled = thisTool == selected_tools_;
@@ -274,18 +279,18 @@ void MainUI::OnLoadMeshClicked() {
   vm_.SetMesh(SV, SF);
 }
 
-void MainUI::OnLayerInvalidated(ViewModel::Layers layer) {
+void MainUI::OnLayerInvalidated(Layers layer) {
   switch (layer) {
-    case ViewModel::Layers::kMesh:
+    case Layers::kMesh:
       OnMeshInvalidated();
       break;
-    case ViewModel::Layers::kCenterOfMass:
+    case Layers::kCenterOfMass:
       OnCenterOfMassInvalidated();
       break;
-    case ViewModel::Layers::kContactPoints:
+    case Layers::kContactPoints:
       OnContactPointsInvalidated();
       break;
-    case ViewModel::Layers::kFingers:
+    case Layers::kFingers:
       OnFingersInvalidated();
       break;
   }
@@ -295,7 +300,7 @@ void MainUI::OnMeshInvalidated() {
   Eigen::MatrixXd V;
   Eigen::MatrixXi F;
   vm_.GetMesh(V, F);
-  auto& meshLayer = GetLayer(ViewModel::Layers::kMesh);
+  auto& meshLayer = GetLayer(Layers::kMesh);
   meshLayer.clear();
   meshLayer.set_mesh(V, F);
   meshLayer.uniform_colors((colors::kGold * 0.3).transpose(),
@@ -304,14 +309,14 @@ void MainUI::OnMeshInvalidated() {
 }
 
 void MainUI::OnCenterOfMassInvalidated() {
-  auto& comLayer = GetLayer(ViewModel::Layers::kCenterOfMass);
+  auto& comLayer = GetLayer(Layers::kCenterOfMass);
   comLayer.clear();
   comLayer.set_points(vm_.GetCenterOfMass().transpose(),
                       Eigen::RowVector3d(0.7, 0.2, 0));
 }
 
 void MainUI::OnContactPointsInvalidated() {
-  auto& cpLayer = GetLayer(ViewModel::Layers::kContactPoints);
+  auto& cpLayer = GetLayer(Layers::kContactPoints);
   cpLayer.clear();
 
   const auto& contact_points = vm_.GetContactPoints();
@@ -351,7 +356,7 @@ void MainUI::OnContactPointsInvalidated() {
 }
 
 void MainUI::OnFingersInvalidated() {
-  auto& fingerLayer = GetLayer(ViewModel::Layers::kFingers);
+  auto& fingerLayer = GetLayer(Layers::kFingers);
 
   const auto& fingers = vm_.GetFingers();
   const auto& finger_settings = vm_.GetFingerSettings();
@@ -387,4 +392,5 @@ void MainUI::OnFingersInvalidated() {
   fingerLayer.point_size = 9;
 }
 
+}  // namespace ui
 }  // namespace psg
