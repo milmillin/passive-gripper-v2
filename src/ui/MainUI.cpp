@@ -18,19 +18,19 @@ void MainUI::init(igl::opengl::glfw::Viewer* viewer_) {
   using namespace std::placeholders;
   igl::opengl::glfw::imgui::ImGuiMenu::init(viewer_);
 
-  for (int i = 1; i < (int)Layers::kMax; i++) {
+  for (int i = 1; i < (int)Layer::kMax; i++) {
     viewer->data_list.emplace_back();
     viewer->data_list.back().id = i;
   }
-  viewer->next_data_id = (int)Layers::kMax;
+  viewer->next_data_id = (int)Layer::kMax;
 
   viewer->core().orthographic = true;
   viewer->core().is_animating = true;
 
-  vm_.RegisterLayerInvalidatedDelegate(
+  vm_.RegisterInvalidatedDelegate(
       std::bind(&MainUI::OnLayerInvalidated, this, _1));
 
-  auto& axisLayer = GetLayer(Layers::kAxis);
+  auto& axisLayer = GetLayer(Layer::kAxis);
   axisLayer.set_edges(axis_V * 0.1, axis_E, Eigen::Matrix3d::Identity());
   axisLayer.line_width = 2;
 }
@@ -50,8 +50,8 @@ bool MainUI::mouse_down(int button, int modifier) {
   double y = viewer->core().viewport(3) - viewer->current_mouse_y;
 
   if (modifier & IGL_MOD_CONTROL) {
-    if (vm_.IsMeshLoaded() && selected_tools_ == Tools::kContactPoint) {
-      const auto& meshLayer = GetLayer(Layers::kMesh);
+    if (vm_.PSG().IsMeshLoaded() && selected_tools_ == Tools::kContactPoint) {
+      const auto& meshLayer = GetLayer(Layer::kMesh);
       const auto& V = meshLayer.V;
       const auto& F = meshLayer.F;
       const auto& N = meshLayer.F_normals;
@@ -69,7 +69,7 @@ bool MainUI::mouse_down(int button, int modifier) {
         Eigen::Vector3d a = V.row(F(fid, 0));
         Eigen::Vector3d b = V.row(F(fid, 1));
         Eigen::Vector3d c = V.row(F(fid, 2));
-        vm_.AddContactPoint(
+        vm_.PSG().AddContactPoint(
             ContactPoint{bc(0) * a + bc(1) * b + bc(2) * c, N.row(fid), fid});
         return true;
       }
@@ -108,7 +108,7 @@ void MainUI::draw_viewer_menu() {
   ImGui::Checkbox("Millimeter", &is_millimeter_);
   ImGui::Checkbox("Swap YZ", &is_swap_yz_);
   ImGui::Separator();
-  if (vm_.IsMeshLoaded()) {
+  if (vm_.PSG().IsMeshLoaded()) {
     DrawMetricPanel();
     DrawToolPanel();
     switch (selected_tools_) {
@@ -139,12 +139,12 @@ void MainUI::DrawMetricPanel() {
   static const char* kFalseTrue[2] = {"False", "True"};
   if (ImGui::CollapsingHeader("Metric", ImGuiTreeNodeFlags_DefaultOpen)) {
     ImGui::PushID("Metric");
-    ImGui::Text("Force Closure: %s", kFalseTrue[vm_.GetIsForceClosure()]);
+    ImGui::Text("Force Closure: %s", kFalseTrue[vm_.PSG().GetIsForceClosure()]);
     ImGui::Text("Partial Force Closure: %s",
-                kFalseTrue[vm_.GetIsPartialClosure()]);
-    ImGui::Text("Min Wrench: %.4e", vm_.GetMinWrench());
-    ImGui::Text("Partial Min Wrench: %.4e", vm_.GetPartialMinWrench());
-    ImGui::Text("Cost: %.4e", vm_.GetCost());
+                kFalseTrue[vm_.PSG().GetIsPartialClosure()]);
+    ImGui::Text("Min Wrench: %.4e", vm_.PSG().GetMinWrench());
+    ImGui::Text("Partial Min Wrench: %.4e", vm_.PSG().GetPartialMinWrench());
+    ImGui::Text("Cost: %.4e", vm_.PSG().GetCost());
     ImGui::PopID();
   }
 }
@@ -166,8 +166,8 @@ void MainUI::DrawContactPointPanel() {
   static char buf_[32];
   float w = ImGui::GetContentRegionAvailWidth();
   if (ImGui::CollapsingHeader("Options", ImGuiTreeNodeFlags_DefaultOpen)) {
-    FingerSettings finger_settings = vm_.GetFingerSettings();
-    ContactSettings contact_settings = vm_.GetContactSettings();
+    FingerSettings finger_settings = vm_.PSG().GetFingerSettings();
+    ContactSettings contact_settings = vm_.PSG().GetContactSettings();
     bool contact_update = false;
     bool finger_update = false;
     contact_update |= ImGui::InputDouble(
@@ -176,13 +176,13 @@ void MainUI::DrawContactPointPanel() {
         ImGui::InputInt("Cone Resolution", (int*)&contact_settings.cone_res);
     finger_update |= ImGui::InputInt("Finger Joints",
                                      (int*)&finger_settings.n_finger_joints);
-    if (finger_update) vm_.SetFingerSettings(finger_settings);
-    if (contact_update) vm_.SetContactSettings(contact_settings);
+    if (finger_update) vm_.PSG().SetFingerSettings(finger_settings);
+    if (contact_update) vm_.PSG().SetContactSettings(contact_settings);
   }
   if (ImGui::CollapsingHeader("Contact Points",
                               ImGuiTreeNodeFlags_DefaultOpen)) {
     size_t to_delete = -1;
-    const auto& contact_points = vm_.GetContactPoints();
+    const auto& contact_points = vm_.PSG().GetContactPoints();
     for (size_t i = 0; i < contact_points.size(); i++) {
       snprintf(buf_, sizeof(buf_), "Delete C%llu", i);
       if (ImGui::Button(buf_, ImVec2(w, 0))) {
@@ -190,11 +190,11 @@ void MainUI::DrawContactPointPanel() {
       }
     }
     if (to_delete != -1) {
-      vm_.RemoveContactPoint(to_delete);
+      vm_.PSG().RemoveContactPoint(to_delete);
     }
     ImGui::Separator();
     if (ImGui::Button("Delete All Contact Points", ImVec2(w, 0))) {
-      vm_.ClearContactPoint();
+      vm_.PSG().ClearContactPoint();
     }
   }
 }
@@ -209,7 +209,7 @@ void MainUI::DrawViewPanel() {}
 
 void MainUI::DrawGuizmoOptionPanel() {}
 
-void MainUI::DrawLayerOptions(Layers layer, const char* id) {}
+void MainUI::DrawLayerOptions(Layer layer, const char* id) {}
 
 void MainUI::DrawToolButton(const char* label, Tools thisTool, float width) {
   bool disabled = thisTool == selected_tools_;
@@ -276,21 +276,22 @@ void MainUI::OnLoadMeshClicked() {
     SF.col(1).swap(SF.col(2));
   }
 
-  vm_.SetMesh(SV, SF);
+  vm_.PSG().SetMesh(SV, SF);
+  // TODO:
 }
 
-void MainUI::OnLayerInvalidated(Layers layer) {
+void MainUI::OnLayerInvalidated(Layer layer) {
   switch (layer) {
-    case Layers::kMesh:
+    case Layer::kMesh:
       OnMeshInvalidated();
       break;
-    case Layers::kCenterOfMass:
+    case Layer::kCenterOfMass:
       OnCenterOfMassInvalidated();
       break;
-    case Layers::kContactPoints:
+    case Layer::kContactPoints:
       OnContactPointsInvalidated();
       break;
-    case Layers::kFingers:
+    case Layer::kFingers:
       OnFingersInvalidated();
       break;
   }
@@ -299,8 +300,8 @@ void MainUI::OnLayerInvalidated(Layers layer) {
 void MainUI::OnMeshInvalidated() {
   Eigen::MatrixXd V;
   Eigen::MatrixXi F;
-  vm_.GetMesh(V, F);
-  auto& meshLayer = GetLayer(Layers::kMesh);
+  vm_.PSG().GetMesh(V, F);
+  auto& meshLayer = GetLayer(Layer::kMesh);
   meshLayer.clear();
   meshLayer.set_mesh(V, F);
   meshLayer.uniform_colors((colors::kGold * 0.3).transpose(),
@@ -309,19 +310,19 @@ void MainUI::OnMeshInvalidated() {
 }
 
 void MainUI::OnCenterOfMassInvalidated() {
-  auto& comLayer = GetLayer(Layers::kCenterOfMass);
+  auto& comLayer = GetLayer(Layer::kCenterOfMass);
   comLayer.clear();
-  comLayer.set_points(vm_.GetCenterOfMass().transpose(),
+  comLayer.set_points(vm_.PSG().GetCenterOfMass().transpose(),
                       Eigen::RowVector3d(0.7, 0.2, 0));
 }
 
 void MainUI::OnContactPointsInvalidated() {
-  auto& cpLayer = GetLayer(Layers::kContactPoints);
+  auto& cpLayer = GetLayer(Layer::kContactPoints);
   cpLayer.clear();
 
-  const auto& contact_points = vm_.GetContactPoints();
-  const auto& contact_cones = vm_.GetContactCones();
-  const auto& contact_settings = vm_.GetContactSettings();
+  const auto& contact_points = vm_.PSG().GetContactPoints();
+  const auto& contact_cones = vm_.PSG().GetContactCones();
+  const auto& contact_settings = vm_.PSG().GetContactSettings();
 
   size_t nContacts = contact_points.size();
   Eigen::MatrixXd V(nContacts * contact_settings.cone_res * 2, 3);
@@ -356,11 +357,11 @@ void MainUI::OnContactPointsInvalidated() {
 }
 
 void MainUI::OnFingersInvalidated() {
-  auto& fingerLayer = GetLayer(Layers::kFingers);
+  auto& fingerLayer = GetLayer(Layer::kFingers);
 
-  const auto& fingers = vm_.GetFingers();
-  const auto& finger_settings = vm_.GetFingerSettings();
-  const Pose& first = vm_.GetTrajectory().front();
+  const auto& fingers = vm_.PSG().GetFingers();
+  const auto& finger_settings = vm_.PSG().GetFingerSettings();
+  const Pose& first = vm_.PSG().GetTrajectory().front();
   const Pose& current_pose = vm_.GetCurrentPose();
 
   Eigen::Affine3d finger_trans_inv = robots::Forward(first).inverse();

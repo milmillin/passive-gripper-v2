@@ -4,6 +4,7 @@
 #include "ikfast.h"
 
 namespace psg {
+namespace core {
 namespace robots {
 // Change axis
 static const Eigen::Affine3d globalTrans =
@@ -111,4 +112,5 @@ void robots::ForwardIntermediate(const Pose& jointConfig,
 }
 
 }  // namespace robots
+}  // namespace core
 }  // namespace psg

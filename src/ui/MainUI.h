@@ -3,7 +3,8 @@
 #include <igl/opengl/glfw/imgui/ImGuiMenu.h>
 #include <igl/opengl/glfw/imgui/ImGuizmoPlugin.h>
 
-#include "Layers.h"
+#include "Layer.h"
+#include "ViewModel.h"
 
 namespace psg {
 namespace ui {
@@ -21,9 +22,11 @@ class MainUI : public igl::opengl::glfw::imgui::ImGuiMenu {
   void draw_viewer_menu() override;
 
  private:
-  inline igl::opengl::ViewerData& GetLayer(Layers layer) {
+  inline igl::opengl::ViewerData& GetLayer(Layer layer) {
     return viewer->data_list[(int)layer];
   }
+
+  ViewModel vm_;
 
   enum class Tools {
     kNone,
@@ -49,14 +52,14 @@ class MainUI : public igl::opengl::glfw::imgui::ImGuiMenu {
   void DrawGuizmoOptionPanel();
 
   // Draw Component
-  void DrawLayerOptions(Layers layer, const char* id);
+  void DrawLayerOptions(Layer layer, const char* id);
   void DrawToolButton(const char* label, Tools thisTool, float width);
 
   // Button Callback
   void OnLoadMeshClicked();
 
   // Layer Invalidation
-  void OnLayerInvalidated(Layers layer);
+  void OnLayerInvalidated(Layer layer);
   void OnMeshInvalidated();
   void OnCenterOfMassInvalidated();
   void OnContactPointsInvalidated();

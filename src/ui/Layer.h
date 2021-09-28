@@ -3,7 +3,7 @@
 namespace psg {
 namespace ui {
 
-enum class Layers : int {
+enum class Layer : int {
   kMesh = 0,
   kCenterOfMass,
   kContactPoints,

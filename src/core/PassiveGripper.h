@@ -7,6 +7,7 @@
 #include "models/ContactPoint.h"
 #include "models/GripperSettings.h"
 #include "models/MeshDependentResource.h"
+#include "models/GripperParams.h"
 
 namespace psg {
 namespace core {
@@ -90,9 +91,6 @@ class PassiveGripper {
   // Cost
   inline double GetCost() const { return cost_; }
 
-  // Robot Pose
-  inline const Pose& GetCurrentPose() const { return current_pose_; }
-
   bool reinit_trajectory = true;
 
  private:
@@ -108,8 +106,6 @@ class PassiveGripper {
   double min_wrench_;
   double partial_min_wrench_;
   double cost_;
-
-  Pose current_pose_ = kInitPose;
 
   // state dependency
   bool mesh_changed_ = false;

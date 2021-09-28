@@ -4,7 +4,7 @@
 #include <Eigen/Geometry>
 #include <vector>
 
-#include "../Constants.h"
+#include "../../Constants.h"
 
 namespace psg {
 namespace core {
