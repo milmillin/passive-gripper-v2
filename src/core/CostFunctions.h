@@ -9,7 +9,7 @@ namespace psg {
 using namespace models;
 
 double EvalAt(const Eigen::Vector3d& p,
-              const Settings& settings,
+              const CostSettings& settings,
               const MeshDependentResource& mdr);
 
 double ComputeCost(const Gripper& gripper, const MeshDependentResource& mdr);

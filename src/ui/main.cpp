@@ -1,6 +1,12 @@
-#include <iostream>
+
+#include <igl/opengl/glfw/Viewer.h>
+
+#include "MainUI.h"
 
 int main(int argv, char** argc) {
-  std::cout << "Hello, world!" << std::endl;
+  psg::MainUI ui;
+  igl::opengl::glfw::Viewer viewer;
+  viewer.plugins.push_back(&ui);
+  viewer.launch();
   return 0;
 }

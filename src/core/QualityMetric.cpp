@@ -106,7 +106,9 @@ static CGAL::Quotient<ET> WrenchInPositiveSpan(
 bool CheckForceClosureQP(const std::vector<ContactPoint>& contactCones,
                          const Eigen::Vector3d& centerOfMass) {
   Eigen::MatrixXd G = CreateGraspMatrix(contactCones, centerOfMass);
-  return MinNormVectorInFacet(G) < kWrenchNormThresh;
+  auto res = MinNormVectorInFacet(G);
+  std::cout << res << std::endl;
+  return res < kWrenchNormThresh;
 }
 
 bool CheckPartialClosureQP(const std::vector<ContactPoint>& contactCones,

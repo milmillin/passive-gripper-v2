@@ -17,6 +17,7 @@ ViewModel::ViewModel() {
 void ViewModel::SetMesh(const Eigen::MatrixXd& V, const Eigen::MatrixXi& F) {
   mdr_.init(V, F);
   mesh_changed_ = true;
+  mesh_loaded_ = true;
   Invalidate();
 }
 
@@ -32,10 +33,12 @@ void ViewModel::AddContactPoint(const ContactPoint& contact_point) {
       InitializeFinger(contact_point,
                        mdr_,
                        effector_pos.translation(),
-                       gripper_.settings.n_finger_joints);
+                       gripper_.finger_settings.n_finger_joints);
   gripper_.params.fingers.push_back(finger);
-  std::vector<ContactPoint>&& cone = GenerateContactCone(
-      contact_point, gripper_.settings.cone_res, gripper_.settings.friction);
+  std::vector<ContactPoint>&& cone =
+      GenerateContactCone(contact_point,
+                          gripper_.finger_settings.cone_res,
+                          gripper_.finger_settings.friction);
   contact_cones_.insert(contact_cones_.end(), cone.begin(), cone.end());
 
   contact_changed_ = true;
@@ -46,9 +49,10 @@ void ViewModel::RemoveContactPoint(size_t index) {
   gripper_.contact_points.erase(gripper_.contact_points.begin() + index);
   gripper_.params.fingers.erase(gripper_.params.fingers.begin() + index);
   contact_cones_.erase(
-      contact_cones_.begin() + (index * gripper_.settings.cone_res),
-      contact_cones_.begin() + ((index + 1) * gripper_.settings.cone_res));
-  contact_changed_= true;
+      contact_cones_.begin() + (index * gripper_.finger_settings.cone_res),
+      contact_cones_.begin() +
+          ((index + 1) * gripper_.finger_settings.cone_res));
+  contact_changed_ = true;
   Invalidate();
 }
 
@@ -85,10 +89,33 @@ void ViewModel::ClearKeyframe() {
   Invalidate();
 }
 
-// Settings
-void ViewModel::SetSettings(const Settings& settings) {
-  gripper_.settings = settings;
-  settings_changed_ = true;
+void ViewModel::SetFingerSettings(const FingerSettings& settings) {
+  gripper_.finger_settings = settings;
+  finger_settings_changed_ = true;
+  Invalidate();
+}
+
+void ViewModel::SetTrajectorySettings(const TrajectorySettings& settings) {
+  gripper_.trajectory_settings = settings;
+  trajectory_settings_changed_ = true;
+  Invalidate();
+}
+
+void ViewModel::SetOptSettings(const OptSettings& settings) {
+  gripper_.opt_settings = settings;
+  opt_settings_changed_ = true;
+  Invalidate();
+}
+
+void ViewModel::SetTopoOptSettings(const TopoOptSettings& settings) {
+  gripper_.topo_opt_settings = settings;
+  topo_opt_settings_changed_ = true;
+  Invalidate();
+}
+
+void ViewModel::SetCostSettings(const CostSettings& settings) {
+  gripper_.cost_settings = settings;
+  cost_settings_changed_ = true;
   Invalidate();
 }
 
@@ -98,14 +125,16 @@ void ViewModel::SetSettings(const Settings& settings) {
 // [] -> [Settings]
 // [Mesh] -> [Contact]
 // [Contact] -> [Quality]
-// [Contact, Settings] -> [Finger]
-// [Finger] -> [Trajectory]
-// [Finger, Trajectory] -> [Cost]
+// [Contact, FingerSettings] -> [Finger]
+// [Finger, TrajectorySettings] -> [Trajectory]
+// [Finger, Trajectory, CostSettings] -> [Cost]
 
 void ViewModel::Invalidate() {
   if (mesh_changed_) InvalidateMesh();
   if (contact_changed_) InvalidateContact();
-  if (settings_changed_) InvalidateSettings();
+  if (finger_settings_changed_) InvalidateFingerSettings();
+  if (trajectory_settings_changed_) InvalidateTrajectorySettings();
+  if (cost_settings_changed_) InvalidateCostSettings();
   if (finger_changed_) InvalidateFinger();
   if (trajectory_changed_) InvalidateTrajectory();
   if (quality_changed_) InvalidateQuality();
@@ -114,7 +143,9 @@ void ViewModel::Invalidate() {
 
 void ViewModel::ForceInvalidateAll() {
   mesh_changed_ = true;
-  settings_changed_ = true;
+  finger_settings_changed_ = true;
+  trajectory_settings_changed_ = true;
+  cost_settings_changed_ = true;
   Invalidate();
 }
 
@@ -127,11 +158,12 @@ void ViewModel::InvalidateMesh() {
   gripper_.contact_points.clear();
   gripper_.params.fingers.clear();
   InvokeLayerInvalidated(Layers::kMesh);
+  InvokeLayerInvalidated(Layers::kCenterOfMass);
   contact_changed_ = true;
 }
 
-void ViewModel::InvalidateSettings() {
-  settings_changed_ = false;
+void ViewModel::InvalidateFingerSettings() {
+  finger_settings_changed_ = false;
   // Re-initialize finger
   Eigen::Affine3d effector_pos =
       robots::Forward(gripper_.params.trajectory.front());
@@ -140,10 +172,22 @@ void ViewModel::InvalidateSettings() {
         InitializeFinger(gripper_.contact_points[i],
                          mdr_,
                          effector_pos.translation(),
-                         gripper_.settings.n_finger_joints);
+                         gripper_.finger_settings.n_finger_joints);
     gripper_.params.fingers[i] = finger;
   }
   finger_changed_ = true;
+}
+
+void ViewModel::InvalidateTrajectorySettings() {
+  trajectory_settings_changed_ = false;
+  if (reinit_trajectory) {
+    trajectory_changed_ = true;
+  }
+}
+
+void ViewModel::InvalidateCostSettings() {
+  cost_settings_changed_ = false;
+  cost_changed_ = true;
 }
 
 void ViewModel::InvalidateContact() {
@@ -157,10 +201,6 @@ void ViewModel::InvalidateFinger() {
   finger_changed_ = false;
   InvokeLayerInvalidated(Layers::kFingers);
   if (reinit_trajectory) {
-    // Re-initialize trajectory
-    InitializeTrajectory(gripper_.params.fingers,
-                         gripper_.params.trajectory.front(),
-                         gripper_.settings.n_keyframes);
     trajectory_changed_ = true;
   }
   cost_changed_ = true;
@@ -168,6 +208,13 @@ void ViewModel::InvalidateFinger() {
 
 void ViewModel::InvalidateTrajectory() {
   trajectory_changed_ = false;
+  if (reinit_trajectory) {
+    // Re-initialize trajectory
+    gripper_.params.trajectory =
+        InitializeTrajectory(gripper_.params.fingers,
+                             gripper_.params.trajectory.front(),
+                             gripper_.trajectory_settings.n_keyframes);
+  }
   InvokeLayerInvalidated(Layers::kTrajectory);
   cost_changed_ = true;
 }
@@ -180,10 +227,10 @@ void ViewModel::InvalidateQuality() {
                                               -Eigen::Vector3d::UnitY(),
                                               Eigen::Vector3d::Zero());
   min_wrench_ = ComputeMinWrenchQP(contact_cones_, mdr_.center_of_mass);
-  min_wrench_ = ComputePartialMinWrenchQP(contact_cones_,
-                                          mdr_.center_of_mass,
-                                          -Eigen::Vector3d::UnitY(),
-                                          Eigen::Vector3d::Zero());
+  partial_min_wrench_ = ComputePartialMinWrenchQP(contact_cones_,
+                                                  mdr_.center_of_mass,
+                                                  -Eigen::Vector3d::UnitY(),
+                                                  Eigen::Vector3d::Zero());
 }
 
 void ViewModel::InvalidateCost() {

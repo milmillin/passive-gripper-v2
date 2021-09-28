@@ -111,7 +111,7 @@ std::vector<ContactPoint> GenerateContactCone(const ContactPoint& contactPoint,
   double curStep;
   const auto& cp = contactPoint;
   GetPerp(cp.normal, B, T);
-  double coeff = std::max(cp.normal.dot(Eigen::Vector3d::UnitY()), 1e-3);
+  double coeff = std::max(-cp.normal.dot(Eigen::Vector3d::UnitY()), 1e-3);
   B *= friction * coeff;
   T *= friction * coeff;
   for (size_t j = 0; j < coneRes; j++) {
