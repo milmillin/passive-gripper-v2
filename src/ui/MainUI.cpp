@@ -245,11 +245,34 @@ void MainUI::DrawRobotPanel() {
 
 void MainUI::DrawOptimizationPanel() {}
 
-void MainUI::DrawViewPanel() {}
+void MainUI::DrawViewPanel() {
+  if (ImGui::CollapsingHeader("View", ImGuiTreeNodeFlags_None)) {
+    ImGui::PushID("View");
+    DrawLayerOptions(Layer::kMesh, "Mesh");
+    DrawLayerOptions(Layer::kContactPoints, "Contact Points");
+    DrawLayerOptions(Layer::kRobot, "Robot");
+    DrawLayerOptions(Layer::kCenterOfMass, "Center Of Mass");
+    DrawLayerOptions(Layer::kAxis, "Axis");
+    DrawLayerOptions(Layer::kFingers, "Fingers");
+    DrawLayerOptions(Layer::kTrajectory, "Trajectory");
+    ImGui::PopID();
+  }
+}
 
 void MainUI::DrawGuizmoOptionPanel() {}
 
-void MainUI::DrawLayerOptions(Layer layer, const char* id) {}
+void MainUI::DrawLayerOptions(Layer layer, const char* id) {
+  auto& data = GetLayer(layer);
+  ImGui::PushID(id);
+  ImGui::Checkbox("##V", (bool*)&data.is_visible);
+  ImGui::SameLine();
+  ImGui::Checkbox("##L", (bool*)&data.show_lines);
+  ImGui::SameLine();
+  ImGui::Checkbox("##F", (bool*)&data.show_faces);
+  ImGui::SameLine();
+  ImGui::Text(id);
+  ImGui::PopID();
+}
 
 void MainUI::DrawToolButton(const char* label, Tools thisTool, float width) {
   bool disabled = thisTool == selected_tools_;
@@ -316,8 +339,13 @@ void MainUI::OnLoadMeshClicked() {
     SF.col(1).swap(SF.col(2));
   }
 
-  vm_.PSG().SetMesh(SV, SF);
-  // TODO:
+  vm_.SetMesh(SV, SF);
+  OnAlignCameraCenter();
+}
+
+void MainUI::OnAlignCameraCenter() {
+  const auto& mesh = GetLayer(Layer::kMesh);
+  viewer->core().align_camera_center(mesh.V);
 }
 
 void MainUI::OnLayerInvalidated(Layer layer) {

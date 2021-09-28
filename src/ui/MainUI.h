@@ -57,6 +57,7 @@ class MainUI : public igl::opengl::glfw::imgui::ImGuiMenu {
 
   // Button Callback
   void OnLoadMeshClicked();
+  void OnAlignCameraCenter();
 
   // Layer Invalidation
   void OnLayerInvalidated(Layer layer);

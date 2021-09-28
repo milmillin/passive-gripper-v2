@@ -24,6 +24,7 @@ class ViewModel {
 
   inline PassiveGripper& PSG() { return psg_; }
 
+  void SetMesh(const Eigen::MatrixXd& V, const Eigen::MatrixXi& F);
   void SetCurrentPose(const Pose& pose);
   void SetCurrentPose(const Eigen::Affine3d& trans);
   void SetCurrentPose(const Eigen::Vector3d& pos, const Eigen::Vector3d& ang);

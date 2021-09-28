@@ -1,7 +1,7 @@
 #include "ViewModel.h"
 
-#include "../core/robots/Robots.h"
 #include "../core/GeometryUtils.h"
+#include "../core/robots/Robots.h"
 
 namespace psg {
 namespace ui {
@@ -12,6 +12,24 @@ ViewModel::ViewModel() {
       std::bind(&ViewModel::OnPsgInvalidated, this, _1));
 
   SetCurrentPose(kInitPose);
+}
+
+void ViewModel::SetMesh(const Eigen::MatrixXd& V, const Eigen::MatrixXi& F) {
+  Eigen::Vector3d minimum = V.colwise().minCoeff();
+  Eigen::Vector3d maximum = V.colwise().maxCoeff();
+
+  Eigen::Vector3d translate(
+      -minimum.x() / 2. - maximum.x() / 2., -minimum.y(), 0.07 - minimum.z());
+
+  Eigen::MatrixXd SV = V.rowwise() + translate.transpose();
+
+  Eigen::Affine3d trans = robots::Forward(current_pose_);
+  SV = (trans * (SV.transpose().colwise().homogeneous())).transpose();
+
+  double min_y = SV.colwise().minCoeff().y();
+  SV.col(1).array() -= min_y;
+
+  psg_.SetMesh(SV, F);
 }
 
 void ViewModel::SetCurrentPose(const Pose& pose) {
@@ -62,7 +80,7 @@ void ViewModel::ComputeIK() {
     current_pose_ = ik_sols_[best];
     ik_sols_index_ = best;
   } else {
-    ik_sols_index_ = -1;  
+    ik_sols_index_ = -1;
   }
 }
 
