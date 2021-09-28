@@ -64,6 +64,7 @@ class MainUI : public igl::opengl::glfw::imgui::ImGuiMenu {
   void OnCenterOfMassInvalidated();
   void OnContactPointsInvalidated();
   void OnFingersInvalidated();
+  void OnRobotInvalidated();
 };
 
 }  // namespace ui

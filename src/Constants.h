@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Eigen/Core>
+#include <Eigen/Geometry>
 #include <array>
 #include <vector>
 
@@ -16,6 +17,25 @@ constexpr size_t kNumDOFs = 6;
 const double kRobotA[] = {0, -0.425, -0.39225, 0, 0, 0};
 const double kRobotD[] = {0.089159, 0, 0, 0.10915, 0.09465, 0.0823};
 const double kRobotAlpha[] = {kHalfPi, 0, 0, kHalfPi, -kHalfPi, 0};
+
+const double kArmRadius = 0.0465;
+const Eigen::Affine3d kLocalTrans[6] = {
+    Eigen::Translation3d(-kArmRadius, -0.0892, -kArmRadius) *
+        Eigen::Scaling(2 * kArmRadius, kArmRadius + 0.0892, 2 * kArmRadius),
+    Eigen::Translation3d(-kArmRadius, -kArmRadius, kArmRadius) *
+        Eigen::Scaling(2 * kArmRadius + 0.425, 2 * kArmRadius, 2 * kArmRadius),
+    Eigen::Translation3d(-kArmRadius, -kArmRadius, 0.02 - kArmRadius) *
+        Eigen::Scaling(2 * kArmRadius + 0.39225,
+                       2 * kArmRadius,
+                       2 * kArmRadius),
+    Eigen::Translation3d(-kArmRadius, -kArmRadius, -kArmRadius) *
+        Eigen::Scaling(2 * kArmRadius, 2 * kArmRadius, 0.09465),
+    Eigen::Translation3d(-kArmRadius, -kArmRadius, -kArmRadius) *
+        Eigen::Scaling(2 * kArmRadius,
+                       2 * kArmRadius,
+                       kArmRadius + 0.0825 - 0.01),
+    Eigen::Translation3d(-kArmRadius, -kArmRadius, -0.01) *
+        Eigen::Scaling(2 * kArmRadius, 2 * kArmRadius, 0.01)};
 
 typedef std::array<double, kNumDOFs> Pose;
 typedef std::vector<Pose> Trajectory;

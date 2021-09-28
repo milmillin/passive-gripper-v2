@@ -6,6 +6,7 @@
 #include "../core/GeometryUtils.h"
 #include "../core/robots/Robots.h"
 #include "../core/models/GripperSettings.h"
+#include "Components.h"
 
 using namespace psg::core;
 
@@ -201,7 +202,46 @@ void MainUI::DrawContactPointPanel() {
 
 void MainUI::DrawTransformPanel() {}
 
-void MainUI::DrawRobotPanel() {}
+void MainUI::DrawRobotPanel() {
+  float w = ImGui::GetContentRegionAvailWidth();
+  ImGui::PushID("RobotPanel");
+  if (ImGui::CollapsingHeader("Forward Kinematics")) {
+    bool updateFK = false;
+    Pose p = vm_.GetCurrentPose();
+    updateFK |= MyInputDouble3Convert(
+        "FK13", &p[0], kRadToDeg, 1, "%.1f");
+    updateFK |= MyInputDouble3Convert(
+        "FK46", &p[3], kRadToDeg, 1, "%.1f");
+    if (updateFK) {
+      vm_.SetCurrentPose(p);
+    }
+  }
+  if (ImGui::CollapsingHeader("Inverse Kinematics")) {
+    ImGui::PushID("IK");
+    bool updateIK = false;
+    Eigen::Vector3d eff_pos = vm_.GetEffPosition();
+    Eigen::Vector3d eff_ang = vm_.GetEffAngles();
+    ImGui::Text("Translation");
+    updateIK |= MyInputDouble3("IKPos", eff_pos.data());
+    ImGui::Text("Rotation");
+    updateIK |= MyInputDouble3Convert(
+        "IKRot", eff_ang.data(), kRadToDeg, 1, "%.1f");
+    /*
+    if (m_ikSolutionValid) {
+      ImGui::Text(
+          "Solution: %llu/%llu", m_ikSelectedIndex + 1, m_ikSolutions.size());
+      if (ImGui::Button("Toggle Solution", ImVec2(w, 0))) {
+        OnToggleIKSolutionClicked();
+      }
+    }
+    */
+    if (updateIK) {
+      vm_.SetCurrentPose(eff_pos, eff_ang);
+    }
+    ImGui::PopID();  // IK
+  }
+  ImGui::PopID();  // RobotPanel
+}
 
 void MainUI::DrawOptimizationPanel() {}
 
@@ -293,6 +333,9 @@ void MainUI::OnLayerInvalidated(Layer layer) {
       break;
     case Layer::kFingers:
       OnFingersInvalidated();
+      break;
+    case Layer::kRobot:
+      OnRobotInvalidated();
       break;
   }
 }
@@ -391,6 +434,41 @@ void MainUI::OnFingersInvalidated() {
   fingerLayer.set_edges(V, E, colors::kRed);
   fingerLayer.line_width = 5;
   fingerLayer.point_size = 9;
+}
+
+void MainUI::OnRobotInvalidated() {
+  auto& robotLayer = GetLayer(Layer::kRobot);
+  robotLayer.clear();
+
+  std::vector<Eigen::Affine3d> trans;
+  robots::ForwardIntermediate(vm_.GetCurrentPose(), trans);
+
+  Eigen::MatrixXd AV(6 * 4, 3);
+  Eigen::MatrixXi AE(6 * 3, 2);
+
+  Eigen::MatrixXd V(6 * 8, 3);
+  Eigen::MatrixXi F(6 * 12, 3);
+
+  for (size_t i = 0; i < 6; i++) {
+    Eigen::Affine3d curTrans = trans[i];
+    F.block<12, 3>(i * 12, 0) = cube_F.array() + (8 * i);
+    V.block<8, 3>(i * 8, 0).transpose() =
+        (curTrans * kLocalTrans[i] * cube_V.transpose());
+
+    AV.block<4, 3>(i * 4, 0).transpose() =
+        curTrans * (0.1 * axis_V).transpose();
+    AE.block<3, 2>(i * 3, 0) = axis_E.array() + (4 * i);
+  }
+
+  robotLayer.set_mesh(V, F);
+  robotLayer.set_edges(AV, AE, Eigen::Matrix3d::Identity().replicate<6, 1>());
+  robotLayer.set_face_based(true);
+  robotLayer.line_width = 2;
+
+  // Eigen::Affine3d effectorTrans = robots::Forward(m_jointConfigs);
+  // m_position = effectorTrans.translation();
+  // m_eulerAngles = effectorTrans.linear().eulerAngles(1, 0, 2);
+  // std::swap(m_eulerAngles(1), m_eulerAngles(0));
 }
 
 }  // namespace ui
