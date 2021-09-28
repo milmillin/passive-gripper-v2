@@ -30,11 +30,11 @@ double EvalAt(const Eigen::Vector3d& p,
 double ComputeCost(const GripperParams& params,
                    const GripperSettings& settings,
                    const MeshDependentResource& mdr) {
-  static const size_t nTrajectorySteps =
+  const size_t nTrajectorySteps =
       settings.cost.n_trajectory_steps;
-  static const size_t nFingerSteps = settings.cost.n_finger_steps;
-  static const double trajectoryStep = 1. / nTrajectorySteps;
-  static const double fingerStep = 1. / nFingerSteps;
+  const size_t nFingerSteps = settings.cost.n_finger_steps;
+  const double trajectoryStep = 1. / nTrajectorySteps;
+  const double fingerStep = 1. / nFingerSteps;
 
   const size_t nKeyframes = params.trajectory.size();
   const size_t nFingers = params.fingers.size();
