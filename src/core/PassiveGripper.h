@@ -35,6 +35,9 @@ class PassiveGripper {
   inline const Eigen::Vector3d& GetCenterOfMass() const {
     return mdr_.center_of_mass;
   }
+  void SetMeshTrans(const Eigen::Affine3d& trans);
+  inline const Eigen::Affine3d& GetMeshTrans() const { return mesh_trans_; }
+  void TransformMesh(const Eigen::Affine3d& trans);
   inline bool IsMeshLoaded() const { return mesh_loaded_; }
 
   // Contact Point
@@ -98,6 +101,7 @@ class PassiveGripper {
   GripperSettings settings_;
   MeshDependentResource mdr_;
   std::vector<ContactPoint> contact_cones_;
+  Eigen::Affine3d mesh_trans_;
 
   bool mesh_loaded_ = false;
 

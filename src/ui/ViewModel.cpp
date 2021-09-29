@@ -22,6 +22,7 @@ void ViewModel::SetMesh(const Eigen::MatrixXd& V, const Eigen::MatrixXi& F) {
       -minimum.x() / 2. - maximum.x() / 2., -minimum.y(), 0.07 - minimum.z());
 
   Eigen::MatrixXd SV = V.rowwise() + translate.transpose();
+  Eigen::Translation3d mesh_trans((SV.colwise().minCoeff() + SV.colwise().maxCoeff()) / 2.);
 
   Eigen::Affine3d trans = robots::Forward(current_pose_);
   SV = (trans * (SV.transpose().colwise().homogeneous())).transpose();
@@ -30,6 +31,7 @@ void ViewModel::SetMesh(const Eigen::MatrixXd& V, const Eigen::MatrixXi& F) {
   SV.col(1).array() -= min_y;
 
   psg_.SetMesh(SV, F);
+  psg_.SetMeshTrans(Eigen::Translation3d(0, -min_y, 0) * trans * mesh_trans);
 }
 
 void ViewModel::SetCurrentPose(const Pose& pose) {

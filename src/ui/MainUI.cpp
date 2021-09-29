@@ -4,8 +4,8 @@
 #include <igl/unproject_onto_mesh.h>
 
 #include "../core/GeometryUtils.h"
-#include "../core/robots/Robots.h"
 #include "../core/models/GripperSettings.h"
+#include "../core/robots/Robots.h"
 #include "Components.h"
 
 using namespace psg::core;
@@ -37,10 +37,13 @@ void MainUI::init(igl::opengl::glfw::Viewer* viewer_) {
 }
 
 inline bool MainUI::pre_draw() {
-  return ImGuiMenu::pre_draw();
+  bool res = ImGuiMenu::pre_draw();
+  imguizmo_pre_draw();
+  return res;
 }
 
 inline bool MainUI::post_draw() {
+  imguizmo_post_draw();
   return ImGuiMenu::post_draw();
 }
 
@@ -208,10 +211,8 @@ void MainUI::DrawRobotPanel() {
   if (ImGui::CollapsingHeader("Forward Kinematics")) {
     bool updateFK = false;
     Pose p = vm_.GetCurrentPose();
-    updateFK |= MyInputDouble3Convert(
-        "FK13", &p[0], kRadToDeg, 1, "%.1f");
-    updateFK |= MyInputDouble3Convert(
-        "FK46", &p[3], kRadToDeg, 1, "%.1f");
+    updateFK |= MyInputDouble3Convert("FK13", &p[0], kRadToDeg, 1, "%.1f");
+    updateFK |= MyInputDouble3Convert("FK46", &p[3], kRadToDeg, 1, "%.1f");
     if (updateFK) {
       vm_.SetCurrentPose(p);
     }
@@ -224,8 +225,8 @@ void MainUI::DrawRobotPanel() {
     ImGui::Text("Translation");
     updateIK |= MyInputDouble3("IKPos", eff_pos.data());
     ImGui::Text("Rotation");
-    updateIK |= MyInputDouble3Convert(
-        "IKRot", eff_ang.data(), kRadToDeg, 1, "%.1f");
+    updateIK |=
+        MyInputDouble3Convert("IKRot", eff_ang.data(), kRadToDeg, 1, "%.1f");
     /*
     if (m_ikSolutionValid) {
       ImGui::Text(
@@ -497,6 +498,82 @@ void MainUI::OnRobotInvalidated() {
   // m_position = effectorTrans.translation();
   // m_eulerAngles = effectorTrans.linear().eulerAngles(1, 0, 2);
   // std::swap(m_eulerAngles(1), m_eulerAngles(0));
+}
+
+inline bool MainUI::IsGuizmoVisible() {
+  return vm_.PSG().IsMeshLoaded() && (selected_tools_ == Tools::kMeshPosition ||
+                                      selected_tools_ == Tools::kRobot);
+}
+
+Eigen::Affine3d MainUI::GetGuizmoTransform() const {
+  if (selected_tools_ == Tools::kMeshPosition) {
+    return vm_.PSG().GetMeshTrans();
+  } else if (selected_tools_ == Tools::kRobot) {
+    if (selected_keyframe_index_ == -1) {
+      return robots::Forward(vm_.GetCurrentPose());
+    } else {
+      return robots::Forward(
+          vm_.PSG().GetTrajectory()[selected_keyframe_index_]);
+    }
+  }
+  return Eigen::Affine3d::Identity();
+}
+
+void MainUI::SetGuizmoTransform(const Eigen::Affine3d& trans) {
+  if (selected_tools_ == Tools::kMeshPosition) {
+    vm_.PSG().TransformMesh(trans * vm_.PSG().GetMeshTrans().inverse());
+  } else {
+    vm_.SetCurrentPose(trans);
+    if (selected_keyframe_index_ != -1) {
+      vm_.PSG().EditKeyframe(selected_keyframe_index_, vm_.GetCurrentPose());
+    }
+  }
+}
+
+bool MainUI::imguizmo_pre_draw() {
+  if (IsGuizmoVisible()) {
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0);
+    ImGuizmo::BeginFrame();
+    ImGui::PopStyleVar();
+  }
+  return false;
+}
+
+bool MainUI::imguizmo_post_draw() {
+  if (IsGuizmoVisible()) {
+    // Don't draw the Viewer's default menu: draw just the ImGuizmo
+    Eigen::Matrix4f view = (viewer->core().view / viewer->core().camera_zoom);
+    Eigen::Matrix4f proj = viewer->core().proj;
+    if (viewer->core().orthographic) {
+      view(2, 3) -= 1000; /* Hack depth */
+    }
+    // ImGuizmo doesn't like a lot of scaling in view, shift it to T
+    const float z = viewer->core().camera_base_zoom;
+    const Eigen::Matrix4f S =
+        (Eigen::Matrix4f() << z, 0, 0, 0, 0, z, 0, 0, 0, 0, z, 0, 0, 0, 0, 1)
+            .finished();
+    view = (view * S.inverse()).eval();
+    Eigen::Matrix4f imguizmo_T = GetGuizmoTransform().matrix().cast<float>();
+    const Eigen::Matrix4f T0 = imguizmo_T;
+    imguizmo_T = (S * imguizmo_T).eval();
+    ImGuiIO& io = ImGui::GetIO();
+    ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
+    ImGuizmo::Manipulate(view.data(),
+                         proj.data(),
+                         imguizmo_operation,
+                         ImGuizmo::LOCAL,
+                         imguizmo_T.data(),
+                         NULL,
+                         NULL);
+    // invert scaling that was shifted onto T
+    imguizmo_T = (S.inverse() * imguizmo_T).eval();
+    const float diff = (imguizmo_T - T0).array().abs().maxCoeff();
+    // Only call if actually changed; otherwise, triggers on all mouse events
+    if (diff > 2e-6) {
+      SetGuizmoTransform(Eigen::Affine3d(imguizmo_T.cast<double>()));
+    }
+  }
+  return false;
 }
 
 }  // namespace ui

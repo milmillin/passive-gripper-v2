@@ -25,6 +25,20 @@ void PassiveGripper::SetMesh(const Eigen::MatrixXd& V,
 
 // Contact Points
 
+void PassiveGripper::SetMeshTrans(const Eigen::Affine3d& trans) {
+  mesh_trans_ = trans;
+}
+
+void PassiveGripper::TransformMesh(const Eigen::Affine3d& trans) {
+  Eigen::MatrixXd V = mdr_.V;
+  Eigen::MatrixXi F = mdr_.F;
+  V = (trans * V.transpose().colwise().homogeneous()).transpose();
+  mdr_.init(V, F);
+  mesh_trans_ = trans * mesh_trans_;
+  mesh_changed_ = true;
+  Invalidate();
+}
+
 void PassiveGripper::AddContactPoint(const ContactPoint& contact_point) {
   params_.contact_points.push_back(contact_point);
 

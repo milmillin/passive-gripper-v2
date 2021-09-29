@@ -66,6 +66,18 @@ class MainUI : public igl::opengl::glfw::imgui::ImGuiMenu {
   void OnContactPointsInvalidated();
   void OnFingersInvalidated();
   void OnRobotInvalidated();
+
+  // Keyframe
+  size_t selected_keyframe_index_ = -1;
+
+  // ImGuizmo
+  ImGuizmo::OPERATION imguizmo_operation = ImGuizmo::TRANSLATE;
+  inline bool IsGuizmoVisible();
+  Eigen::Affine3d GetGuizmoTransform() const;
+  void SetGuizmoTransform(const Eigen::Affine3d& trans);
+  bool imguizmo_pre_draw();
+  bool imguizmo_post_draw();
+
 };
 
 }  // namespace ui
