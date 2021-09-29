@@ -1,6 +1,6 @@
 #include "Components.h"
 
-#include <imgui.h>
+#include <imgui_internal.h>
 
 namespace psg {
 namespace ui {
@@ -48,6 +48,19 @@ bool MyInputDouble3Convert(const char* name,
     v[2] = conv[2] / factor;
   }
   return updated;
+}
+
+bool MyButton(const char* label, const ImVec2& size, bool disabled) {
+  if (disabled) {
+    ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
+    ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
+  }
+  bool res = ImGui::Button(label, size);
+  if (disabled) {
+    ImGui::PopStyleVar();
+    ImGui::PopItemFlag();
+  }
+  return res;
 }
 
 }  // namespace ui

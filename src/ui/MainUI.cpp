@@ -260,7 +260,26 @@ void MainUI::DrawViewPanel() {
   }
 }
 
-void MainUI::DrawGuizmoOptionPanel() {}
+void MainUI::DrawGuizmoOptionPanel() {
+  float w = ImGui::GetContentRegionAvailWidth();
+  float p = ImGui::GetStyle().FramePadding.x;
+  if (ImGui::CollapsingHeader("Manipulation Mode",
+                              ImGuiTreeNodeFlags_DefaultOpen)) {
+    ImGui::PushID("Manipulation");
+    if (MyButton("Trans",
+                 ImVec2((w - p) / 2, 0),
+                 imguizmo_operation == ImGuizmo::TRANSLATE)) {
+      imguizmo_operation = ImGuizmo::TRANSLATE;
+    }
+    ImGui::SameLine(0, p);
+    if (MyButton("Rot",
+                 ImVec2((w - p) / 2, 0),
+                 imguizmo_operation == ImGuizmo::ROTATE)) {
+      imguizmo_operation = ImGuizmo::ROTATE;
+    }
+    ImGui::PopID();
+  }
+}
 
 void MainUI::DrawLayerOptions(Layer layer, const char* id) {
   auto& data = GetLayer(layer);
@@ -277,16 +296,8 @@ void MainUI::DrawLayerOptions(Layer layer, const char* id) {
 
 void MainUI::DrawToolButton(const char* label, Tools thisTool, float width) {
   bool disabled = thisTool == selected_tools_;
-  if (disabled) {
-    ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
-    ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
-  }
-  if (ImGui::Button(label, ImVec2(width, 0))) {
+  if (MyButton(label, ImVec2(width, 0), disabled)) {
     selected_tools_ = thisTool;
-  }
-  if (disabled) {
-    ImGui::PopStyleVar();
-    ImGui::PopItemFlag();
   }
 }
 
