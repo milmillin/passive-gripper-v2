@@ -203,7 +203,26 @@ void MainUI::DrawContactPointPanel() {
   }
 }
 
-void MainUI::DrawTransformPanel() {}
+void MainUI::DrawTransformPanel() {
+  float w = ImGui::GetContentRegionAvailWidth();
+  if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen)) {
+    ImGui::Text("Translation");
+    MyInputDouble3("Translate", mesh_translate_.data());
+    ImGui::Text("Rotation");
+    MyInputDouble3Convert(
+        "Rotation", mesh_rotation_.data(), kRadToDeg, 1, "%.1f");
+    if (ImGui::Button("Apply", ImVec2(w, 0))) {
+      Eigen::Affine3d mesh_trans = vm_.PSG().GetMeshTrans();
+      Eigen::Affine3d trans =
+          mesh_trans * Eigen::Translation3d(mesh_translate_) *
+          Eigen::AngleAxisd(mesh_rotation_(1), Eigen::Vector3d::UnitY()) *
+          Eigen::AngleAxisd(mesh_rotation_(0), Eigen::Vector3d::UnitX()) *
+          Eigen::AngleAxisd(mesh_rotation_(2), Eigen::Vector3d::UnitZ()) *
+          mesh_trans.inverse();
+      vm_.PSG().TransformMesh(trans);
+    }
+  }
+}
 
 void MainUI::DrawRobotPanel() {
   float w = ImGui::GetContentRegionAvailWidth();

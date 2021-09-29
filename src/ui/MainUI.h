@@ -70,6 +70,10 @@ class MainUI : public igl::opengl::glfw::imgui::ImGuiMenu {
   // Keyframe
   size_t selected_keyframe_index_ = -1;
 
+  // Transform
+  Eigen::Vector3d mesh_translate_ = Eigen::Vector3d::Zero();
+  Eigen::Vector3d mesh_rotation_ = Eigen::Vector3d::Zero();
+
   // ImGuizmo
   ImGuizmo::OPERATION imguizmo_operation = ImGuizmo::TRANSLATE;
   inline bool IsGuizmoVisible();
