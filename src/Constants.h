@@ -1,5 +1,8 @@
 #pragma once
 
+#define DECLARE_GETTER(x, y) \
+  inline const decltype(y)& x() const { return y; }
+
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 #include <array>

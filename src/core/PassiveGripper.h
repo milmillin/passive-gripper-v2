@@ -5,9 +5,9 @@
 #include <vector>
 
 #include "models/ContactPoint.h"
+#include "models/GripperParams.h"
 #include "models/GripperSettings.h"
 #include "models/MeshDependentResource.h"
-#include "models/GripperParams.h"
 
 namespace psg {
 namespace core {
@@ -17,8 +17,7 @@ using namespace models;
 class PassiveGripper {
  public:
   enum class InvalidatedReason { kMesh, kContactPoints, kFingers, kTrajectory };
-  typedef std::function<void(InvalidatedReason)>
-      InvalidatedDelegate;
+  typedef std::function<void(InvalidatedReason)> InvalidatedDelegate;
 
   PassiveGripper();
 
@@ -32,29 +31,13 @@ class PassiveGripper {
     V = mdr_.V;
     F = mdr_.F;
   }
-  inline const Eigen::Vector3d& GetCenterOfMass() const {
-    return mdr_.center_of_mass;
-  }
   void SetMeshTrans(const Eigen::Affine3d& trans);
-  inline const Eigen::Affine3d& GetMeshTrans() const { return mesh_trans_; }
   void TransformMesh(const Eigen::Affine3d& trans);
-  inline bool IsMeshLoaded() const { return mesh_loaded_; }
 
   // Contact Point
   void AddContactPoint(const ContactPoint& contact_point);
   void RemoveContactPoint(size_t index);
   void ClearContactPoint();
-  inline const std::vector<ContactPoint>& GetContactPoints() const {
-    return params_.contact_points;
-  }
-  inline const std::vector<ContactPoint>& GetContactCones() const {
-    return contact_cones_;
-  }
-
-  // Fingers
-  inline const std::vector<Eigen::MatrixXd>& GetFingers() const {
-    return params_.fingers;
-  }
 
   // Trajectory
   void AddKeyframe(const Pose& pose);
@@ -70,29 +53,6 @@ class PassiveGripper {
   void SetOptSettings(const OptSettings& finger_settings);
   void SetTopoOptSettings(const TopoOptSettings& finger_settings);
   void SetCostSettings(const CostSettings& finger_settings);
-  inline const ContactSettings& GetContactSettings() const {
-    return settings_.contact;
-  }
-  inline const FingerSettings& GetFingerSettings() const {
-    return settings_.finger;
-  }
-  inline const TrajectorySettings& GetTrajectorySettings() const {
-    return settings_.trajectory;
-  }
-  inline const OptSettings& GetOptSettings() const { return settings_.opt; }
-  inline const TopoOptSettings& GetTopoOptSettings() const {
-    return settings_.topo_opt;
-  }
-  inline const CostSettings& GetCostSettings() const { return settings_.cost; }
-
-  // Quality Metric
-  inline bool GetIsForceClosure() const { return is_force_closure_; }
-  inline bool GetIsPartialClosure() const { return is_partial_closure_; }
-  inline double GetMinWrench() const { return min_wrench_; }
-  inline double GetPartialMinWrench() const { return partial_min_wrench_; }
-
-  // Cost
-  inline double GetCost() const { return cost_; }
 
   bool reinit_trajectory = true;
 
@@ -142,6 +102,25 @@ class PassiveGripper {
   void InvalidateTrajectory();
   void InvalidateQuality();
   void InvalidateCost();
+
+ public:
+  DECLARE_GETTER(GetCenterOfMass, mdr_.center_of_mass)
+  DECLARE_GETTER(GetMeshTrans, mesh_trans_)
+  DECLARE_GETTER(IsMeshLoaded, mesh_loaded_)
+  DECLARE_GETTER(GetContactPoints, params_.contact_points)
+  DECLARE_GETTER(GetContactCones, contact_cones_)
+  DECLARE_GETTER(GetFingers, params_.fingers)
+  DECLARE_GETTER(GetContactSettings, settings_.contact)
+  DECLARE_GETTER(GetFingerSettings, settings_.finger)
+  DECLARE_GETTER(GetTrajectorySettings, settings_.trajectory)
+  DECLARE_GETTER(GetOptSettings, settings_.opt)
+  DECLARE_GETTER(GetTopoOptSettings, settings_.topo_opt)
+  DECLARE_GETTER(GetCostSettings, settings_.cost)
+  DECLARE_GETTER(GetIsForceClosure, is_force_closure_)
+  DECLARE_GETTER(GetIsPartialClosure, is_partial_closure_)
+  DECLARE_GETTER(GetMinWrench, min_wrench_)
+  DECLARE_GETTER(GetPartialMinWrench, partial_min_wrench_)
+  DECLARE_GETTER(GetCost, cost_)
 };
 
 }  // namespace core

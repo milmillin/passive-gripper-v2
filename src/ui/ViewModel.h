@@ -1,10 +1,8 @@
 #pragma once
 
+#include "../Constants.h"
 #include "../core/PassiveGripper.h"
 #include "Layer.h"
-
-#define DECLARE_GETTER(x, y) \
-  inline const decltype(y)& x() const { return y; }
 
 using namespace psg::core;
 
