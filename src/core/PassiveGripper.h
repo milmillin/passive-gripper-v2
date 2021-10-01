@@ -121,6 +121,9 @@ class PassiveGripper {
   DECLARE_GETTER(GetMinWrench, min_wrench_)
   DECLARE_GETTER(GetPartialMinWrench, partial_min_wrench_)
   DECLARE_GETTER(GetCost, cost_)
+  DECLARE_GETTER(GetParams, params_)
+  DECLARE_GETTER(GetSettings, settings_)
+  DECLARE_GETTER(GetMDR, mdr_)
 };
 
 }  // namespace core

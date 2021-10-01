@@ -1,5 +1,7 @@
 #pragma once
 
+#include <nlopt.h>
+
 #include "../../Constants.h"
 
 namespace psg {
@@ -7,15 +9,17 @@ namespace core {
 namespace models {
 
 struct OptSettings {
-  double opt_max_runtime = 0;  // seconds
-  double opt_finger_wiggle = 0.01;
-  Pose opt_trajectory_wiggle = {4. * kDegToRad,
+  double max_runtime = 0;  // seconds
+  double finger_wiggle = 0.01;
+  Pose trajectory_wiggle = {4. * kDegToRad,
                                 4. * kDegToRad,
                                 4. * kDegToRad,
                                 8. * kDegToRad,
                                 8. * kDegToRad,
                                 8. * kDegToRad};
-  double opt_tolerance = 0;  // run forever
+  double tolerance = 0;  // run forever
+  nlopt_algorithm algorithm = NLOPT_GN_CRS2_LM;
+  size_t population = 20000;
 };
 
 }  // namespace models
