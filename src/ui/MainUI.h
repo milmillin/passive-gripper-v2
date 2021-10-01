@@ -66,6 +66,7 @@ class MainUI : public igl::opengl::glfw::imgui::ImGuiMenu {
   void OnContactPointsInvalidated();
   void OnFingersInvalidated();
   void OnRobotInvalidated();
+  void OnTrajectoryInvalidated();
 
   // Keyframe
   size_t selected_keyframe_index_ = -1;

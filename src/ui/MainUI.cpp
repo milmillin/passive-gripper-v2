@@ -396,6 +396,9 @@ void MainUI::OnLayerInvalidated(Layer layer) {
     case Layer::kRobot:
       OnRobotInvalidated();
       break;
+    case Layer::kTrajectory:
+      OnTrajectoryInvalidated();
+      break;
   }
 }
 
@@ -523,11 +526,33 @@ void MainUI::OnRobotInvalidated() {
   robotLayer.set_edges(AV, AE, Eigen::Matrix3d::Identity().replicate<6, 1>());
   robotLayer.set_face_based(true);
   robotLayer.line_width = 2;
+}
 
-  // Eigen::Affine3d effectorTrans = robots::Forward(m_jointConfigs);
-  // m_position = effectorTrans.translation();
-  // m_eulerAngles = effectorTrans.linear().eulerAngles(1, 0, 2);
-  // std::swap(m_eulerAngles(1), m_eulerAngles(0));
+void MainUI::OnTrajectoryInvalidated() {
+  const Trajectory& trajectory = vm_.PSG().GetTrajectory();
+  size_t nKeyframe = trajectory.size();
+  if (nKeyframe == 0) return;
+
+  auto& trajectoryLayer = GetLayer(Layer::kTrajectory);
+
+  Eigen::MatrixXd V(4 * nKeyframe, 3);
+  Eigen::MatrixXi E(4 * nKeyframe - 1, 2);
+  Eigen::MatrixXd C(4 * nKeyframe - 1, 3);
+
+  for (size_t i = 0; i < nKeyframe; i++) {
+    Eigen::Affine3d curTrans = robots::Forward(trajectory[i]);
+    V.block<4, 3>(i * 4, 0).transpose() = curTrans * (0.1 * axis_V).transpose();
+    E.block<3, 2>(i * 3, 0) = axis_E.array() + (4 * i);
+    C.block<3, 3>(i * 3, 0) = Eigen::Matrix3d::Identity();
+    if (i + 1 < nKeyframe) {
+      E(3 * nKeyframe + i, 0) = i * 4;
+      E(3 * nKeyframe + i, 1) = (i + 1) * 4;
+      C.row(3 * nKeyframe + i) = Eigen::RowVector3d(0.7, 0, 0.8);
+    }
+  }
+
+  trajectoryLayer.set_edges(V, E, C);
+  trajectoryLayer.line_width = 2;
 }
 
 inline bool MainUI::IsGuizmoVisible() {
