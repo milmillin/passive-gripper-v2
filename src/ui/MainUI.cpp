@@ -7,6 +7,7 @@
 #include "../core/models/GripperSettings.h"
 #include "../core/robots/Robots.h"
 #include "Components.h"
+#include "../core/CostFunctions.h"
 
 using namespace psg::core;
 
@@ -34,6 +35,8 @@ void MainUI::init(igl::opengl::glfw::Viewer* viewer_) {
   auto& axisLayer = GetLayer(Layer::kAxis);
   axisLayer.set_edges(axis_V * 0.1, axis_E, Eigen::Matrix3d::Identity());
   axisLayer.line_width = 2;
+
+  GetLayer(Layer::kSweptSurface).show_lines = false;
 }
 
 inline bool MainUI::pre_draw() {
@@ -275,6 +278,7 @@ void MainUI::DrawViewPanel() {
     DrawLayerOptions(Layer::kAxis, "Axis");
     DrawLayerOptions(Layer::kFingers, "Fingers");
     DrawLayerOptions(Layer::kTrajectory, "Trajectory");
+    DrawLayerOptions(Layer::kSweptSurface, "Swept Finger");
     ImGui::PopID();
   }
 }
@@ -398,6 +402,9 @@ void MainUI::OnLayerInvalidated(Layer layer) {
       break;
     case Layer::kTrajectory:
       OnTrajectoryInvalidated();
+      break;
+    case Layer::kSweptSurface:
+      OnSweptSurfaceInvalidated();
       break;
   }
 }
@@ -553,6 +560,117 @@ void MainUI::OnTrajectoryInvalidated() {
 
   trajectoryLayer.set_edges(V, E, C);
   trajectoryLayer.line_width = 2;
+}
+
+void MainUI::OnSweptSurfaceInvalidated() {
+  const auto& fingers = vm_.PSG().GetFingers();
+  const auto& trajectory = vm_.PSG().GetTrajectory();
+  if (fingers.empty()) return;
+  auto& layer = GetLayer(Layer::kSweptSurface);
+  const size_t nFingers = fingers.size();
+  static constexpr size_t nTrajectorySteps = 32;
+  static constexpr size_t nFingerSteps = 32;
+  static constexpr double trajectoryStep = 1. / nTrajectorySteps;
+  static constexpr double fingerStep = 1. / nFingerSteps;
+
+  const size_t nKeyframes = trajectory.size();
+  const size_t nDOF = trajectory.front().size();
+  const size_t nFingerJoints = fingers.front().rows();
+
+  const size_t nFrames = (nKeyframes - 1) * nTrajectorySteps + 1;
+  const size_t nEvalsPerFingerPerFrame = (nFingerJoints - 1) * nFingerSteps + 1;
+  const size_t nEvals = nFrames * nFingers * nEvalsPerFingerPerFrame;
+  Eigen::MatrixXd P(nEvals, 3);
+  Eigen::MatrixXi PF(
+      (nFrames - 1) * nFingers * (nEvalsPerFingerPerFrame - 1) * 2, 3);
+  Eigen::VectorXd Cost(nEvals);
+
+  Eigen::Affine3d finger_trans_inv =
+      robots::Forward(trajectory.front()).inverse();
+
+  {
+    Eigen::Affine3d curTrans =
+        robots::Forward(trajectory.front()) * finger_trans_inv;
+    for (size_t i = 0; i < nFingers; i++) {
+      const Eigen::MatrixXd& finger = fingers[i];
+      Eigen::MatrixXd transformedFinger =
+          (curTrans * finger.transpose().colwise().homogeneous()).transpose();
+      P.row(i * nEvalsPerFingerPerFrame) = transformedFinger.row(0);
+      for (size_t joint = 1; joint < nFingerJoints; joint++) {
+        for (size_t kk = 1; kk <= nFingerSteps; kk++) {
+          double fingerT = kk * fingerStep;
+          Eigen::RowVector3d lerpedFinger =
+              transformedFinger.row(joint - 1) * (1. - fingerT) +
+              transformedFinger.row(joint) * fingerT;
+          P.row(i * nEvalsPerFingerPerFrame + (joint - 1) * nFingerSteps + kk) =
+              lerpedFinger;
+        }
+      }
+    }
+  }
+  for (size_t iKf = 1; iKf < nKeyframes; iKf++) {
+    Pose t_lerpedKeyframe;
+    for (long long j = 1; j <= nTrajectorySteps; j++) {
+      double trajectoryT = j * trajectoryStep;
+      for (size_t k = 0; k < kNumDOFs; k++) {
+        t_lerpedKeyframe[k] = trajectory[iKf - 1][k] * (1 - trajectoryT) +
+                              trajectory[iKf][k] * trajectoryT;
+      }
+      Eigen::Affine3d curTrans =
+          robots::Forward(t_lerpedKeyframe) * finger_trans_inv;
+      for (size_t i = 0; i < nFingers; i++) {
+        const Eigen::MatrixXd& finger = fingers[i];
+        Eigen::MatrixXd transformedFinger =
+            (curTrans * finger.transpose().colwise().homogeneous()).transpose();
+        P.row(((iKf - 1) * nTrajectorySteps + j) * nFingers *
+                  nEvalsPerFingerPerFrame +
+              i * nEvalsPerFingerPerFrame) = transformedFinger.row(0);
+        for (size_t joint = 1; joint < nFingerJoints; joint++) {
+          for (size_t kk = 1; kk <= nFingerSteps; kk++) {
+            double fingerT = kk * fingerStep;
+            Eigen::RowVector3d lerpedFinger =
+                transformedFinger.row(joint - 1) * (1. - fingerT) +
+                transformedFinger.row(joint) * fingerT;
+            P.row(((iKf - 1) * nTrajectorySteps + j) * nFingers *
+                      nEvalsPerFingerPerFrame +
+                  i * nEvalsPerFingerPerFrame + (joint - 1) * nFingerSteps +
+                  kk) = lerpedFinger;
+          }
+        }
+        for (size_t jj = 1; jj < nEvalsPerFingerPerFrame; jj++) {
+          // (nFrames - 1) * nFingers * (nEvalsPerFingerPerFrame - 1) * 2, 2);
+
+          int cur = ((iKf - 1) * nTrajectorySteps + j) * nFingers *
+                        nEvalsPerFingerPerFrame +
+                    i * nEvalsPerFingerPerFrame + jj;
+          int last = ((iKf - 1) * nTrajectorySteps + j - 1) * nFingers *
+                         nEvalsPerFingerPerFrame +
+                     i * nEvalsPerFingerPerFrame + jj;
+
+          PF.block<2, 3>(((iKf - 1) * nTrajectorySteps + j - 1) * nFingers *
+                                 (nEvalsPerFingerPerFrame - 1) * 2 +
+                             i * (nEvalsPerFingerPerFrame - 1) * 2 +
+                             (jj - 1) * 2,
+                         0) = (Eigen::MatrixXi(2, 3) << cur,
+                               cur - 1,
+                               last - 1,
+                               cur,
+                               last - 1,
+                               last)
+                                  .finished();
+        }
+      }
+    }
+  }
+  for (size_t i = 0; i < nEvals; i++) {
+    Cost(i) = EvalAt(
+        P.row(i).transpose(), vm_.PSG().GetSettings().cost, vm_.PSG().GetMDR());
+  }
+  layer.clear();
+  layer.set_mesh(P, PF);
+  layer.set_data(Cost);
+  layer.set_face_based(true);
+  layer.double_sided = true;
 }
 
 inline bool MainUI::IsGuizmoVisible() {

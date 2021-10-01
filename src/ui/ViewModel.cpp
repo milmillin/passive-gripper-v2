@@ -101,9 +101,11 @@ void ViewModel::OnPsgInvalidated(PassiveGripper::InvalidatedReason reason) {
       break;
     case PassiveGripper::InvalidatedReason::kFingers:
       InvokeLayerInvalidated(Layer::kFingers);
+      InvokeLayerInvalidated(Layer::kSweptSurface);
       break;
     case PassiveGripper::InvalidatedReason::kTrajectory:
       InvokeLayerInvalidated(Layer::kTrajectory);
+      InvokeLayerInvalidated(Layer::kSweptSurface);
       break;
   }
 }
