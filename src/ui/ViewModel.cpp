@@ -60,6 +60,14 @@ void ViewModel::SetCurrentPose(const Eigen::Vector3d& pos,
   PoseChanged();
 }
 
+void ViewModel::TogglePose() {
+  if (ik_sols_index_ != -1) {
+    ik_sols_index_ = (ik_sols_index_ + 1) % ik_sols_.size();
+    current_pose_ = ik_sols_[ik_sols_index_];
+    PoseChanged();
+  }
+}
+
 void ViewModel::ComputeIK() {
   Eigen::Affine3d trans =
       Eigen::Translation3d(eff_position_) *

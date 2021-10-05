@@ -249,6 +249,9 @@ void MainUI::DrawRobotPanel() {
     ImGui::Text("Rotation");
     updateIK |=
         MyInputDouble3Convert("IKRot", eff_ang.data(), kRadToDeg, 1, "%.1f");
+    if (MyButton("Toggle Pose", ImVec2(w, 0), !vm_.CanTogglePose())) {
+      vm_.TogglePose();    
+    }
     /*
     if (m_ikSolutionValid) {
       ImGui::Text(

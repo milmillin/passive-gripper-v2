@@ -26,6 +26,8 @@ class ViewModel {
   void SetCurrentPose(const Pose& pose);
   void SetCurrentPose(const Eigen::Affine3d& trans);
   void SetCurrentPose(const Eigen::Vector3d& pos, const Eigen::Vector3d& ang);
+  void TogglePose();
+  inline bool CanTogglePose() const { return ik_sols_index_ != -1; }
 
  private:
   LayerInvalidatedDelegate LayerInvalidated_;
