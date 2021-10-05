@@ -67,7 +67,7 @@ static double ComputeCostWrapper(unsigned n,
 }
 
 Optimizer::~Optimizer() {
-  if (optimize_future_.valid()) Cancel();
+  Cancel();
   if (opt_ != nullptr) nlopt_destroy(opt_);
 }
 
@@ -129,6 +129,13 @@ void Optimizer::Resume() {
   });
 }
 
+void Optimizer::Reset() {
+  Cancel();
+  is_running_ = false;
+  is_resumable_ = false;
+  is_result_available_ = false;
+}
+
 void Optimizer::Wait() {
   if (optimize_future_.valid()) {
     optimize_future_.get();
@@ -138,8 +145,8 @@ void Optimizer::Wait() {
 void Optimizer::Cancel() {
   if (opt_ != nullptr) {
     nlopt_force_stop(opt_);
-    optimize_future_.get();
   }
+  Wait();
 }
 
 const GripperParams& Optimizer::GetCurrentParams() {

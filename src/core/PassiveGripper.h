@@ -54,7 +54,11 @@ class PassiveGripper {
   void SetTopoOptSettings(const TopoOptSettings& finger_settings);
   void SetCostSettings(const CostSettings& finger_settings);
 
+  // Params
+  void SetParams(const GripperParams& params);
+
   bool reinit_trajectory = true;
+  bool reinit_fingers = true;
 
  private:
   GripperParams params_;

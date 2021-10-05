@@ -29,6 +29,8 @@ class ViewModel {
   void TogglePose();
   inline bool CanTogglePose() const { return ik_sols_index_ != -1; }
 
+  void AnimateTo(const Pose& pose);
+  void NextFrame();
  private:
   LayerInvalidatedDelegate LayerInvalidated_;
   void InvokeLayerInvalidated(Layer layer);
@@ -46,11 +48,17 @@ class ViewModel {
   void ComputeIK();
   void PoseChanged();
 
+  static const size_t kAnimationSteps = 30;
+  bool is_animating_ = false;
+  Pose src_pose_;
+  Pose dst_pose_;
+  size_t cur_step_ = 0;
  public:
   DECLARE_GETTER(PSG, psg_)
   DECLARE_GETTER(GetEffPosition, eff_position_)
   DECLARE_GETTER(GetEffAngles, eff_angles_)
   DECLARE_GETTER(GetCurrentPose, current_pose_)
+  DECLARE_GETTER(GetIsAnimating, is_animating_)
 };
 
 }  // namespace ui

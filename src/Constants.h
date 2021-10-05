@@ -51,6 +51,78 @@ static constexpr double kWrenchReg = 1e-10;
 // zero threshold
 static constexpr double kWrenchNormThresh = 1e-5;
 
+namespace labels {
+
+const char* const kAlgorithms[] = {
+    "NLOPT_GN_DIRECT",
+    "NLOPT_GN_DIRECT_L",
+    "NLOPT_GN_DIRECT_L_RAND",
+    "NLOPT_GN_DIRECT_NOSCAL",
+    "NLOPT_GN_DIRECT_L_NOSCAL",
+    "NLOPT_GN_DIRECT_L_RAND_NOSCAL",
+
+    "NLOPT_GN_ORIG_DIRECT",
+    "NLOPT_GN_ORIG_DIRECT_L",
+
+    "NLOPT_GD_STOGO",
+    "NLOPT_GD_STOGO_RAND",
+
+    "NLOPT_LD_LBFGS_NOCEDAL",
+
+    "NLOPT_LD_LBFGS",
+
+    "NLOPT_LN_PRAXIS",
+
+    "NLOPT_LD_VAR1",
+    "NLOPT_LD_VAR2",
+
+    "NLOPT_LD_TNEWTON",
+    "NLOPT_LD_TNEWTON_RESTART",
+    "NLOPT_LD_TNEWTON_PRECOND",
+    "NLOPT_LD_TNEWTON_PRECOND_RESTART",
+
+    "NLOPT_GN_CRS2_LM",
+
+    "NLOPT_GN_MLSL",
+    "NLOPT_GD_MLSL",
+    "NLOPT_GN_MLSL_LDS",
+    "NLOPT_GD_MLSL_LDS",
+
+    "NLOPT_LD_MMA",
+
+    "NLOPT_LN_COBYLA",
+
+    "NLOPT_LN_NEWUOA",
+    "NLOPT_LN_NEWUOA_BOUND",
+
+    "NLOPT_LN_NELDERMEAD",
+    "NLOPT_LN_SBPLX",
+
+    "NLOPT_LN_AUGLAG",
+    "NLOPT_LD_AUGLAG",
+    "NLOPT_LN_AUGLAG_EQ",
+    "NLOPT_LD_AUGLAG_EQ",
+
+    "NLOPT_LN_BOBYQA",
+
+    "NLOPT_GN_ISRES",
+
+    /* new variants that require local_optimizer to be set",
+       not with older constants for backwards compatibility */
+    "NLOPT_AUGLAG",
+    "NLOPT_AUGLAG_EQ",
+    "NLOPT_G_MLSL",
+    "NLOPT_G_MLSL_LDS",
+
+    "NLOPT_LD_SLSQP",
+
+    "NLOPT_LD_CCSAQ",
+
+    "NLOPT_GN_ESCH",
+
+    "NLOPT_GN_AGS"};
+}
+
 namespace colors {
 const Eigen::RowVector3d kPurple = Eigen::RowVector3d(219, 76, 178) / 255;
 const Eigen::RowVector3d kOrange = Eigen::RowVector3d(239, 126, 50) / 255;

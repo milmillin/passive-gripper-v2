@@ -5,6 +5,7 @@
 
 #include "Layer.h"
 #include "ViewModel.h"
+#include "../core/Optimizer.h"
 
 namespace psg {
 namespace ui {
@@ -50,6 +51,7 @@ class MainUI : public igl::opengl::glfw::imgui::ImGuiMenu {
   void DrawOptimizationPanel();
   void DrawViewPanel();
   void DrawGuizmoOptionPanel();
+  void DrawOptimizationStatusPanel();
 
   // Draw Component
   void DrawLayerOptions(Layer layer, const char* id);
@@ -75,6 +77,9 @@ class MainUI : public igl::opengl::glfw::imgui::ImGuiMenu {
   // Transform
   Eigen::Vector3d mesh_translate_ = Eigen::Vector3d::Zero();
   Eigen::Vector3d mesh_rotation_ = Eigen::Vector3d::Zero();
+
+  // Optimization
+  Optimizer optimizer_;
 
   // ImGuizmo
   ImGuizmo::OPERATION imguizmo_operation = ImGuizmo::TRANSLATE;

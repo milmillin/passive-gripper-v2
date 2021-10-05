@@ -20,6 +20,7 @@ class Optimizer {
   void Wait();
   void Cancel();
   void Resume();
+  void Reset();
 
   inline bool IsRunning() { return opt_ != nullptr && is_running_; };
   inline bool IsResultAvailable() {
@@ -31,6 +32,7 @@ class Optimizer {
     return start_time_;
   }
   const GripperParams& GetCurrentParams();
+
 
   // Internal use
   double ComputeCostInternal(unsigned n, const double* x);

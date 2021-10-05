@@ -68,6 +68,25 @@ void ViewModel::TogglePose() {
   }
 }
 
+void ViewModel::AnimateTo(const Pose& pose) {
+  src_pose_ = current_pose_;
+  dst_pose_ = FixAngles(current_pose_, pose);
+  is_animating_ = true;
+  cur_step_ = 0;
+}
+
+void ViewModel::NextFrame() {
+  if (!is_animating_) return;
+  cur_step_++;
+  double t = (double)cur_step_ / kAnimationSteps;
+  Pose p;
+  for (size_t i = 0; i < kNumDOFs; i++) {
+    p[i] = (1 - t) * src_pose_[i] + t * dst_pose_[i];
+  }
+  SetCurrentPose(p);
+  if (cur_step_ == kAnimationSteps) is_animating_ = false;
+}
+
 void ViewModel::ComputeIK() {
   Eigen::Affine3d trans =
       Eigen::Translation3d(eff_position_) *

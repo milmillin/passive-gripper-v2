@@ -78,17 +78,21 @@ void PassiveGripper::ClearContactPoint() {
 // Trajectory
 void PassiveGripper::AddKeyframe(const Pose& pose) {
   params_.trajectory.push_back(pose);
+  FixTrajectory(params_.trajectory);
   trajectory_changed_ = true;
   Invalidate();
 }
 void PassiveGripper::EditKeyframe(size_t index, const Pose& pose) {
   params_.trajectory[index] = pose;
+  FixTrajectory(params_.trajectory);
   trajectory_changed_ = true;
+  if (index == 0) finger_settings_changed_ = true;
   Invalidate();
 }
 void PassiveGripper::RemoveKeyframe(size_t index) {
   if (params_.trajectory.size() <= 1) return;
   params_.trajectory.erase(params_.trajectory.begin() + index);
+  FixTrajectory(params_.trajectory);
   trajectory_changed_ = true;
   Invalidate();
 }
@@ -134,6 +138,19 @@ void PassiveGripper::SetCostSettings(const CostSettings& settings) {
   settings_.cost = settings;
   cost_settings_changed_ = true;
   Invalidate();
+}
+
+void PassiveGripper::SetParams(const GripperParams& params) {
+  bool tmp_reinit_finger = reinit_fingers;
+  bool tmp_reinit_trajectory = reinit_trajectory;
+  reinit_fingers = false;
+  reinit_trajectory = false;
+  params_ = params;
+  finger_changed_ = true;
+  trajectory_changed_ = true;
+  Invalidate();
+  reinit_fingers = tmp_reinit_finger;
+  reinit_trajectory = tmp_reinit_trajectory;
 }
 
 // State Invalidation
@@ -197,16 +214,18 @@ void PassiveGripper::InvalidateContactSettings() {
 void PassiveGripper::InvalidateFingerSettings() {
   finger_settings_changed_ = false;
   // Re-initialize finger
-  Eigen::Affine3d effector_pos = robots::Forward(params_.trajectory.front());
-  for (size_t i = 0; i < params_.contact_points.size(); i++) {
-    Eigen::MatrixXd&& finger =
-        InitializeFinger(params_.contact_points[i],
-                         mdr_,
-                         effector_pos.translation(),
-                         settings_.finger.n_finger_joints);
-    params_.fingers[i] = finger;
+  if (reinit_fingers) {
+    Eigen::Affine3d effector_pos = robots::Forward(params_.trajectory.front());
+    for (size_t i = 0; i < params_.contact_points.size(); i++) {
+      Eigen::MatrixXd&& finger =
+          InitializeFinger(params_.contact_points[i],
+                           mdr_,
+                           effector_pos.translation(),
+                           settings_.finger.n_finger_joints);
+      params_.fingers[i] = finger;
+    }
+    finger_changed_ = true;
   }
-  finger_changed_ = true;
 }
 
 void PassiveGripper::InvalidateTrajectorySettings() {

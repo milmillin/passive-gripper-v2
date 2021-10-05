@@ -3,11 +3,11 @@
 #include <igl/remove_duplicate_vertices.h>
 #include <igl/unproject_onto_mesh.h>
 
+#include "../core/CostFunctions.h"
 #include "../core/GeometryUtils.h"
 #include "../core/models/GripperSettings.h"
 #include "../core/robots/Robots.h"
 #include "Components.h"
-#include "../core/CostFunctions.h"
 
 using namespace psg::core;
 
@@ -40,6 +40,7 @@ void MainUI::init(igl::opengl::glfw::Viewer* viewer_) {
 }
 
 inline bool MainUI::pre_draw() {
+  if (vm_.GetIsAnimating()) vm_.NextFrame();
   bool res = ImGuiMenu::pre_draw();
   imguizmo_pre_draw();
   return res;
@@ -115,7 +116,12 @@ void MainUI::draw_viewer_menu() {
   ImGui::Checkbox("Millimeter", &is_millimeter_);
   ImGui::Checkbox("Swap YZ", &is_swap_yz_);
   ImGui::Separator();
+  ImGui::Checkbox("Reinit Trajectory", &vm_.PSG().reinit_trajectory);
+  ImGui::Separator();
   if (vm_.PSG().IsMeshLoaded()) {
+    if (optimizer_.IsRunning() || optimizer_.IsResultAvailable()) {
+      DrawOptimizationStatusPanel();
+    }
     DrawMetricPanel();
     DrawToolPanel();
     switch (selected_tools_) {
@@ -250,26 +256,107 @@ void MainUI::DrawRobotPanel() {
     updateIK |=
         MyInputDouble3Convert("IKRot", eff_ang.data(), kRadToDeg, 1, "%.1f");
     if (MyButton("Toggle Pose", ImVec2(w, 0), !vm_.CanTogglePose())) {
-      vm_.TogglePose();    
+      vm_.TogglePose();
     }
-    /*
-    if (m_ikSolutionValid) {
-      ImGui::Text(
-          "Solution: %llu/%llu", m_ikSelectedIndex + 1, m_ikSolutions.size());
-      if (ImGui::Button("Toggle Solution", ImVec2(w, 0))) {
-        OnToggleIKSolutionClicked();
-      }
-    }
-    */
     if (updateIK) {
       vm_.SetCurrentPose(eff_pos, eff_ang);
     }
     ImGui::PopID();  // IK
   }
+  if (ImGui::CollapsingHeader("Keyframes", ImGuiTreeNodeFlags_DefaultOpen)) {
+    ImGui::PushID("Keyframes");
+    size_t to_delete = -1;
+    const auto& trajectory = vm_.PSG().GetTrajectory();
+    for (size_t i = 0; i < trajectory.size(); i++) {
+      ImGui::PushID(std::to_string(i).c_str());
+
+      if (ImGui::Button("X")) {
+        to_delete = i;
+      }
+      ImGui::SameLine();
+      if (ImGui::Button("Goto")) {
+        vm_.AnimateTo(trajectory[i]);
+      }
+      ImGui::SameLine();
+      if (ImGui::Button(">>")) {
+        selected_keyframe_index_ = i;
+        vm_.SetCurrentPose(trajectory[i]);
+      }
+      if (selected_keyframe_index_ == i) {
+        ImGui::SameLine();
+        ImGui::Text(">> ");
+      }
+      ImGui::SameLine();
+      ImGui::Text("P%llu", i);
+
+      ImGui::PopID();  // i
+    }
+    if (to_delete != -1) {
+      vm_.PSG().RemoveKeyframe(to_delete);
+    }
+    if (ImGui::Button(">>")) {
+      selected_keyframe_index_ = -1;
+    }
+    if (selected_keyframe_index_ == -1) {
+      ImGui::SameLine();
+      if (ImGui::Button(">> New Keyframe")) {
+        vm_.PSG().reinit_trajectory = false;
+        vm_.PSG().AddKeyframe(vm_.GetCurrentPose());
+      }
+    } else {
+      ImGui::SameLine();
+      ImGui::Text("New Keyframe");
+    }
+    ImGui::PopID();  // Keyframes
+  }
   ImGui::PopID();  // RobotPanel
 }
 
-void MainUI::DrawOptimizationPanel() {}
+void MainUI::DrawOptimizationPanel() {
+  ImGui::PushID("Optimization");
+  float w = ImGui::GetContentRegionAvailWidth();
+  if (ImGui::CollapsingHeader("Optimization", ImGuiTreeNodeFlags_DefaultOpen)) {
+    OptSettings opt_settings = vm_.PSG().GetOptSettings();
+    CostSettings cost_settings = vm_.PSG().GetCostSettings();
+    bool opt_update = false;
+    bool cost_update = false;
+    ImGui::Text("Trajectory Wiggle (deg)");
+    opt_update |= MyInputDouble3Convert(
+        "traj13", &opt_settings.trajectory_wiggle[0], kRadToDeg, 1, "%.1f");
+    opt_update |= MyInputDouble3Convert(
+        "traj46", &opt_settings.trajectory_wiggle[3], kRadToDeg, 1, "%.1f");
+    opt_update |= ImGui::InputDouble(
+        "Finger Wiggle (m)", &opt_settings.finger_wiggle, 0.01);
+    opt_update |=
+        ImGui::InputDouble("Max Runtime (s)", &opt_settings.max_runtime, 1);
+    opt_update |=
+        ImGui::InputDouble("Tolerance", &opt_settings.tolerance, 0.0001);
+
+    if (ImGui::BeginCombo("Algorithm",
+                          labels::kAlgorithms[opt_settings.algorithm])) {
+      for (int i = 0; i < NLOPT_NUM_ALGORITHMS; i++) {
+        bool is_selected = (opt_settings.algorithm == i);
+        if (ImGui::Selectable(labels::kAlgorithms[i], is_selected)) {
+          opt_settings.algorithm = (nlopt_algorithm)i;        
+          opt_update = true;
+        }
+        if (is_selected) {
+          ImGui::SetItemDefaultFocus();
+        }
+      }
+      ImGui::EndCombo();
+    }
+    opt_update |= ImGui::InputInt("Population", (int*)&opt_settings.population, 1000);
+
+    cost_update = ImGui::InputDouble("Floor", &cost_settings.floor, 0.001);
+    if (opt_update) vm_.PSG().SetOptSettings(opt_settings);
+    if (cost_update) vm_.PSG().SetCostSettings(cost_settings);
+    if (ImGui::Button("Optimize", ImVec2(w, 0))) {
+      optimizer_.Optimize(vm_.PSG());
+    }
+  }
+  ImGui::PopID();
+}
 
 void MainUI::DrawViewPanel() {
   if (ImGui::CollapsingHeader("View", ImGuiTreeNodeFlags_None)) {
@@ -305,6 +392,43 @@ void MainUI::DrawGuizmoOptionPanel() {
     }
     ImGui::PopID();
   }
+}
+
+void MainUI::DrawOptimizationStatusPanel() {
+  float w = ImGui::GetContentRegionAvailWidth();
+  float p = ImGui::GetStyle().FramePadding.x;
+
+  ImGui::PushID("OptProg");
+  if (ImGui::CollapsingHeader("Optimization Progress",
+                              ImGuiTreeNodeFlags_DefaultOpen)) {
+    bool isRunning = optimizer_.IsRunning();
+    auto start = optimizer_.GetStartTime();
+    auto stop = std::chrono::high_resolution_clock::now();
+    auto duration =
+        std::chrono::duration_cast<std::chrono::seconds>(stop - start);
+    if (isRunning) {
+      ImGui::Text("Optimizer Running...");
+      ImGui::Text("Elapsed: %llds", duration.count());
+    } else {
+      ImGui::Text("Optimizer Stopped...");
+    }
+    ImGui::Text("Current Cost: %.4e", optimizer_.GetCurrentCost());
+    if (isRunning) {
+      if (ImGui::Button("Pause", ImVec2(w, 0))) {
+        optimizer_.Cancel();
+      }
+    } else {
+      if (ImGui::Button("Resume", ImVec2(w, 0))) {
+        optimizer_.Resume();
+      }
+    }
+    if (optimizer_.IsResultAvailable()) {
+      if (ImGui::Button("Load Result", ImVec2(w, 0))) {
+        vm_.PSG().SetParams(optimizer_.GetCurrentParams());
+      }
+    }
+  }
+  ImGui::PopID();
 }
 
 void MainUI::DrawLayerOptions(Layer layer, const char* id) {
@@ -379,6 +503,7 @@ void MainUI::OnLoadMeshClicked() {
 
   vm_.SetMesh(SV, SF);
   OnAlignCameraCenter();
+  optimizer_.Reset();
 }
 
 void MainUI::OnAlignCameraCenter() {
@@ -701,6 +826,7 @@ void MainUI::SetGuizmoTransform(const Eigen::Affine3d& trans) {
   } else {
     vm_.SetCurrentPose(trans);
     if (selected_keyframe_index_ != -1) {
+      vm_.PSG().reinit_trajectory = false;
       vm_.PSG().EditKeyframe(selected_keyframe_index_, vm_.GetCurrentPose());
     }
   }
