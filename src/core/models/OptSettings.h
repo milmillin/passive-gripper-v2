@@ -11,12 +11,13 @@ namespace models {
 struct OptSettings {
   double max_runtime = 0;  // seconds
   double finger_wiggle = 0.01;
-  Pose trajectory_wiggle = {4. * kDegToRad,
-                                4. * kDegToRad,
-                                4. * kDegToRad,
-                                8. * kDegToRad,
-                                8. * kDegToRad,
-                                8. * kDegToRad};
+  Pose trajectory_wiggle = (Pose() << 4. * kDegToRad,
+                            4. * kDegToRad,
+                            4. * kDegToRad,
+                            8. * kDegToRad,
+                            8. * kDegToRad,
+                            8. * kDegToRad)
+                               .finished();
   double tolerance = 0;  // run forever
   nlopt_algorithm algorithm = NLOPT_GN_CRS2_LM;
   size_t population = 20000;

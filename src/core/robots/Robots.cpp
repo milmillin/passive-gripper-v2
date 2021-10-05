@@ -72,7 +72,9 @@ static bool InverseImpl(const Eigen::Matrix3d& rot,
     std::vector<IkReal> vsolfree(numSolFreeParams);
     sol.GetSolution(solvalues, vsolfree);
     Pose p;
-    std::copy_n(solvalues.begin(), kNumDOFs, p.begin());
+    for (size_t j = 0; j < kNumDOFs; j++) {
+      p[j] = solvalues[j];
+    }
     out_jointConfigs.push_back(p);
   }
 

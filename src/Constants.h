@@ -40,10 +40,11 @@ const Eigen::Affine3d kLocalTrans[6] = {
     Eigen::Translation3d(-kArmRadius, -kArmRadius, -0.01) *
         Eigen::Scaling(2 * kArmRadius, 2 * kArmRadius, 0.01)};
 
-typedef std::array<double, kNumDOFs> Pose;
+typedef Eigen::Array<double, kNumDOFs, 1> Pose;
 typedef std::vector<Pose> Trajectory;
 
-const Pose kInitPose = {-kHalfPi, -2., -2., 4., -kHalfPi, 0.};
+const Pose kInitPose =
+    (Pose() << -kHalfPi, -2., -2., 4., -kHalfPi, 0.).finished();
 
 // Quality Metric
 // small float to make quadratic program positive semidefinite
