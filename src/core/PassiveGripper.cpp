@@ -16,11 +16,12 @@ PassiveGripper::PassiveGripper() {
 }
 
 void PassiveGripper::SetMesh(const Eigen::MatrixXd& V,
-                             const Eigen::MatrixXi& F) {
+                             const Eigen::MatrixXi& F,
+                             bool invalidate) {
   mdr_.init(V, F);
   mesh_changed_ = true;
   mesh_loaded_ = true;
-  Invalidate();
+  if (invalidate) Invalidate();
 }
 
 // Contact Points
@@ -140,7 +141,19 @@ void PassiveGripper::SetCostSettings(const CostSettings& settings) {
   Invalidate();
 }
 
-void PassiveGripper::SetParams(const GripperParams& params) {
+void PassiveGripper::SetSettings(const GripperSettings& settings,
+                                 bool invalidate) {
+  settings_ = settings;
+  contact_settings_changed_ = true;
+  finger_settings_changed_ = true;
+  trajectory_settings_changed_ = true;
+  opt_settings_changed_ = true;
+  topo_opt_settings_changed_ = true;
+  cost_settings_changed_ = true;
+  if (invalidate) Invalidate();
+}
+
+void PassiveGripper::SetParams(const GripperParams& params, bool invalidate) {
   bool tmp_reinit_finger = reinit_fingers;
   bool tmp_reinit_trajectory = reinit_trajectory;
   reinit_fingers = false;
@@ -148,7 +161,7 @@ void PassiveGripper::SetParams(const GripperParams& params) {
   params_ = params;
   finger_changed_ = true;
   trajectory_changed_ = true;
-  Invalidate();
+  if (invalidate) Invalidate();
   reinit_fingers = tmp_reinit_finger;
   reinit_trajectory = tmp_reinit_trajectory;
 }
@@ -176,12 +189,22 @@ void PassiveGripper::Invalidate() {
   if (cost_changed_) InvalidateCost();
 }
 
-void PassiveGripper::ForceInvalidateAll() {
+void PassiveGripper::ForceInvalidateAll(bool disable_reinit) {
+  bool tmp_reinit_finger;
+  bool tmp_reinit_trajectory;
+  if (disable_reinit) {
+    tmp_reinit_finger = reinit_fingers;
+    tmp_reinit_trajectory = reinit_trajectory;
+  }
   mesh_changed_ = true;
   finger_settings_changed_ = true;
   trajectory_settings_changed_ = true;
   cost_settings_changed_ = true;
   Invalidate();
+  if (disable_reinit) {
+    reinit_fingers = tmp_reinit_finger;
+    reinit_trajectory = tmp_reinit_trajectory;
+  }
 }
 
 void PassiveGripper::InvokeInvalidated(InvalidatedReason reason) {

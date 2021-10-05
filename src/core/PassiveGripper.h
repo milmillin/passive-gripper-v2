@@ -8,6 +8,7 @@
 #include "models/GripperParams.h"
 #include "models/GripperSettings.h"
 #include "models/MeshDependentResource.h"
+#include "serialization/Serialization.h"
 
 namespace psg {
 namespace core {
@@ -24,9 +25,10 @@ class PassiveGripper {
   inline void RegisterInvalidatedDelegate(const InvalidatedDelegate& d) {
     Invalidated_ = d;
   }
+  void ForceInvalidateAll(bool disable_reinit = false);
 
   // Mesh
-  void SetMesh(const Eigen::MatrixXd& V, const Eigen::MatrixXi& F);
+  void SetMesh(const Eigen::MatrixXd& V, const Eigen::MatrixXi& F, bool invalidate = true);
   inline void GetMesh(Eigen::MatrixXd& V, Eigen::MatrixXi& F) const {
     V = mdr_.V;
     F = mdr_.F;
@@ -48,14 +50,15 @@ class PassiveGripper {
 
   // Settings
   void SetContactSettings(const ContactSettings& settings);
-  void SetFingerSettings(const FingerSettings& finger_settings);
-  void SetTrajectorySettings(const TrajectorySettings& finger_settings);
-  void SetOptSettings(const OptSettings& finger_settings);
-  void SetTopoOptSettings(const TopoOptSettings& finger_settings);
-  void SetCostSettings(const CostSettings& finger_settings);
+  void SetFingerSettings(const FingerSettings& settings);
+  void SetTrajectorySettings(const TrajectorySettings& settings);
+  void SetOptSettings(const OptSettings& settings);
+  void SetTopoOptSettings(const TopoOptSettings& settings);
+  void SetCostSettings(const CostSettings& settings);
+  void SetSettings(const GripperSettings& settings, bool invalidate = true);
 
   // Params
-  void SetParams(const GripperParams& params);
+  void SetParams(const GripperParams& params, bool invalidate = true);
 
   bool reinit_trajectory = true;
   bool reinit_fingers = true;
@@ -92,7 +95,6 @@ class PassiveGripper {
   InvalidatedDelegate Invalidated_;
 
   void Invalidate();
-  void ForceInvalidateAll();
   void InvokeInvalidated(InvalidatedReason reason);
 
   // To be called by Invalidate()
@@ -132,3 +134,30 @@ class PassiveGripper {
 
 }  // namespace core
 }  // namespace psg
+
+DECL_SERIALIZE(psg::core::PassiveGripper, obj) {
+  constexpr int version = 1;
+  SERIALIZE(version);
+  SERIALIZE(obj.GetMDR().V);
+  SERIALIZE(obj.GetMDR().F);
+  SERIALIZE(obj.GetParams());
+  SERIALIZE(obj.GetSettings());
+}
+
+DECL_DESERIALIZE(psg::core::PassiveGripper, obj) {
+  int version;
+  DESERIALIZE(version);
+  Eigen::MatrixXd V;
+  Eigen::MatrixXi F;
+  GripperParams params;
+  GripperSettings settings;
+  if (version == 1) {
+    DESERIALIZE(V);
+    DESERIALIZE(F);
+    DESERIALIZE(params);
+    DESERIALIZE(settings);
+    obj.SetMesh(V, F);
+    obj.SetSettings(settings);
+    obj.SetParams(params);
+  }
+}

@@ -59,6 +59,8 @@ class MainUI : public igl::opengl::glfw::imgui::ImGuiMenu {
 
   // Button Callback
   void OnLoadMeshClicked();
+  void OnLoadPSGClicked();
+  void OnSavePSGClicked();
   void OnAlignCameraCenter();
 
   // Layer Invalidation

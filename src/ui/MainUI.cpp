@@ -2,11 +2,13 @@
 
 #include <igl/remove_duplicate_vertices.h>
 #include <igl/unproject_onto_mesh.h>
+#include <iostream>
 
 #include "../core/CostFunctions.h"
 #include "../core/GeometryUtils.h"
 #include "../core/models/GripperSettings.h"
 #include "../core/robots/Robots.h"
+#include "../core/serialization/Serialization.h"
 #include "Components.h"
 
 using namespace psg::core;
@@ -118,6 +120,13 @@ void MainUI::draw_viewer_menu() {
   ImGui::Separator();
   ImGui::Checkbox("Reinit Trajectory", &vm_.PSG().reinit_trajectory);
   ImGui::Separator();
+  if (ImGui::Button("Load PSG", ImVec2((w - p) / 2, 0))) {
+    OnLoadPSGClicked();
+  }
+  ImGui::SameLine();
+  if (MyButton("Save PSG", ImVec2((w - p) / 2, 0), !vm_.PSG().IsMeshLoaded())) {
+    OnSavePSGClicked();
+  }
   if (vm_.PSG().IsMeshLoaded()) {
     if (optimizer_.IsRunning() || optimizer_.IsResultAvailable()) {
       DrawOptimizationStatusPanel();
@@ -337,7 +346,7 @@ void MainUI::DrawOptimizationPanel() {
       for (int i = 0; i < NLOPT_NUM_ALGORITHMS; i++) {
         bool is_selected = (opt_settings.algorithm == i);
         if (ImGui::Selectable(labels::kAlgorithms[i], is_selected)) {
-          opt_settings.algorithm = (nlopt_algorithm)i;        
+          opt_settings.algorithm = (nlopt_algorithm)i;
           opt_update = true;
         }
         if (is_selected) {
@@ -346,7 +355,8 @@ void MainUI::DrawOptimizationPanel() {
       }
       ImGui::EndCombo();
     }
-    opt_update |= ImGui::InputInt("Population", (int*)&opt_settings.population, 1000);
+    opt_update |=
+        ImGui::InputInt("Population", (int*)&opt_settings.population, 1000);
 
     cost_update = ImGui::InputDouble("Floor", &cost_settings.floor, 0.001);
     if (opt_update) vm_.PSG().SetOptSettings(opt_settings);
@@ -504,6 +514,49 @@ void MainUI::OnLoadMeshClicked() {
   vm_.SetMesh(SV, SF);
   OnAlignCameraCenter();
   optimizer_.Reset();
+}
+
+void MainUI::OnLoadPSGClicked() {
+  std::string filename = igl::file_dialog_open();
+
+  // Sanity check
+  if (filename.empty()) return;
+  size_t last_dot = filename.rfind('.');
+  if (last_dot == std::string::npos) {
+    std::cerr << "Error: No file extension found in " << filename << std::endl;
+    return;
+  }
+  std::string extension = filename.substr(last_dot + 1);
+  if (extension != "psg") {
+    std::cerr << "Error: Not a .psg file" << filename << std::endl;
+    return;
+  }
+
+  std::ifstream myfile(filename, std::ios::in | std::ios::binary);
+  psg::core::serialization::Deserialize(vm_.PSG(), myfile);
+  std::cout << filename << " psg loaded!" << std::endl;
+  OnAlignCameraCenter();
+}
+
+void MainUI::OnSavePSGClicked() {
+  std::string filename = igl::file_dialog_save();
+
+  // Sanity check
+  if (filename.empty()) return;
+  size_t last_dot = filename.rfind('.');
+  if (last_dot == std::string::npos) {
+    std::cerr << "Error: No file extension found in " << filename << std::endl;
+    return;
+  }
+  std::string extension = filename.substr(last_dot + 1);
+  if (extension != "psg") {
+    std::cerr << "Error: Not a .psg file" << filename << std::endl;
+    return;
+  }
+
+  std::ofstream myfile(filename, std::ios::out | std::ios::binary);
+  psg::core::serialization::Serialize(vm_.PSG(), myfile);
+  std::cout << "PSG saved to " << filename << std::endl;
 }
 
 void MainUI::OnAlignCameraCenter() {

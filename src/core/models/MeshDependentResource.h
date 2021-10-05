@@ -5,6 +5,7 @@
 #include <Eigen/Core>
 
 #include "../../Constants.h"
+#include "../serialization/Serialization.h"
 
 namespace psg {
 namespace core {
@@ -37,3 +38,22 @@ struct MeshDependentResource {
 }  // namespace models
 }  // namespace core
 }  // namespace psg
+
+DECL_SERIALIZE(psg::core::models::MeshDependentResource, obj) {
+  constexpr int version = 1;
+  SERIALIZE(version);
+  SERIALIZE(obj.V);
+  SERIALIZE(obj.F);
+}
+
+DECL_DESERIALIZE(psg::core::models::MeshDependentResource, obj) {
+  int version;
+  DESERIALIZE(version);
+  Eigen::MatrixXd V;
+  Eigen::MatrixXi F;
+  if (version == 1) {
+    DESERIALIZE(V);
+    DESERIALIZE(F);
+    obj.init(V, F);
+  }
+}
