@@ -38,6 +38,7 @@ class PassiveGripper {
 
   // Contact Point
   void AddContactPoint(const ContactPoint& contact_point);
+  void SetContactPoints(const std::vector<ContactPoint>& contact_points);
   void RemoveContactPoint(size_t index);
   void ClearContactPoint();
 

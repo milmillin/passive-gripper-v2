@@ -1,6 +1,9 @@
 #include "Initialization.h"
 
+#include <igl/random_points_on_mesh.h>
+#include <random>
 #include "GeometryUtils.h"
+#include "QualityMetric.h"
 #include "robots/Robots.h"
 
 namespace psg {
@@ -228,6 +231,90 @@ Trajectory InitializeTrajectory(const std::vector<Eigen::MatrixXd>& fingers,
     }
   }
   return result;
+}
+
+std::vector<ContactPointMetric> InitializeContactPoints(
+    const MeshDependentResource& mdr,
+    const GripperSettings& settings,
+    size_t num_candidates,
+    size_t num_seeds) {
+  std::vector<ContactPointMetric> prelim;
+  prelim.reserve(num_candidates);
+
+  Eigen::MatrixXd B;
+  Eigen::VectorXi FI;
+  Eigen::MatrixXd X;
+  igl::random_points_on_mesh(num_seeds, mdr.V, mdr.F, B, FI, X);
+
+  std::mt19937 gen;
+  std::uniform_int_distribution<int> dist(0, num_seeds - 1);
+
+#pragma omp parallel
+  {
+    while (true) {
+      bool toContinue;
+#pragma omp critical
+      { toContinue = prelim.size() < num_candidates; }
+      if (!toContinue) break;
+
+      // Random 3 contact points
+      int pids[3] = {dist(gen), dist(gen), dist(gen)};
+      if (pids[0] == pids[1] || pids[1] == pids[2] || pids[0] == pids[2])
+        continue;
+      std::vector<ContactPoint> contactPoints(3);
+      bool work = true;
+      for (int i = 0; i < 3; i++) {
+        contactPoints[i] =
+            ContactPoint{X.row(pids[i]), mdr.FN.row(FI(pids[i])), FI(pids[i])};
+        if (X.row(pids[i]).y() <= settings.cost.floor) {
+          work = false;
+          break;
+        }
+      }
+      if (!work) continue;
+
+      // Check Feasibility
+      std::vector<ContactPoint> contact_cones;
+      contact_cones.reserve(3 * settings.contact.cone_res);
+      for (size_t i = 0; i < 3; i++) {
+        const auto&& cone = GenerateContactCone(contactPoints[i],
+                                                settings.contact.cone_res,
+                                                settings.contact.friction);
+        contact_cones.insert(contact_cones.end(), cone.begin(), cone.end());
+      }
+
+      double partialMinWrench =
+          ComputePartialMinWrenchQP(contact_cones,
+                                    mdr.center_of_mass,
+                                    -Eigen::Vector3d::UnitY(),
+                                    Eigen::Vector3d::Zero());
+      // Get at least a partial closure
+      if (partialMinWrench == 0) continue;
+
+      double minWrench = ComputeMinWrenchQP(contact_cones, mdr.center_of_mass);
+
+      ContactPointMetric candidate;
+      candidate.contact_points = contactPoints;
+      candidate.partial_min_wrench = partialMinWrench;
+      candidate.min_wrench = minWrench;
+#pragma omp critical
+      {
+        prelim.push_back(candidate);
+        if (prelim.size() % 100 == 0)
+          std::cout << "prelim prog: " << prelim.size() << "/" << num_candidates
+                    << std::endl;
+      }
+    }
+  }
+
+  std::sort(prelim.begin(),
+            prelim.end(),
+            [](const ContactPointMetric& a, const ContactPointMetric& b) {
+              if (a.min_wrench == b.min_wrench)
+                return a.partial_min_wrench > b.partial_min_wrench;
+              return a.min_wrench > b.min_wrench;
+            });
+  return prelim;
 }
 
 }  // namespace core

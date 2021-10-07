@@ -2,7 +2,9 @@
 
 #include <Eigen/Core>
 #include "models/ContactPoint.h"
+#include "models/ContactPointMetric.h"
 #include "models/MeshDependentResource.h"
+#include "models/GripperSettings.h"
 
 namespace psg {
 namespace core {
@@ -17,6 +19,12 @@ Eigen::MatrixXd InitializeFinger(const ContactPoint& contact_point,
 Trajectory InitializeTrajectory(const std::vector<Eigen::MatrixXd>& fingers,
                                 const Pose& init_pose,
                                 size_t n_keyframes);
+
+std::vector<ContactPointMetric> InitializeContactPoints(
+    const MeshDependentResource& mdr,
+    const GripperSettings& settings,
+    size_t num_candidates,
+    size_t num_seeds);
 
 }  // namespace core
 }  // namespace psg

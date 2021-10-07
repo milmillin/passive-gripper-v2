@@ -10,6 +10,7 @@
 #include "../core/robots/Robots.h"
 #include "../core/serialization/Serialization.h"
 #include "Components.h"
+#include "../core/Initialization.h"
 
 using namespace psg::core;
 
@@ -218,6 +219,30 @@ void MainUI::DrawContactPointPanel() {
     if (ImGui::Button("Delete All Contact Points", ImVec2(w, 0))) {
       vm_.PSG().ClearContactPoint();
     }
+  }
+  if (ImGui::CollapsingHeader("Candidates",
+                              ImGuiTreeNodeFlags_DefaultOpen)) {
+    ImGui::InputInt("# Candidates", (int*)&cp_num_candidates, 1000);
+    ImGui::InputInt("# Seeds", (int*)&cp_num_seeds, 1000);
+    if (ImGui::Button("Generate Candidates", ImVec2(w, 0))) {
+      contact_point_candidates_ = InitializeContactPoints(
+          vm_.PSG().GetMDR(), vm_.PSG().GetSettings(), cp_num_candidates, cp_num_seeds);    
+    }
+    ImGui::Separator();
+    size_t k = std::min(10ull, contact_point_candidates_.size());
+    ImGui::PushID("CPC");
+    for (size_t i = 0; i < k; i++) {
+      ImGui::PushID(std::to_string(i).c_str());
+      if (ImGui::Button("Select")) {
+        vm_.PSG().SetContactPoints(contact_point_candidates_[i].contact_points);
+      }
+      ImGui::SameLine();
+      ImGui::Text("mw: %.4e, pmw: %.4e",
+                  contact_point_candidates_[i].min_wrench,
+                  contact_point_candidates_[i].partial_min_wrench);
+      ImGui::PopID();
+    }
+    ImGui::PopID();
   }
 }
 

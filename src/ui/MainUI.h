@@ -6,6 +6,7 @@
 #include "Layer.h"
 #include "ViewModel.h"
 #include "../core/Optimizer.h"
+#include "../core/models/ContactPointMetric.h"
 
 namespace psg {
 namespace ui {
@@ -73,6 +74,11 @@ class MainUI : public igl::opengl::glfw::imgui::ImGuiMenu {
   void OnTrajectoryInvalidated();
   void OnSweptSurfaceInvalidated();
 
+  // Contact Point Candidates
+  size_t cp_num_seeds = 1000;
+  size_t cp_num_candidates = 10000;
+  std::vector<ContactPointMetric> contact_point_candidates_;
+
   // Keyframe
   size_t selected_keyframe_index_ = -1;
 
@@ -90,7 +96,6 @@ class MainUI : public igl::opengl::glfw::imgui::ImGuiMenu {
   void SetGuizmoTransform(const Eigen::Affine3d& trans);
   bool imguizmo_pre_draw();
   bool imguizmo_post_draw();
-
 };
 
 }  // namespace ui

@@ -58,6 +58,29 @@ void PassiveGripper::AddContactPoint(const ContactPoint& contact_point) {
   Invalidate();
 }
 
+void PassiveGripper::SetContactPoints(
+    const std::vector<ContactPoint>& contact_points) {
+  params_.contact_points = contact_points;
+  params_.fingers.clear();
+  contact_cones_.clear();
+  Eigen::Affine3d effector_pos = robots::Forward(params_.trajectory.front());
+
+  for (size_t i = 0; i < contact_points.size(); i++) {
+    Eigen::MatrixXd&& finger =
+        InitializeFinger(contact_points[i],
+                         mdr_,
+                         effector_pos.translation(),
+                         settings_.finger.n_finger_joints);
+    params_.fingers.push_back(finger);
+    std::vector<ContactPoint>&& cone = GenerateContactCone(
+        contact_points[i], settings_.contact.cone_res, settings_.contact.friction);
+    contact_cones_.insert(contact_cones_.end(), cone.begin(), cone.end());
+  }
+
+  contact_changed_ = true;
+  Invalidate();
+}
+
 void PassiveGripper::RemoveContactPoint(size_t index) {
   params_.contact_points.erase(params_.contact_points.begin() + index);
   params_.fingers.erase(params_.fingers.begin() + index);
