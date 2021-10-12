@@ -134,7 +134,7 @@ class PassiveGripper : public psg::core::serialization::Serializable {
   DECLARE_GETTER(GetSettings, settings_)
   DECLARE_GETTER(GetMDR, mdr_)
 
-  SERIALIZE_MEMBER() {
+  DECL_SERIALIZE() {
     constexpr int version = 1;
     SERIALIZE(version);
     SERIALIZE(GetMDR().V);
@@ -143,7 +143,7 @@ class PassiveGripper : public psg::core::serialization::Serializable {
     SERIALIZE(GetSettings());
   }
 
-  DESERIALIZE_MEMBER() {
+  DECL_DESERIALIZE() {
     int version;
     DESERIALIZE(version);
     Eigen::MatrixXd V;

@@ -14,7 +14,7 @@ struct ContactPoint : psg::core::serialization::Serializable {
   Eigen::Vector3d normal;  // pointing out of mesh
   int fid;
 
-  SERIALIZE_MEMBER() {
+  DECL_SERIALIZE() {
     constexpr int version = 1;
     SERIALIZE(version);
     SERIALIZE(position);
@@ -22,7 +22,7 @@ struct ContactPoint : psg::core::serialization::Serializable {
     SERIALIZE(fid);
   }
 
-  DESERIALIZE_MEMBER() {
+  DECL_DESERIALIZE() {
     int version;
     DESERIALIZE(version);
     if (version == 1) {

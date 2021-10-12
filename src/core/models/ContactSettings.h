@@ -10,14 +10,14 @@ struct ContactSettings : psg::core::serialization::Serializable {
   double friction = 0.5;
   size_t cone_res = 4;
 
-  SERIALIZE_MEMBER() {
+  DECL_SERIALIZE() {
     constexpr int version = 1;
     SERIALIZE(version);
     SERIALIZE(friction);
     SERIALIZE(cone_res);
   }
 
-  DESERIALIZE_MEMBER() {
+  DECL_DESERIALIZE() {
     int version;
     DESERIALIZE(version);
     if (version == 1) {

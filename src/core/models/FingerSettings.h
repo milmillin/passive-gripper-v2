@@ -9,13 +9,13 @@ namespace models {
 struct FingerSettings : psg::core::serialization::Serializable {
   size_t n_finger_joints = 4;
 
-  SERIALIZE_MEMBER() {
+  DECL_SERIALIZE() {
     constexpr int version = 1;
     SERIALIZE(version);
     SERIALIZE(n_finger_joints);
   }
 
-  DESERIALIZE_MEMBER() {
+  DECL_DESERIALIZE() {
     int version;
     DESERIALIZE(version);
     if (version == 1) {

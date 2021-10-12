@@ -34,14 +34,14 @@ struct MeshDependentResource : psg::core::serialization::Serializable {
 
   size_t ComputeClosestFacet(const Eigen::Vector3d& position) const;
 
-  SERIALIZE_MEMBER() {
+  DECL_SERIALIZE() {
     constexpr int version = 1;
     SERIALIZE(version);
     SERIALIZE(V);
     SERIALIZE(F);
   }
 
-  DESERIALIZE_MEMBER() {
+  DECL_DESERIALIZE() {
     int version;
     DESERIALIZE(version);
     Eigen::MatrixXd V_;

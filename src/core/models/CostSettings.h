@@ -11,7 +11,7 @@ struct CostSettings : psg::core::serialization::Serializable {
   size_t n_trajectory_steps = 32;
   size_t n_finger_steps = 32;
 
-  SERIALIZE_MEMBER() {
+  DECL_SERIALIZE() {
     constexpr int version = 1;
     SERIALIZE(version);
     SERIALIZE(floor);
@@ -19,7 +19,7 @@ struct CostSettings : psg::core::serialization::Serializable {
     SERIALIZE(n_finger_steps);
   }
 
-  DESERIALIZE_MEMBER() {
+  DECL_DESERIALIZE() {
     int version;
     DESERIALIZE(version);
     if (version == 1) {

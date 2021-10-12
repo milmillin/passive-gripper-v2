@@ -23,7 +23,7 @@ struct OptSettings : psg::core::serialization::Serializable {
   nlopt_algorithm algorithm = NLOPT_GN_CRS2_LM;
   size_t population = 20000;
 
-  SERIALIZE_MEMBER() {
+  DECL_SERIALIZE() {
     constexpr int version = 1;
     SERIALIZE(version);
     SERIALIZE(max_runtime);
@@ -34,7 +34,7 @@ struct OptSettings : psg::core::serialization::Serializable {
     SERIALIZE(population);
   }
 
-  DESERIALIZE_MEMBER() {
+  DECL_DESERIALIZE() {
     int version = 1;
     DESERIALIZE(version);
     if (version == 1) {

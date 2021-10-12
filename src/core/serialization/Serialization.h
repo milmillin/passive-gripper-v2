@@ -14,8 +14,8 @@ namespace core {
 namespace serialization {
 
 struct Serializable {
-  virtual inline void Serialize(std::ofstream& f) const = 0;
-  virtual inline void Deserialize(std::ifstream& f) = 0;
+  virtual void Serialize(std::ofstream& f) const = 0;
+  virtual void Deserialize(std::ifstream& f) = 0;
 };
 
 // Serializable
@@ -212,6 +212,6 @@ void Deserialize(Eigen::Matrix<T, R, C, P, MR, MC>& obj, std::ifstream& f) {
 
 #define SERIALIZE(obj) psg::core::serialization::Serialize(obj, f)
 #define DESERIALIZE(obj) psg::core::serialization::Deserialize(obj, f)
-#define SERIALIZE_MEMBER() inline void Serialize(std::ofstream& f) const override
-#define DESERIALIZE_MEMBER() inline void Deserialize(std::ifstream& f) override
+#define DECL_SERIALIZE() inline void Serialize(std::ofstream& f) const override
+#define DECL_DESERIALIZE() inline void Deserialize(std::ifstream& f) override
 

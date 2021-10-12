@@ -14,7 +14,7 @@ struct GripperParams : psg::core::serialization::Serializable {
   Trajectory trajectory;
   std::vector<ContactPoint> contact_points;
 
-  SERIALIZE_MEMBER() {
+  DECL_SERIALIZE() {
     constexpr int version = 1;
     SERIALIZE(version);
     SERIALIZE(fingers);
@@ -22,7 +22,7 @@ struct GripperParams : psg::core::serialization::Serializable {
     SERIALIZE(contact_points);
   }
 
-  DESERIALIZE_MEMBER() {
+  DECL_DESERIALIZE() {
     int version;
     DESERIALIZE(version);
     if (version == 1) {

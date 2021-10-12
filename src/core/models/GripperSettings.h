@@ -22,7 +22,7 @@ struct GripperSettings : psg::core::serialization::Serializable {
   TopoOptSettings topo_opt;
   CostSettings cost;
 
-  SERIALIZE_MEMBER() {
+  DECL_SERIALIZE() {
     constexpr int version = 1;
     SERIALIZE(version);
     SERIALIZE(contact);
@@ -33,7 +33,7 @@ struct GripperSettings : psg::core::serialization::Serializable {
     SERIALIZE(cost);
   }
 
-  DESERIALIZE_MEMBER() {
+  DECL_DESERIALIZE() {
     int version;
     DESERIALIZE(version);
     if (version == 1) {

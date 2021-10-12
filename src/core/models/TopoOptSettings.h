@@ -17,7 +17,7 @@ struct TopoOptSettings : psg::core::serialization::Serializable {
   double contact_point_size = 0.01;
   double base_thickness = 0.01;
 
-  SERIALIZE_MEMBER() {
+  DECL_SERIALIZE() {
     constexpr int version = 1;
     SERIALIZE(version);
     SERIALIZE(lower_bound);
@@ -30,7 +30,7 @@ struct TopoOptSettings : psg::core::serialization::Serializable {
     SERIALIZE(base_thickness);
   }
 
-  DESERIALIZE_MEMBER() {
+  DECL_DESERIALIZE() {
     int version;
     DESERIALIZE(version);
     if (version == 1) {
