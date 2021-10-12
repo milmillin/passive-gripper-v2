@@ -229,7 +229,7 @@ void MainUI::DrawContactPointPanel() {
           vm_.PSG().GetMDR(), vm_.PSG().GetSettings(), cp_num_candidates, cp_num_seeds);    
     }
     ImGui::Separator();
-    size_t k = std::min(10ull, contact_point_candidates_.size());
+    size_t k = std::min((size_t)10, contact_point_candidates_.size());
     ImGui::PushID("CPC");
     for (size_t i = 0; i < k; i++) {
       ImGui::PushID(std::to_string(i).c_str());

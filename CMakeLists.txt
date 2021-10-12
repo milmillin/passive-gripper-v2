@@ -1,8 +1,7 @@
 cmake_minimum_required(VERSION 3.14)
 project(passive-gripper)
 set (CMAKE_CXX_STANDARD 17)
-
-include(FetchContent)
+set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
@@ -87,11 +86,11 @@ find_package(NLopt CONFIG REQUIRED)
 find_package(CGAL CONFIG REQUIRED)
 
 # Linking
-set(CORE_LINK_LIBS igl::core igl::embree igl::png igl::cgal embree lapack Qhull::qhullcpp Qhull::qhull_r CGAL::CGAL)
+set(CORE_LINK_LIBS igl::core igl::embree igl::png igl::cgal embree lapack Qhull::qhullcpp NLopt::nlopt CGAL::CGAL)
 if (NOT MSVC)
-    list(APPEND CORE_LINK_LIBS stdc++fs nlopt) # Not sure if neccessary here
+    list(APPEND CORE_LINK_LIBS stdc++fs Qhull::qhullstatic_r)
 else()
-    list(APPEND CORE_LINK_LIBS NLopt::nlopt)
+    list(APPEND CORE_LINK_LIBS Qhull:qhull_r)
 endif()
 
 add_library(core ${CORE_SRCFILES})

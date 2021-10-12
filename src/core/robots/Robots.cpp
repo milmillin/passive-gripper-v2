@@ -28,7 +28,7 @@ static void ForwardImpl(const Pose& jointConfig,
   }
 }
 
-Eigen::Affine3d robots::Forward(const Pose& jointConfig) {
+Eigen::Affine3d Forward(const Pose& jointConfig) {
   Eigen::Matrix3d rot;
   Eigen::Vector3d trans;
   ForwardImpl(jointConfig, rot, trans);
@@ -81,7 +81,7 @@ static bool InverseImpl(const Eigen::Matrix3d& rot,
   return true;
 }
 
-bool robots::Inverse(Eigen::Affine3d trans,
+bool Inverse(Eigen::Affine3d trans,
                      std::vector<Pose>& out_jointConfigs) {
   trans = globalTransInv * trans;
   return InverseImpl(trans.linear(), trans.translation(), out_jointConfigs);
@@ -98,7 +98,7 @@ static Eigen::Affine3d JointTransform(double theta,
   return result;
 }
 
-void robots::ForwardIntermediate(const Pose& jointConfig,
+void ForwardIntermediate(const Pose& jointConfig,
                                  std::vector<Eigen::Affine3d>& out_trans) {
   out_trans.resize(kNumDOFs);
   out_trans[0] =

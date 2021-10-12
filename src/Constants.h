@@ -11,10 +11,10 @@
 namespace psg {
 
 constexpr double kPi = EIGEN_PI;
-constexpr double kTwoPi = EIGEN_PI * 2.;
-constexpr double kHalfPi = EIGEN_PI / 2.;
-constexpr float kDegToRad = EIGEN_PI / 180.;
-constexpr float kRadToDeg = 180. / EIGEN_PI;
+constexpr double kTwoPi = kPi * 2.;
+constexpr double kHalfPi = kPi / 2.;
+const double kDegToRad = kPi / 180.;
+const double kRadToDeg = 180. / kPi;
 
 constexpr size_t kNumDOFs = 6;
 const double kRobotA[] = {0, -0.425, -0.39225, 0, 0, 0};

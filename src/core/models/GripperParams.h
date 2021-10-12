@@ -1,8 +1,9 @@
 #pragma once
 
+#include "ContactPoint.h"
+
 #include "../../Constants.h"
 #include "../serialization/Serialization.h"
-#include "ContactPoint.h"
 
 namespace psg {
 namespace core {
