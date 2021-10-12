@@ -9,7 +9,7 @@ namespace psg {
 namespace core {
 namespace models {
 
-struct OptSettings {
+struct OptSettings : psg::core::serialization::Serializable {
   double max_runtime = 0;  // seconds
   double finger_wiggle = 0.01;
   Pose trajectory_wiggle = (Pose() << 4. * kDegToRad,
@@ -22,32 +22,32 @@ struct OptSettings {
   double tolerance = 0;  // run forever
   nlopt_algorithm algorithm = NLOPT_GN_CRS2_LM;
   size_t population = 20000;
+
+  SERIALIZE_MEMBER() {
+    constexpr int version = 1;
+    SERIALIZE(version);
+    SERIALIZE(max_runtime);
+    SERIALIZE(finger_wiggle);
+    SERIALIZE(trajectory_wiggle);
+    SERIALIZE(tolerance);
+    SERIALIZE(algorithm);
+    SERIALIZE(population);
+  }
+
+  DESERIALIZE_MEMBER() {
+    int version = 1;
+    DESERIALIZE(version);
+    if (version == 1) {
+      DESERIALIZE(max_runtime);
+      DESERIALIZE(finger_wiggle);
+      DESERIALIZE(trajectory_wiggle);
+      DESERIALIZE(tolerance);
+      DESERIALIZE(algorithm);
+      DESERIALIZE(population);
+    }
+  }
 };
 
 }  // namespace models
 }  // namespace core
 }  // namespace psg
-
-DECL_SERIALIZE(psg::core::models::OptSettings, obj) {
-  constexpr int version = 1;
-  SERIALIZE(version);
-  SERIALIZE(obj.max_runtime);
-  SERIALIZE(obj.finger_wiggle);
-  SERIALIZE(obj.trajectory_wiggle);
-  SERIALIZE(obj.tolerance);
-  SERIALIZE(obj.algorithm);
-  SERIALIZE(obj.population);
-}
-
-DECL_DESERIALIZE(psg::core::models::OptSettings, obj) {
-  int version = 1;
-  DESERIALIZE(version);
-  if (version == 1) {
-    DESERIALIZE(obj.max_runtime);
-    DESERIALIZE(obj.finger_wiggle);
-    DESERIALIZE(obj.trajectory_wiggle);
-    DESERIALIZE(obj.tolerance);
-    DESERIALIZE(obj.algorithm);
-    DESERIALIZE(obj.population);
-  }
-}

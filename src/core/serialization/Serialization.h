@@ -210,24 +210,6 @@ void Deserialize(Eigen::Matrix<T, R, C, P, MR, MC>& obj, std::ifstream& f) {
 }  // namespace core
 }  // namespace psg
 
-#define DECL_SERIALIZE(Type, obj)                           \
-  namespace psg {                                           \
-  namespace core {                                          \
-  namespace serialization {                                 \
-  inline void Serialize(const Type& obj, std::ofstream& f); \
-  }                                                         \
-  }                                                         \
-  }                                                         \
-  void psg::core::serialization::Serialize(const Type& obj, std::ofstream& f)
-#define DECL_DESERIALIZE(Type, obj)                     \
-  namespace psg {                                       \
-  namespace core {                                      \
-  namespace serialization {                             \
-  inline void Deserialize(Type& obj, std::ifstream& f); \
-  }                                                     \
-  }                                                     \
-  }                                                     \
-  void psg::core::serialization::Deserialize(Type& obj, std::ifstream& f)
 #define SERIALIZE(obj) psg::core::serialization::Serialize(obj, f)
 #define DESERIALIZE(obj) psg::core::serialization::Deserialize(obj, f)
 #define SERIALIZE_MEMBER() inline void Serialize(std::ofstream& f) const override

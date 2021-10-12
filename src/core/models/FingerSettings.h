@@ -6,24 +6,24 @@ namespace psg {
 namespace core {
 namespace models {
 
-struct FingerSettings {
+struct FingerSettings : psg::core::serialization::Serializable {
   size_t n_finger_joints = 4;
+
+  SERIALIZE_MEMBER() {
+    constexpr int version = 1;
+    SERIALIZE(version);
+    SERIALIZE(n_finger_joints);
+  }
+
+  DESERIALIZE_MEMBER() {
+    int version;
+    DESERIALIZE(version);
+    if (version == 1) {
+      DESERIALIZE(n_finger_joints);
+    }
+  }
 };
 
 }  // namespace models
 }  // namespace core
 }  // namespace psg
-
-DECL_SERIALIZE(psg::core::models::FingerSettings, obj) {
-  constexpr int version = 1;
-  SERIALIZE(version);
-  SERIALIZE(obj.n_finger_joints);
-}
-
-DECL_DESERIALIZE(psg::core::models::FingerSettings, obj) {
-  int version;
-  DESERIALIZE(version);
-  if (version == 1) {
-    DESERIALIZE(obj.n_finger_joints);
-  }
-}

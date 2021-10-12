@@ -15,7 +15,7 @@ namespace core {
 
 using namespace models;
 
-class PassiveGripper {
+class PassiveGripper : public psg::core::serialization::Serializable {
  public:
   enum class InvalidatedReason { kMesh, kContactPoints, kFingers, kTrajectory };
   typedef std::function<void(InvalidatedReason)> InvalidatedDelegate;
@@ -28,7 +28,9 @@ class PassiveGripper {
   void ForceInvalidateAll(bool disable_reinit = false);
 
   // Mesh
-  void SetMesh(const Eigen::MatrixXd& V, const Eigen::MatrixXi& F, bool invalidate = true);
+  void SetMesh(const Eigen::MatrixXd& V,
+               const Eigen::MatrixXi& F,
+               bool invalidate = true);
   inline void GetMesh(Eigen::MatrixXd& V, Eigen::MatrixXi& F) const {
     V = mdr_.V;
     F = mdr_.F;
@@ -131,34 +133,34 @@ class PassiveGripper {
   DECLARE_GETTER(GetParams, params_)
   DECLARE_GETTER(GetSettings, settings_)
   DECLARE_GETTER(GetMDR, mdr_)
+
+  SERIALIZE_MEMBER() {
+    constexpr int version = 1;
+    SERIALIZE(version);
+    SERIALIZE(GetMDR().V);
+    SERIALIZE(GetMDR().F);
+    SERIALIZE(GetParams());
+    SERIALIZE(GetSettings());
+  }
+
+  DESERIALIZE_MEMBER() {
+    int version;
+    DESERIALIZE(version);
+    Eigen::MatrixXd V;
+    Eigen::MatrixXi F;
+    GripperParams params;
+    GripperSettings settings;
+    if (version == 1) {
+      DESERIALIZE(V);
+      DESERIALIZE(F);
+      DESERIALIZE(params);
+      DESERIALIZE(settings);
+      SetMesh(V, F);
+      SetSettings(settings);
+      SetParams(params);
+    }
+  }
 };
 
 }  // namespace core
 }  // namespace psg
-
-DECL_SERIALIZE(psg::core::PassiveGripper, obj) {
-  constexpr int version = 1;
-  SERIALIZE(version);
-  SERIALIZE(obj.GetMDR().V);
-  SERIALIZE(obj.GetMDR().F);
-  SERIALIZE(obj.GetParams());
-  SERIALIZE(obj.GetSettings());
-}
-
-DECL_DESERIALIZE(psg::core::PassiveGripper, obj) {
-  int version;
-  DESERIALIZE(version);
-  Eigen::MatrixXd V;
-  Eigen::MatrixXi F;
-  GripperParams params;
-  GripperSettings settings;
-  if (version == 1) {
-    DESERIALIZE(V);
-    DESERIALIZE(F);
-    DESERIALIZE(params);
-    DESERIALIZE(settings);
-    obj.SetMesh(V, F);
-    obj.SetSettings(settings);
-    obj.SetParams(params);
-  }
-}

@@ -11,7 +11,7 @@ namespace psg {
 namespace core {
 namespace models {
 
-struct MeshDependentResource {
+struct MeshDependentResource : psg::core::serialization::Serializable {
   Eigen::MatrixXd V;
   Eigen::MatrixXi F;
   Eigen::MatrixXd FN;
@@ -33,27 +33,27 @@ struct MeshDependentResource {
                                double& out_s) const;
 
   size_t ComputeClosestFacet(const Eigen::Vector3d& position) const;
+
+  SERIALIZE_MEMBER() {
+    constexpr int version = 1;
+    SERIALIZE(version);
+    SERIALIZE(V);
+    SERIALIZE(F);
+  }
+
+  DESERIALIZE_MEMBER() {
+    int version;
+    DESERIALIZE(version);
+    Eigen::MatrixXd V_;
+    Eigen::MatrixXi F_;
+    if (version == 1) {
+      DESERIALIZE(V_);
+      DESERIALIZE(F_);
+      init(V_, F_);
+    }
+  }
 };
 
 }  // namespace models
 }  // namespace core
 }  // namespace psg
-
-DECL_SERIALIZE(psg::core::models::MeshDependentResource, obj) {
-  constexpr int version = 1;
-  SERIALIZE(version);
-  SERIALIZE(obj.V);
-  SERIALIZE(obj.F);
-}
-
-DECL_DESERIALIZE(psg::core::models::MeshDependentResource, obj) {
-  int version;
-  DESERIALIZE(version);
-  Eigen::MatrixXd V;
-  Eigen::MatrixXi F;
-  if (version == 1) {
-    DESERIALIZE(V);
-    DESERIALIZE(F);
-    obj.init(V, F);
-  }
-}

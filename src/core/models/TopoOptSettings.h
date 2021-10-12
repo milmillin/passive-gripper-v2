@@ -6,7 +6,7 @@ namespace psg {
 namespace core {
 namespace models {
 
-struct TopoOptSettings {
+struct TopoOptSettings : psg::core::serialization::Serializable {
   Eigen::Vector3d lower_bound = Eigen::Vector3d(-0.2, -0.05, 0.5);
   Eigen::Vector3d upper_bound = Eigen::Vector3d(0.05, 0.2, 0.8);
   double neg_vol_res = 0.005;
@@ -16,36 +16,36 @@ struct TopoOptSettings {
 
   double contact_point_size = 0.01;
   double base_thickness = 0.01;
+
+  SERIALIZE_MEMBER() {
+    constexpr int version = 1;
+    SERIALIZE(version);
+    SERIALIZE(lower_bound);
+    SERIALIZE(upper_bound);
+    SERIALIZE(neg_vol_res);
+    SERIALIZE(topo_res);
+    SERIALIZE(attachment_size);
+    SERIALIZE(attachment_samples);
+    SERIALIZE(contact_point_size);
+    SERIALIZE(base_thickness);
+  }
+
+  DESERIALIZE_MEMBER() {
+    int version;
+    DESERIALIZE(version);
+    if (version == 1) {
+      DESERIALIZE(lower_bound);
+      DESERIALIZE(upper_bound);
+      DESERIALIZE(neg_vol_res);
+      DESERIALIZE(topo_res);
+      DESERIALIZE(attachment_size);
+      DESERIALIZE(attachment_samples);
+      DESERIALIZE(contact_point_size);
+      DESERIALIZE(base_thickness);
+    }
+  }
 };
 
 }  // namespace models
 }  // namespace core
 }  // namespace psg
-
-DECL_SERIALIZE(psg::core::models::TopoOptSettings, obj) {
-  constexpr int version = 1;
-  SERIALIZE(version);
-  SERIALIZE(obj.lower_bound);
-  SERIALIZE(obj.upper_bound);
-  SERIALIZE(obj.neg_vol_res);
-  SERIALIZE(obj.topo_res);
-  SERIALIZE(obj.attachment_size);
-  SERIALIZE(obj.attachment_samples);
-  SERIALIZE(obj.contact_point_size);
-  SERIALIZE(obj.base_thickness);
-}
-
-DECL_DESERIALIZE(psg::core::models::TopoOptSettings, obj) {
-  int version;
-  DESERIALIZE(version);
-  if (version == 1) {
-    DESERIALIZE(obj.lower_bound);
-    DESERIALIZE(obj.upper_bound);
-    DESERIALIZE(obj.neg_vol_res);
-    DESERIALIZE(obj.topo_res);
-    DESERIALIZE(obj.attachment_size);
-    DESERIALIZE(obj.attachment_samples);
-    DESERIALIZE(obj.contact_point_size);
-    DESERIALIZE(obj.base_thickness);
-  }
-}

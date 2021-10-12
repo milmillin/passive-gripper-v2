@@ -9,30 +9,30 @@ namespace psg {
 namespace core {
 namespace models {
 
-struct GripperParams {
+struct GripperParams : psg::core::serialization::Serializable {
   std::vector<Eigen::MatrixXd> fingers;
   Trajectory trajectory;
   std::vector<ContactPoint> contact_points;
+
+  SERIALIZE_MEMBER() {
+    constexpr int version = 1;
+    SERIALIZE(version);
+    SERIALIZE(fingers);
+    SERIALIZE(trajectory);
+    SERIALIZE(contact_points);
+  }
+
+  DESERIALIZE_MEMBER() {
+    int version;
+    DESERIALIZE(version);
+    if (version == 1) {
+      DESERIALIZE(fingers);
+      DESERIALIZE(trajectory);
+      DESERIALIZE(contact_points);
+    }
+  }
 };
 
 }  // namespace models
 }  // namespace core
 }  // namespace psg
-
-DECL_SERIALIZE(psg::core::models::GripperParams, obj) {
-  constexpr int version = 1;
-  SERIALIZE(version);
-  SERIALIZE(obj.fingers);
-  SERIALIZE(obj.trajectory);
-  SERIALIZE(obj.contact_points);
-}
-
-DECL_DESERIALIZE(psg::core::models::GripperParams, obj) {
-  int version;
-  DESERIALIZE(version);
-  if (version == 1) {
-    DESERIALIZE(obj.fingers);
-    DESERIALIZE(obj.trajectory);
-    DESERIALIZE(obj.contact_points);
-  }
-}
