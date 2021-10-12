@@ -264,8 +264,9 @@ std::vector<ContactPointMetric> InitializeContactPoints(
       std::vector<ContactPoint> contactPoints(3);
       bool work = true;
       for (int i = 0; i < 3; i++) {
-        contactPoints[i] =
-            ContactPoint{X.row(pids[i]), mdr.FN.row(FI(pids[i])), FI(pids[i])};
+        contactPoints[i].position = X.row(pids[i]);
+        contactPoints[i].normal = mdr.FN.row(FI(pids[i]));
+        contactPoints[i].fid = FI(pids[i]);
         if (X.row(pids[i]).y() <= settings.cost.floor) {
           work = false;
           break;

@@ -90,7 +90,7 @@ set(CORE_LINK_LIBS igl::core igl::embree igl::png igl::cgal embree lapack Qhull:
 if (NOT MSVC)
     list(APPEND CORE_LINK_LIBS stdc++fs Qhull::qhullstatic_r)
 else()
-    list(APPEND CORE_LINK_LIBS Qhull:qhull_r)
+    list(APPEND CORE_LINK_LIBS Qhull::qhull_r)
 endif()
 
 add_library(core ${CORE_SRCFILES})

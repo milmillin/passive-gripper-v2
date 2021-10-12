@@ -117,8 +117,9 @@ std::vector<ContactPoint> GenerateContactCone(const ContactPoint& contactPoint,
   T *= friction * coeff;
   for (size_t j = 0; j < coneRes; j++) {
     curStep = j * stepSize;
-    contactCones[j] = ContactPoint{
-        cp.position, cp.normal + B * cos(curStep) + T * sin(curStep), cp.fid};
+    contactCones[j].position = cp.position;
+    contactCones[j].normal = cp.normal + B * cos(curStep) + T * sin(curStep);
+    contactCones[j].fid = cp.fid;
   }
 
   return contactCones;

@@ -80,8 +80,11 @@ bool MainUI::mouse_down(int button, int modifier) {
         Eigen::Vector3d a = V.row(F(fid, 0));
         Eigen::Vector3d b = V.row(F(fid, 1));
         Eigen::Vector3d c = V.row(F(fid, 2));
-        vm_.PSG().AddContactPoint(
-            ContactPoint{bc(0) * a + bc(1) * b + bc(2) * c, N.row(fid), fid});
+        ContactPoint cp;
+        cp.position = bc(0) * a + bc(1) * b + bc(2) * c;
+        cp.normal = N.row(fid);
+        cp.fid = fid;
+        vm_.PSG().AddContactPoint(cp);
         return true;
       }
     }

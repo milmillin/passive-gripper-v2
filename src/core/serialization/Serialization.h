@@ -13,12 +13,29 @@ namespace psg {
 namespace core {
 namespace serialization {
 
-// Arithmetic types
-template <typename T, std::enable_if_t<std::is_arithmetic<T>::value ||
-                                     std::is_enum<T>::value, bool> = true>
+struct Serializable {
+  virtual inline void Serialize(std::ofstream& f) const = 0;
+  virtual inline void Deserialize(std::ifstream& f) = 0;
+};
+
+// Serializable
+template <typename T,
+          std::enable_if_t<std::is_base_of_v<Serializable, T>, bool> = true>
 inline void Serialize(const T& obj, std::ofstream& f);
-template <typename T, std::enable_if_t<std::is_arithmetic<T>::value ||
-                                     std::is_enum<T>::value, bool> = true>
+template <typename T,
+          std::enable_if_t<std::is_base_of_v<Serializable, T>, bool> = true>
+inline void Deserialize(T& obj, std::ifstream& f);
+
+// Arithmetic types
+template <
+    typename T,
+    std::enable_if_t<std::is_arithmetic<T>::value || std::is_enum<T>::value,
+                     bool> = true>
+inline void Serialize(const T& obj, std::ofstream& f);
+template <
+    typename T,
+    std::enable_if_t<std::is_arithmetic<T>::value || std::is_enum<T>::value,
+                     bool> = true>
 inline void Deserialize(T& obj, std::ifstream& f);
 
 // std::string
@@ -55,15 +72,31 @@ inline void Deserialize(Eigen::Matrix<T, R, C, P, MR, MC>& obj,
 
 //============== IMPLEMENTATION =================
 
+// Serializable
+template <typename T,
+          std::enable_if_t<std::is_base_of_v<Serializable, T>, bool> = true>
+  void Serialize(const T& obj, std::ofstream& f) {
+  static_cast<const Serializable*>(&obj)->Serialize(f);
+}
+template <typename T,
+          std::enable_if_t<std::is_base_of_v<Serializable, T>, bool> = true>
+  void Deserialize(T& obj, std::ifstream& f) {
+  static_cast<Serializable*>(&obj)->Deserialize(f);
+}
+
 // Arithmetic types
-template <typename T, std::enable_if_t<std::is_arithmetic<T>::value ||
-                                     std::is_enum<T>::value, bool> = true>
+template <
+    typename T,
+    std::enable_if_t<std::is_arithmetic<T>::value || std::is_enum<T>::value,
+                     bool> = true>
 void Serialize(const T& obj, std::ofstream& f) {
   f.write(reinterpret_cast<const char*>(&obj), sizeof(obj));
 }
 
-template <typename T, std::enable_if_t<std::is_arithmetic<T>::value ||
-                                     std::is_enum<T>::value, bool> = true>
+template <
+    typename T,
+    std::enable_if_t<std::is_arithmetic<T>::value || std::is_enum<T>::value,
+                     bool> = true>
 void Deserialize(T& obj, std::ifstream& f) {
   f.read((char*)&obj, sizeof(obj));
 }
@@ -177,16 +210,15 @@ void Deserialize(Eigen::Matrix<T, R, C, P, MR, MC>& obj, std::ifstream& f) {
 }  // namespace core
 }  // namespace psg
 
-#define DECL_SERIALIZE(Type, obj)                                  \
-  namespace psg {                                                  \
-  namespace core {                                                 \
-  namespace serialization {                                        \
-  inline void Serialize(const Type& obj, std::ofstream& f);        \
-  }                                                                \
-  }                                                                \
-  }                                                                \
-  void psg::core::serialization::Serialize(const Type& obj, \
-                                                  std::ofstream& f)
+#define DECL_SERIALIZE(Type, obj)                           \
+  namespace psg {                                           \
+  namespace core {                                          \
+  namespace serialization {                                 \
+  inline void Serialize(const Type& obj, std::ofstream& f); \
+  }                                                         \
+  }                                                         \
+  }                                                         \
+  void psg::core::serialization::Serialize(const Type& obj, std::ofstream& f)
 #define DECL_DESERIALIZE(Type, obj)                     \
   namespace psg {                                       \
   namespace core {                                      \
@@ -198,3 +230,6 @@ void Deserialize(Eigen::Matrix<T, R, C, P, MR, MC>& obj, std::ifstream& f) {
   void psg::core::serialization::Deserialize(Type& obj, std::ifstream& f)
 #define SERIALIZE(obj) psg::core::serialization::Serialize(obj, f)
 #define DESERIALIZE(obj) psg::core::serialization::Deserialize(obj, f)
+#define SERIALIZE_MEMBER() inline void Serialize(std::ofstream& f) const override
+#define DESERIALIZE_MEMBER() inline void Deserialize(std::ifstream& f) override
+
