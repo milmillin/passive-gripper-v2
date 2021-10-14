@@ -331,6 +331,7 @@ void PassiveGripper::InvalidateQuality() {
 void PassiveGripper::InvalidateCost() {
   cost_changed_ = false;
   cost_ = ComputeCost(params_, settings_, mdr_);
+  min_dist_ = MinDistance(params_, settings_, mdr_);
 }
 
 }  // namespace core

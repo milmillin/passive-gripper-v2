@@ -18,5 +18,9 @@ double ComputeCost(const GripperParams& params,
                    const GripperSettings& settings,
                    const MeshDependentResource& mdr);
 
+double MinDistance(const GripperParams& params,
+                   const GripperSettings& settings,
+                   const MeshDependentResource& mdr);
+
 }  // namespace core
 }  // namespace psg

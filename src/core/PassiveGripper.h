@@ -80,6 +80,7 @@ class PassiveGripper : public psg::core::serialization::Serializable {
   double min_wrench_;
   double partial_min_wrench_;
   double cost_;
+  double min_dist_;
 
   // state dependency
   bool mesh_changed_ = false;
@@ -130,6 +131,7 @@ class PassiveGripper : public psg::core::serialization::Serializable {
   DECLARE_GETTER(GetMinWrench, min_wrench_)
   DECLARE_GETTER(GetPartialMinWrench, partial_min_wrench_)
   DECLARE_GETTER(GetCost, cost_)
+  DECLARE_GETTER(GetMinDist, min_dist_)
   DECLARE_GETTER(GetParams, params_)
   DECLARE_GETTER(GetSettings, settings_)
   DECLARE_GETTER(GetMDR, mdr_)
