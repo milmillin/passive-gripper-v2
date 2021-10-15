@@ -113,6 +113,9 @@ add_executable(${PROJECT_NAME} ${UI_SRCFILES})
 target_link_libraries(${PROJECT_NAME} ${UI_LINK_LIBS})
 
 set(BATCH_LINK_LIBS core)
+if (NOT MSVC)
+    list(APPEND BATCH_LINK_LIBS stdc++fs)
+endif()
 
 add_executable(psg-batch ${BATCH_SRCFILES})
 target_link_libraries(psg-batch ${BATCH_LINK_LIBS})

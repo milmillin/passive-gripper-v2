@@ -6,11 +6,11 @@
 
 #include "../core/CostFunctions.h"
 #include "../core/GeometryUtils.h"
+#include "../core/Initialization.h"
 #include "../core/models/GripperSettings.h"
 #include "../core/robots/Robots.h"
 #include "../core/serialization/Serialization.h"
 #include "Components.h"
-#include "../core/Initialization.h"
 
 using namespace psg::core;
 
@@ -224,13 +224,15 @@ void MainUI::DrawContactPointPanel() {
       vm_.PSG().ClearContactPoint();
     }
   }
-  if (ImGui::CollapsingHeader("Candidates",
-                              ImGuiTreeNodeFlags_DefaultOpen)) {
+  if (ImGui::CollapsingHeader("Candidates", ImGuiTreeNodeFlags_DefaultOpen)) {
     ImGui::InputInt("# Candidates", (int*)&cp_num_candidates, 1000);
     ImGui::InputInt("# Seeds", (int*)&cp_num_seeds, 1000);
     if (ImGui::Button("Generate Candidates", ImVec2(w, 0))) {
-      contact_point_candidates_ = InitializeContactPoints(
-          vm_.PSG().GetMDR(), vm_.PSG().GetSettings(), cp_num_candidates, cp_num_seeds);    
+      contact_point_candidates_ =
+          InitializeContactPoints(vm_.PSG().GetMDR(),
+                                  vm_.PSG().GetSettings(),
+                                  cp_num_candidates,
+                                  cp_num_seeds);
     }
     ImGui::Separator();
     size_t k = std::min((size_t)10, contact_point_candidates_.size());
@@ -247,6 +249,12 @@ void MainUI::DrawContactPointPanel() {
       ImGui::PopID();
     }
     ImGui::PopID();
+    ImGui::Separator();
+    ImGui::InputInt("# Export", (int*)&cp_export_size, 10);
+    ImGui::Text("Select filename as a format, e.g. bunny_%%03d.cp");
+    if (ImGui::Button("Save Candidates", ImVec2(w, 0))) {
+      OnExportContactPointCandidates();
+    }
   }
 }
 
@@ -591,6 +599,19 @@ void MainUI::OnSavePSGClicked() {
 void MainUI::OnAlignCameraCenter() {
   const auto& mesh = GetLayer(Layer::kMesh);
   viewer->core().align_camera_center(mesh.V);
+}
+
+void MainUI::OnExportContactPointCandidates() {
+  static thread_local char buf[64];
+  std::string filename = igl::file_dialog_save();
+  if (filename.empty()) return;
+  size_t n_export = std::min(cp_export_size, contact_point_candidates_.size());
+  for (size_t i = 0; i < n_export; i++) {
+    snprintf(buf, 64, filename.c_str(), i);
+    std::ofstream f(buf, std::ios::out | std::ios::binary);
+    psg::core::serialization::Serialize(
+        contact_point_candidates_[i].contact_points, f);
+  }
 }
 
 void MainUI::OnLayerInvalidated(Layer layer) {
