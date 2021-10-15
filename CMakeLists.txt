@@ -14,6 +14,7 @@ endif()
 # Add your project files
 file(GLOB_RECURSE CORE_SRCFILES "src/core/*.cpp")
 file(GLOB_RECURSE UI_SRCFILES "src/ui/*.cpp")
+file(GLOB_RECURSE BATCH_SRCFILES "src/batch/*.cpp")
 
 if (MSVC)
   # For Microsoft compiler
@@ -24,6 +25,11 @@ if (MSVC)
   )
   set_source_files_properties(
     ${UI_SRCFILES}
+    PROPERTIES
+    COMPILE_FLAGS "/W4"
+  )
+  set_source_files_properties(
+    ${BATCH_SRCFILES}
     PROPERTIES
     COMPILE_FLAGS "/W4"
   )
@@ -47,6 +53,11 @@ else()
   )
   set_source_files_properties(
     ${UI_SRCFILES}
+    PROPERTIES
+    COMPILE_FLAGS "-Wall -Wextra -pedantic"
+  )
+  set_source_files_properties(
+    ${BATCH_SRCFILES}
     PROPERTIES
     COMPILE_FLAGS "-Wall -Wextra -pedantic"
   )
@@ -100,3 +111,8 @@ set(UI_LINK_LIBS core igl::core igl::opengl_glfw igl::opengl_glfw_imgui)
 
 add_executable(${PROJECT_NAME} ${UI_SRCFILES})
 target_link_libraries(${PROJECT_NAME} ${UI_LINK_LIBS})
+
+set(BATCH_LINK_LIBS core)
+
+add_executable(psg-batch ${BATCH_SRCFILES})
+target_link_libraries(psg-batch ${BATCH_LINK_LIBS})
