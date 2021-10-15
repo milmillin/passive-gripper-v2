@@ -72,8 +72,10 @@ void PassiveGripper::SetContactPoints(
                          effector_pos.translation(),
                          settings_.finger.n_finger_joints);
     params_.fingers.push_back(finger);
-    std::vector<ContactPoint>&& cone = GenerateContactCone(
-        contact_points[i], settings_.contact.cone_res, settings_.contact.friction);
+    std::vector<ContactPoint>&& cone =
+        GenerateContactCone(contact_points[i],
+                            settings_.contact.cone_res,
+                            settings_.contact.friction);
     contact_cones_.insert(contact_cones_.end(), cone.begin(), cone.end());
   }
 
@@ -182,6 +184,15 @@ void PassiveGripper::SetParams(const GripperParams& params, bool invalidate) {
   reinit_fingers = false;
   reinit_trajectory = false;
   params_ = params;
+  contact_cones_.clear();
+  for (size_t i = 0; i < params_.contact_points.size(); i++) {
+    std::vector<ContactPoint>&& cone =
+        GenerateContactCone(params_.contact_points[i],
+                            settings_.contact.cone_res,
+                            settings_.contact.friction);
+    contact_cones_.insert(contact_cones_.end(), cone.begin(), cone.end());
+  }
+  contact_changed_ = true;
   finger_changed_ = true;
   trajectory_changed_ = true;
   if (invalidate) Invalidate();

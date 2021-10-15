@@ -775,8 +775,9 @@ void MainUI::OnTrajectoryInvalidated() {
 void MainUI::OnSweptSurfaceInvalidated() {
   const auto& fingers = vm_.PSG().GetFingers();
   const auto& trajectory = vm_.PSG().GetTrajectory();
-  if (fingers.empty()) return;
   auto& layer = GetLayer(Layer::kSweptSurface);
+  layer.clear();
+  if (fingers.empty()) return;
   const size_t nFingers = fingers.size();
   static constexpr size_t nTrajectorySteps = 32;
   static constexpr size_t nFingerSteps = 32;
@@ -876,7 +877,6 @@ void MainUI::OnSweptSurfaceInvalidated() {
     Cost(i) = EvalAt(
         P.row(i).transpose(), vm_.PSG().GetSettings().cost, vm_.PSG().GetMDR());
   }
-  layer.clear();
   layer.set_mesh(P, PF);
   layer.set_data(Cost);
   layer.set_face_based(true);

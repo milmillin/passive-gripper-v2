@@ -19,8 +19,8 @@ struct OptSettings : psg::core::serialization::Serializable {
                             8. * kDegToRad,
                             8. * kDegToRad)
                                .finished();
-  double tolerance = 0;  // run forever
-  nlopt_algorithm algorithm = NLOPT_GN_CRS2_LM;
+  double tolerance = 1e-4;
+  nlopt_algorithm algorithm = NLOPT_GN_DIRECT;
   size_t population = 20000;
 
   DECL_SERIALIZE() {

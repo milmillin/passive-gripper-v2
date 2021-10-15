@@ -97,8 +97,9 @@ void Optimizer::Optimize(const PassiveGripper& psg) {
   }
   nlopt_set_lower_bounds(opt_, lb_.get());
   nlopt_set_upper_bounds(opt_, ub_.get());
+  nlopt_set_stopval(opt_, 0);
   if (settings_.opt.max_runtime == 0.) {
-    nlopt_set_stopval(opt_, settings_.opt.tolerance);
+    nlopt_set_ftol_rel(opt_, settings_.opt.tolerance);
   }
 
   n_iters_ = 0;
