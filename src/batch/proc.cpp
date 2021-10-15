@@ -4,7 +4,7 @@
 
 #include "../core/Optimizer.h";
 #include "../core/PassiveGripper.h";
-#include "../core/Serialization.h";
+#include "../core/serialization/Serialization.h";
 
 using namespace psg::core::models;
 
@@ -23,12 +23,12 @@ bool ProcessTestCase(const std::string& name,
     return false;
   }
   psg::core::PassiveGripper psg;
-  psg.Deserialize(f);
+  psg.Deserialize(psg_file);
   psg::core::Optimizer optimizer;
   const size_t buf_size = cp_filename_fmt.size() + 16;
   char* buf = new char[buf_size];
   for (int i = 0; i < n_cp_files; i++) {
-    snprintf(buf, buf_size, cp_filename_fmt, i);
+    snprintf(buf, buf_size, cp_filename_fmt.c_str(), i);
     std::string cp_filename = buf;
     Log() << "> Processing " << cp_filename << std::endl;
     std::ifstream cp_file(cp_filename, std::ios::in | std::ios::binary);
@@ -44,9 +44,9 @@ bool ProcessTestCase(const std::string& name,
     optimizer.Optimize(psg);
     optimizer.Wait();
     auto stop_time = std::chrono::high_resolution_clock::now();
-    long long duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
         stop_time - start_time);
-    snprintf(buf, buf_size, out_filename_fmt, i);
+    snprintf(buf, buf_size, out_filename_fmt.c_str(), i);
     std::string out_filename = buf;
     std::ofstream out_file(out_filename, std::ios::out | std::ios::binary);
     if (!out_file.is_open()) {
@@ -55,7 +55,7 @@ bool ProcessTestCase(const std::string& name,
     }
     psg.SetParams(optimizer.GetCurrentParams());
     psg.Serialize(out_file);
-    Log() << "> Optimization took " << duration << " ms." << std::endl;
+    Log() << "> Optimization took " << duration.count() << " ms." << std::endl;
     Log() << "> Optimized gripper written to " << out_filename << std::endl;
     printf("%s,%s,%s,%s,%.5e,%.5e,%.5e,%.5e,%lld\n",
            name.c_str(),

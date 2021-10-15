@@ -4,7 +4,8 @@
 #include <ctime>
 
 std::ostream& LogImpl(const char* type) {
-  auto now = std::chrono::system_clock::now();
-  std::time_t now_time = std::chrono::system_clock::to_time_t(now);
-  return std::cerr << "[" << std::ctime(&now_time) << "][" << type << "] ";
+  static thread_local char buf[64];
+  std::time_t t = std::time(nullptr);
+  std::strftime(buf, 64, "%F %T", std::localtime(&t));
+  return std::cerr << "[" << buf << "][" << type << "] ";
 }

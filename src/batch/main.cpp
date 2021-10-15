@@ -15,14 +15,14 @@ int main(int argc, char** argv) {
   std::ifstream tf(argv[1]);
   if (!tf.is_open()) {
     Error() << "Error openning file " << argv[1] << std::endl;
-    return 1
+    return 1;
   }
 
   std::string signature;
   tf >> signature;
   if (signature != "%PSGTESTS") {
     Error() << "Invalid header" << std::endl;
-    return 1
+    return 1;
   }
   int version;
   tf >> version;
@@ -51,7 +51,7 @@ int main(int argc, char** argv) {
     }
   } else {
     Error() << "Unknown Version " << version << std::endl;
-    return 1
+    return 1;
   }
   return 0;
 }
