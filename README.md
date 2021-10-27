@@ -7,12 +7,13 @@ git submodule update --init --recursive
 ```
 ## Dependencies
 
-- [Embree](https://www.embree.org/downloads.html) needs manual installation
-
-#### Windows
+We use [vcpkg](https://github.com/microsoft/vcpkg) to handle dependencies. Install the following packages:
 
 ```cmd
-vcpkg install embree3:x64-windows
+vcpkg install embree3:x64-[windows|linux]
+vcpkg install qhull:x64-[windows|linux]
+vcpkg install cgal:x64-[windows|linux]
+vcpkg install nlopt:x64-[windows|linux]
 ```
 
 #### Linux
