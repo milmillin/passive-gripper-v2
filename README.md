@@ -5,7 +5,7 @@ This is a passive gripper project.
 # Installation
 
 ```bash
-git clone https://github.com/milmillin/passive-gripper-v2.git]
+git clone https://github.com/milmillin/passive-gripper-v2.git
 cd passive-gripper-v2
 git submodule update --init --recursive
 ```
