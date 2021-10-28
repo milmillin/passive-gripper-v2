@@ -1,6 +1,8 @@
 #include "Psgtests.h"
 
 #include <stdexcept>
+#include <iostream>
+#include <fstream>
 
 #include "utils.h"
 
@@ -41,5 +43,5 @@ Psgtests::Psgtests(const std::string& filename) {
   }
 }
 
-Psgtests::ProcessFrom(size_t i_obj, size_t j_cp) {
+void Psgtests::ProcessFrom(size_t i_obj, size_t j_cp) {
 }
