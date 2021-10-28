@@ -241,10 +241,22 @@ std::vector<ContactPointMetric> InitializeContactPoints(
   std::vector<ContactPointMetric> prelim;
   prelim.reserve(num_candidates);
 
-  Eigen::MatrixXd B;
-  Eigen::VectorXi FI;
-  Eigen::MatrixXd X;
-  igl::random_points_on_mesh(num_seeds, mdr.V, mdr.F, B, FI, X);
+  std::vector<int> FI;
+  std::vector<Eigen::Vector3d> X;
+
+  while (FI.size() < num_seeds) {
+    Eigen::MatrixXd B_;
+    Eigen::VectorXi FI_;
+    Eigen::MatrixXd X_;
+    igl::random_points_on_mesh(num_seeds, mdr.V, mdr.F, B_, FI_, X_);
+    for (long long i = 0; i < X_.rows(); i++) {
+      if (X_.row(i).y() > settings.cost.floor) {
+        FI.push_back(FI_(i));
+        X.push_back(X_.row(i));
+      }
+    }
+  }
+  std::cout << "Num seeds: " << X.size() << std::endl;
 
   std::mt19937 gen;
   std::uniform_int_distribution<int> dist(0, num_seeds - 1);
@@ -262,17 +274,11 @@ std::vector<ContactPointMetric> InitializeContactPoints(
       if (pids[0] == pids[1] || pids[1] == pids[2] || pids[0] == pids[2])
         continue;
       std::vector<ContactPoint> contactPoints(3);
-      bool work = true;
       for (int i = 0; i < 3; i++) {
-        contactPoints[i].position = X.row(pids[i]);
-        contactPoints[i].normal = mdr.FN.row(FI(pids[i]));
-        contactPoints[i].fid = FI(pids[i]);
-        if (X.row(pids[i]).y() <= settings.cost.floor) {
-          work = false;
-          break;
-        }
+        contactPoints[i].position = X[pids[i]];
+        contactPoints[i].normal = mdr.FN.row(FI[pids[i]]);
+        contactPoints[i].fid = FI[pids[i]];
       }
-      if (!work) continue;
 
       // Check Feasibility
       std::vector<ContactPoint> contact_cones;
