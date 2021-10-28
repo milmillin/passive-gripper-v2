@@ -2,13 +2,13 @@
 
 #include "utils.h"
 
-#include "../core/Optimizer.h";
-#include "../core/PassiveGripper.h";
-#include "../core/serialization/Serialization.h";
+#include "../core/Optimizer.h"
+#include "../core/PassiveGripper.h"
+#include "../core/serialization/Serialization.h"
 
 using namespace psg::core::models;
 
-static char* bool_str[2] = {"False", "True"};
+static const char const* bool_str[2] = {"False", "True"};
 
 bool ProcessTestCase(const std::string& name,
                      const std::string& psg_filename,
