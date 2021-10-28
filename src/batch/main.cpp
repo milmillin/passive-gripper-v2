@@ -4,6 +4,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <omp.h>
 
 #include <boost/process.hpp>
 
@@ -15,6 +16,7 @@ namespace fs = std::filesystem;
 namespace bp = boost::process;
 
 int main(int argc, char** argv) {
+  Log() << "Num threads: " << omp_get_max_threads() << std::endl;
   if (argc < 2) {
     Error() << ".psgtests file required." << std::endl;
     return 1;
