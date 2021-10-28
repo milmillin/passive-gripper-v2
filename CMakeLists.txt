@@ -94,7 +94,12 @@ find_package(Qhull CONFIG REQUIRED)
 # NLOPT
 find_package(NLopt CONFIG REQUIRED)
 
+# CGAL
 find_package(CGAL CONFIG REQUIRED)
+
+# Boost
+find_package(Boost COMPONENTS system filesystem REQUIRED)
+
 
 # Linking
 set(CORE_LINK_LIBS igl::core igl::embree igl::png igl::cgal embree lapack Qhull::qhullcpp NLopt::nlopt CGAL::CGAL)
@@ -112,7 +117,7 @@ set(UI_LINK_LIBS core igl::core igl::opengl_glfw igl::opengl_glfw_imgui)
 add_executable(${PROJECT_NAME} ${UI_SRCFILES})
 target_link_libraries(${PROJECT_NAME} ${UI_LINK_LIBS})
 
-set(BATCH_LINK_LIBS core)
+set(BATCH_LINK_LIBS core Boost::filesystem Boost::system)
 if (NOT MSVC)
     list(APPEND BATCH_LINK_LIBS stdc++fs)
 endif()

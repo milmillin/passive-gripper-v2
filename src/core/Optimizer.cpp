@@ -167,7 +167,7 @@ double Optimizer::ComputeCostInternal(unsigned n, const double* x) {
       std::lock_guard<std::mutex> guard(g_min_x_mutex_);
       memcpy(g_min_x_.get(), x, n * sizeof(double));
     }
-    std::cout << "Iter: " << n_iters_ << ", Current Cost : " << cost
+    std::cerr << "Iter: " << n_iters_ << ", Current Cost : " << cost
               << std::endl;
   }
   return cost;

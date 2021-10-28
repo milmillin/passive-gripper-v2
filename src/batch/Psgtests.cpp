@@ -1,8 +1,8 @@
 #include "Psgtests.h"
 
-#include <stdexcept>
-#include <iostream>
 #include <fstream>
+#include <iostream>
+#include <stdexcept>
 
 #include "utils.h"
 
@@ -43,5 +43,24 @@ Psgtests::Psgtests(const std::string& filename) {
   }
 }
 
-void Psgtests::ProcessFrom(size_t i_obj, size_t j_cp) {
+void Psgtests::ProcessFrom(size_t i_obj,
+                           size_t j_cp,
+                           const ProcessCallback& cb) const {
+  TestcaseCallback tcb;
+  if (i_obj < testcases.size()) {
+    try {
+      if (cb) tcb = [i_obj, &cb](size_t j, const Testcase& tc) { cb(i_obj, j, tc); };
+      testcases[i_obj].ProcessFrom(j_cp, tcb);
+    } catch (const std::exception& e) {
+      Error() << e.what() << std::endl;
+    }
+  }
+  for (size_t i = i_obj + 1; i < testcases.size(); i++) {
+    try {
+      if (cb) tcb = [i, &cb](size_t j, const Testcase& tc) { cb(i, j, tc); };
+      testcases[i].ProcessFrom(0, tcb);
+    } catch (const std::exception& e) {
+      Error() << e.what() << std::endl;
+    }
+  }
 }
