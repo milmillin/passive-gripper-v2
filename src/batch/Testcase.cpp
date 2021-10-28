@@ -9,8 +9,8 @@
 #include "../core/Optimizer.h"
 #include "../core/PassiveGripper.h"
 #include "../core/serialization/Serialization.h"
+#include "../utils.h"
 #include "Result.h"
-#include "utils.h"
 
 using namespace psg::core::models;
 

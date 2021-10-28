@@ -7,9 +7,9 @@
 
 #include <boost/process.hpp>
 
+#include "../utils.h"
 #include "Psgtests.h"
 #include "Result.h"
-#include "utils.h"
 
 namespace fs = std::filesystem;
 namespace bp = boost::process;
@@ -41,7 +41,7 @@ int main(int argc, char** argv) {
       ckpt_fn = argv[i + 1];
       i++;
     } else if (strncmp(argv[i], "-x", 4) == 0) {
-      restart_set = true;    
+      restart_set = true;
     } else if (strncmp(argv[i], "-h", 4) == 0) {
       hook_set = true;
       hook_str = argv[i + 1];
@@ -57,7 +57,8 @@ int main(int argc, char** argv) {
   if (!restart_set) {
     std::ifstream ckpt_file(ckpt_fn);
     if (!ckpt_file.is_open()) {
-      Error() << "Warning: cannot open checkpoint file: " << ckpt_fn << std::endl;
+      Error() << "Warning: cannot open checkpoint file: " << ckpt_fn
+              << std::endl;
     } else {
       ckpt_file >> ckpt_i >> ckpt_j;
       Log() << "Checkpoint loaded: " << ckpt_i << ' ' << ckpt_j << std::endl;
@@ -65,11 +66,12 @@ int main(int argc, char** argv) {
     }
   }
 
-
-  ProcessCallback cb = [hook_set, &ckpt_fn, &hook_str](size_t i, size_t j, const Testcase& tc) {
+  ProcessCallback cb = [hook_set, &ckpt_fn, &hook_str](
+                           size_t i, size_t j, const Testcase& tc) {
     std::ofstream ckpt_file(ckpt_fn);
     if (!ckpt_file.is_open()) {
-      Error() << "Warning: cannot open checkpoint file: " << ckpt_fn << std::endl;
+      Error() << "Warning: cannot open checkpoint file: " << ckpt_fn
+              << std::endl;
     } else {
       ckpt_file << i << ' ' << j << std::endl;
       Log() << "Checkpoint updated: " << i << ' ' << j << std::endl;

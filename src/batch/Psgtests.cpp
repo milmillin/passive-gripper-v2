@@ -4,7 +4,7 @@
 #include <iostream>
 #include <stdexcept>
 
-#include "utils.h"
+#include "../utils.h"
 
 Psgtests::Psgtests(const std::string& filename) {
   std::ifstream tf(filename);

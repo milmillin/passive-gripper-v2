@@ -124,3 +124,6 @@ endif()
 
 add_executable(psg-batch ${BATCH_SRCFILES})
 target_link_libraries(psg-batch ${BATCH_LINK_LIBS})
+
+add_executable(psg-cp-gen "src/cp-gen/main.cpp")
+target_link_libraries(psg-cp-gen core)
