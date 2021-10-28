@@ -5,7 +5,8 @@ This is a passive gripper project.
 # Installation
 
 ```bash
-git clone https://github.com/milmillin/passive-gripper.git
+git clone https://github.com/milmillin/passive-gripper-v2.git]
+cd passive-gripper-v2
 git submodule update --init --recursive
 ```
 ## Dependencies
@@ -19,7 +20,7 @@ vcpkg install cgal:x64-[windows|linux]
 vcpkg install nlopt:x64-[windows|linux]
 ```
 
-## Compile
+## Compilation
 
 The compilation is done using the standard cmake routine. Inside the root project directory, run:
 
