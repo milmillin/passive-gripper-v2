@@ -15,7 +15,7 @@ struct Result {
   double partial_min_wrench;
   double cost;
   double min_dist;
-  double duration;
+  long long duration;
 };
 
 static const char* bool_str[2] = {"False", "True"};

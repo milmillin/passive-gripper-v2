@@ -26,10 +26,6 @@ Psgtests::Psgtests(const std::string& filename, const SettingsOverrider& stgo_) 
     testcases.reserve(n_tests);
     for (int i = 0; i < n_tests; i++) {
       std::string name;
-      std::string psg_filename;
-      std::string cp_filename_fmt;
-      int n_cp_files;
-      std::string out_filename_fmt;
       tf >> name;
       testcases.emplace_back();
       testcases.back().name = name;
