@@ -150,6 +150,8 @@ double MinDistance(const GripperParams& params,
   const size_t nEvalsPerFingerPerFrame = (nFingerJoints - 1) * nFingerSteps + 1;
   const size_t nFrames = (nKeyframes - 1) * nTrajectorySteps + 1;
 
+  if (nKeyframes <= 1) return 0;
+
   double min_dist = 0;
 
   Eigen::Affine3d fingerTransInv =
@@ -162,7 +164,7 @@ double MinDistance(const GripperParams& params,
     for (long long ii = 0; ii < nFrames; ii++) {
       size_t a = ii / nTrajectorySteps;
       size_t b = ii % nTrajectorySteps;
-      if (a == nKeyframes) {
+      if (a == nKeyframes - 1) {
         a--;
         b = nTrajectorySteps;
       }

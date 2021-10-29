@@ -183,7 +183,7 @@ static void LengthParameterize(const Eigen::MatrixXd& V,
       curV++;
     }
     double t = (targetStep - cumDis[curV]) / (cumDis[curV + 1] - cumDis[curV]);
-    out_V.row(i) = V.row(curV) * t + V.row(curV - 1) * (1 - t);
+    out_V.row(i) = V.row(curV + 1) * t + V.row(curV) * (1 - t);
   }
   out_V.row(nSteps) = V.row(V.rows() - 1);
 }
