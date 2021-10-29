@@ -6,7 +6,9 @@
 
 struct Result {
   std::string name;
-  std::string out_filename;
+  size_t cp_idx;
+  std::string out_fn;
+  bool failed;
   bool force_closure;
   bool partial_force_closure;
   double min_wrench;
@@ -20,7 +22,7 @@ static const char* bool_str[2] = {"False", "True"};
 
 inline std::ostream& operator<<(std::ostream& f, const Result& r) {
   f << std::setprecision(5) << std::scientific;
-  f << r.name << '\t' << r.out_filename << '\t' << bool_str[r.force_closure]
+  f << r.name << '\t' << r.cp_idx << '\t' << bool_str[r.force_closure]
     << '\t' << bool_str[r.partial_force_closure] << '\t' << r.min_wrench << '\t'
     << r.partial_min_wrench << '\t' << r.cost << '\t' << r.min_dist << '\t'
     << r.duration;
@@ -30,6 +32,6 @@ inline std::ostream& operator<<(std::ostream& f, const Result& r) {
 struct ResultHeader {};
 
 inline std::ostream& operator<<(std::ostream& f, const ResultHeader& r) {
-  f << "name\tcname\tfc\tpfc\tmw\tpmw\tcost\tdist\ttime";
+  f << "name\tidx\tfc\tpfc\tmw\tpmw\tcost\tdist\ttime";
   return f;
 }

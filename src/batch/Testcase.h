@@ -3,17 +3,14 @@
 #include <string>
 #include <functional>
 
-struct Testcase;
+#include "Result.h"
+#include "SettingsOverrider.h"
 
-typedef std::function<void(size_t, size_t, const Testcase&)> ProcessCallback;
-typedef std::function<void(size_t, const Testcase&)> TestcaseCallback;
+typedef std::function<void(size_t, size_t, size_t, const Result&)> ProcessCallback;
+typedef std::function<void(const Result&)> TestcaseCallback;
 
 struct Testcase {
   std::string name;
-  std::string psg_filename;
-  std::string cp_filename_fmt;
-  size_t n_cp_files;
-  std::string out_filename_fmt;
 
-  void ProcessFrom(size_t j_cp, const TestcaseCallback& cb) const;
+  void ProcessFrom(size_t j_cp, size_t need, const SettingsOverrider& stgo, const TestcaseCallback& cb) const;
 };

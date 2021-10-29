@@ -6,7 +6,8 @@
 
 #include "../utils.h"
 
-Psgtests::Psgtests(const std::string& filename) {
+Psgtests::Psgtests(const std::string& filename, const SettingsOverrider& stgo_) {
+  stgo = &stgo_;
   std::ifstream tf(filename);
   if (!tf.is_open()) {
     throw std::invalid_argument("Error openning file " + filename);
@@ -29,14 +30,9 @@ Psgtests::Psgtests(const std::string& filename) {
       std::string cp_filename_fmt;
       int n_cp_files;
       std::string out_filename_fmt;
-      tf >> name >> psg_filename >> cp_filename_fmt >> n_cp_files >>
-          out_filename_fmt;
+      tf >> name;
       testcases.emplace_back();
       testcases.back().name = name;
-      testcases.back().psg_filename = psg_filename;
-      testcases.back().cp_filename_fmt = cp_filename_fmt;
-      testcases.back().n_cp_files = n_cp_files;
-      testcases.back().out_filename_fmt = out_filename_fmt;
     }
   } else {
     throw std::invalid_argument("Unkown Version " + std::to_string(version));
@@ -45,20 +41,32 @@ Psgtests::Psgtests(const std::string& filename) {
 
 void Psgtests::ProcessFrom(size_t i_obj,
                            size_t j_cp,
+                           size_t ckpt_need,
+                           size_t need,
                            const ProcessCallback& cb) const {
   TestcaseCallback tcb;
   if (i_obj < testcases.size()) {
     try {
-      if (cb) tcb = [i_obj, &cb](size_t j, const Testcase& tc) { cb(i_obj, j, tc); };
-      testcases[i_obj].ProcessFrom(j_cp, tcb);
+      size_t need_ = ckpt_need;
+      if (cb)
+        tcb = [i_obj, &cb, &need_](const Result& r) {
+          if (!r.failed) need_--;
+          cb(i_obj, r.cp_idx, need_, r);
+        };
+      testcases[i_obj].ProcessFrom(j_cp, need_, *stgo, tcb);
     } catch (const std::exception& e) {
       Error() << e.what() << std::endl;
     }
   }
   for (size_t i = i_obj + 1; i < testcases.size(); i++) {
     try {
-      if (cb) tcb = [i, &cb](size_t j, const Testcase& tc) { cb(i, j, tc); };
-      testcases[i].ProcessFrom(0, tcb);
+      size_t need_ = need;
+      if (cb) 
+        tcb = [i_obj, &cb, &need_](const Result& r) {
+          if (!r.failed) need_--;
+          cb(i_obj, r.cp_idx, need_, r);
+        };
+      testcases[i].ProcessFrom(0, need_, *stgo, tcb);
     } catch (const std::exception& e) {
       Error() << e.what() << std::endl;
     }
