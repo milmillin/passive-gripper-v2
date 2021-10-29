@@ -62,9 +62,9 @@ void Psgtests::ProcessFrom(size_t i_obj,
     try {
       size_t need_ = need;
       if (cb) 
-        tcb = [i_obj, &cb, &need_](const Result& r) {
+        tcb = [i, &cb, &need_](const Result& r) {
           if (!r.failed) need_--;
-          cb(i_obj, r.cp_idx, need_, r);
+          cb(i, r.cp_idx, need_, r);
         };
       testcases[i].ProcessFrom(0, need_, *stgo, tcb);
     } catch (const std::exception& e) {
