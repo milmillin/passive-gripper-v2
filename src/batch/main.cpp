@@ -29,7 +29,7 @@ int main(int argc, char** argv) {
   std::string ckpt_fn = ".checkpoint";
   size_t ckpt_i = 0;
   size_t ckpt_j = 0;
-  constexpr size_t kNeed = 5;
+  constexpr size_t kNeed = 1;
   size_t ckpt_need = kNeed;
   bool restart_set = false;
 
