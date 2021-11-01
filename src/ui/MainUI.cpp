@@ -447,8 +447,42 @@ void MainUI::DrawTopoOptPanel() {
       std::string filename = igl::file_dialog_save();
       if (!filename.empty()) {
         vm_.ComputeNegativeVolume();
-        GenerateTopyConfig(
-            vm_.PSG(), vm_.GetNegVolV(), vm_.GetNegVolF(), filename);
+        std::vector<Eigen::Vector3i> atv;
+        std::vector<Eigen::Vector3i> ctv;
+        std::vector<Eigen::Vector3i> fbv;
+        Eigen::Vector3d lb = vm_.PSG().GetTopoOptSettings().lower_bound;
+        double res = vm_.PSG().GetTopoOptSettings().topo_res;
+        GenerateTopyConfig(vm_.PSG(),
+                           vm_.GetNegVolV(),
+                           vm_.GetNegVolF(),
+                           filename,
+                           atv,
+                           ctv,
+                           fbv);
+
+        auto& layer = GetLayer(Layer::kTopyDebug);
+        Eigen::MatrixXd P(atv.size() + ctv.size() + fbv.size(), 3);
+        Eigen::MatrixXd C(atv.size() + ctv.size() + fbv.size(), 3);
+        for (size_t i = 0; i < atv.size(); i++) {
+          P.row(i) = ((atv[i].cast<double>().array() + 0.5) * res);
+          C.row(i) = colors::kGreen;
+        }
+        for (size_t i = 0; i < ctv.size(); i++) {
+          P.row(atv.size() + i) =
+              ((ctv[i].cast<double>().array() + 0.5).array() * res);
+          C.row(atv.size() + i) = colors::kRed;
+        }
+        for (size_t i = 0; i < fbv.size(); i++) {
+          P.row(atv.size() + ctv.size() + i) =        
+              ((fbv[i].cast<double>().array() + 0.5).array() * res);
+          C.row(atv.size() + ctv.size() + i) = colors::kPurple;
+        }
+        P.rowwise() += lb.transpose();
+        P = (robots::Forward(vm_.GetCurrentPose()) *
+             P.transpose().colwise().homogeneous())
+                .transpose();
+        layer.set_points(P, C);
+        layer.point_size = 8;
       }
     }
   }

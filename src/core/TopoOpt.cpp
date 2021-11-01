@@ -51,20 +51,36 @@ static inline Eigen::Vector3i PointToVoxel(const Eigen::Vector3d& p,
   return ((p - lb).array() / res).cast<int>();
 }
 
-static inline int VoxelToIndex(const Eigen::Vector3i& v,
-                               const Eigen::Vector3i& range) {
-  constexpr int X = 0;
-  constexpr int Y = 1;
-  constexpr int Z = 2;
-  return v(X) * range(Y) + (range(Y) - 1 - v(Y)) + v(Z) * range(X) * range(Y) +
-         1;
+static inline int VoxelToElemIndex(const Eigen::Vector3i& v,
+                                   const Eigen::Vector3i& range) {
+  return v.z() * range.x() * range.y() + v.x() * range.y() +
+         (range.y() - v.y() - 1) + 1;
 }
 
-static std::vector<int> ConvertToIndices(const std::vector<Eigen::Vector3i>& v,
-                                         const Eigen::Vector3i& range) {
+static inline int VoxelToNodeIndex(const Eigen::Vector3i& v,
+                                   const Eigen::Vector3i& range) {
+  return v.z() * (range.x() + 1) * (range.y() + 1) + v.x() * (range.y() + 1) +
+         (range.y() - v.y()) + 1;
+}
+
+static std::vector<int> ConvertToElemIndices(
+    const std::vector<Eigen::Vector3i>& v,
+    const Eigen::Vector3i& range) {
   std::vector<int> res(v.size());
   for (size_t i = 0; i < v.size(); i++) {
-    res[i] = VoxelToIndex(v[i], range);
+    res[i] = VoxelToElemIndex(v[i], range);
+  }
+  std::sort(res.begin(), res.end());
+  res.resize(std::unique(res.begin(), res.end()) - res.begin());
+  return res;
+}
+
+static std::vector<int> ConvertToNodeIndices(
+    const std::vector<Eigen::Vector3i>& v,
+    const Eigen::Vector3i& range) {
+  std::vector<int> res(v.size());
+  for (size_t i = 0; i < v.size(); i++) {
+    res[i] = VoxelToNodeIndex(v[i], range);
   }
   std::sort(res.begin(), res.end());
   res.resize(std::unique(res.begin(), res.end()) - res.begin());
@@ -90,7 +106,7 @@ static Eigen::Vector3i ClosestEmptySpace(
         for (int dz = -d; dz < d; dz++) {
           Eigen::Vector3i newP = p + Eigen::Vector3i(dx, dy, dz);
           if (!VoxelValid(newP, range)) continue;
-          int index = VoxelToIndex(newP, range);
+          int index = VoxelToElemIndex(newP, range);
           auto res = std::lower_bound(
               forbidden_indices.begin(), forbidden_indices.end(), index);
           if (res == forbidden_indices.end() || *res != index) {
@@ -130,7 +146,10 @@ static void WriteToFile(std::string fileName,
 void GenerateTopyConfig(const PassiveGripper& psg,
                         const Eigen::MatrixXd& neg_V,
                         const Eigen::MatrixXi& neg_F,
-                        const std::string& filename) {
+                        const std::string& filename,
+                        std::vector<Eigen::Vector3i>& out_attachment_voxels,
+                        std::vector<Eigen::Vector3i>& out_contact_voxels,
+                        std::vector<Eigen::Vector3i>& out_forbidden_voxels) {
   Eigen::Vector3d lb = psg.GetTopoOptSettings().lower_bound;
   Eigen::Vector3d ub = psg.GetTopoOptSettings().upper_bound;
   double res = psg.GetTopoOptSettings().topo_res;
@@ -139,7 +158,8 @@ void GenerateTopyConfig(const PassiveGripper& psg,
   std::vector<Eigen::Vector3i> forbidden_voxels =
       GetForbiddenVoxels(neg_V, neg_F, lb, ub, res, range);
   std::vector<int> forbidden_indices =
-      ConvertToIndices(forbidden_voxels, range);
+      ConvertToElemIndices(forbidden_voxels, range);
+  out_forbidden_voxels = forbidden_voxels;
 
   std::vector<Eigen::Vector3i> attachment_voxels;
   int sample = psg.GetTopoOptSettings().attachment_samples;
@@ -153,7 +173,8 @@ void GenerateTopyConfig(const PassiveGripper& psg,
     }
   }
   std::vector<int> attachment_indices =
-      ConvertToIndices(attachment_voxels, range);
+      ConvertToNodeIndices(attachment_voxels, range);
+  out_attachment_voxels = attachment_voxels;
 
   Eigen::Affine3d finger_trans_inv =
       robots::Forward(psg.GetTrajectory().front()).inverse();
@@ -164,12 +185,18 @@ void GenerateTopyConfig(const PassiveGripper& psg,
         forbidden_indices,
         range));
   }
-  std::vector<int> contact_indices = ConvertToIndices(contact_voxels, range);
+  std::vector<int> contact_indices = ConvertToNodeIndices(contact_voxels, range);
+  out_contact_voxels = contact_voxels;
 
   size_t lastdot = filename.rfind('.');
+  size_t lastslash = filename.rfind('/');
+  if (lastslash == std::string::npos) lastslash = filename.rfind('\\');
 
   std::map<std::string, std::string> config = kTopyConfig;
-  config["PROB_NAME"] = filename.substr(0, lastdot);
+  config["PROB_NAME"] =
+      filename.substr(lastslash + 1,
+                      (lastdot == std::string::npos) ? std::string::npos
+                                                     : lastdot - lastslash - 1);
   config["NUM_ELEM_X"] = std::to_string(range(0));
   config["NUM_ELEM_Y"] = std::to_string(range(1));
   config["NUM_ELEM_Z"] = std::to_string(range(2));
@@ -178,8 +205,8 @@ void GenerateTopyConfig(const PassiveGripper& psg,
   config["LOAD_NODE_X"] = config["LOAD_NODE_Y"] = config["LOAD_NODE_Z"] =
       FormatNodeList(contact_indices);
   std::vector<double> loadX, loadY, loadZ;
-  for (auto& point : psg.GetContactPoints()) {
-    Eigen::Vector3d tN = finger_trans_inv.linear() * point.normal;
+  for (const auto& point : psg.GetContactPoints()) {
+    Eigen::Vector3d tN = finger_trans_inv.linear() * -point.normal;
     loadX.push_back(tN(0));
     loadY.push_back(tN(1));
     loadZ.push_back(tN(2));

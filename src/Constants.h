@@ -147,6 +147,7 @@ namespace colors {
 const Eigen::RowVector3d kPurple = Eigen::RowVector3d(219, 76, 178) / 255;
 const Eigen::RowVector3d kOrange = Eigen::RowVector3d(239, 126, 50) / 255;
 const Eigen::RowVector3d kRed = Eigen::RowVector3d(192, 35, 35) / 255;
+const Eigen::RowVector3d kGreen = Eigen::RowVector3d(35, 192, 35) / 255;
 const Eigen::RowVector3d kBrown = Eigen::RowVector3d(130, 4, 1) / 255;
 const Eigen::RowVector3d kDarkBlue = Eigen::RowVector3d(20, 36, 89) / 255;
 const Eigen::RowVector3d kBlue = Eigen::RowVector3d(0, 0, 255) / 255;
