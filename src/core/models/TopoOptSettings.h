@@ -11,7 +11,7 @@ struct TopoOptSettings : psg::core::serialization::Serializable {
   Eigen::Vector3d upper_bound = Eigen::Vector3d(0.05, 0.2, 0.8);
   double neg_vol_res = 0.002;
   double topo_res = 0.002;
-  double attachment_size = 0.04;
+  double attachment_size = 0.038; // diameter
   int attachment_samples = 30;
 
   double contact_point_size = 0.01;

@@ -48,7 +48,26 @@ static std::vector<Eigen::Vector3i> GetForbiddenVoxels(
 static inline Eigen::Vector3i PointToVoxel(const Eigen::Vector3d& p,
                                            const Eigen::Vector3d& lb,
                                            double res) {
-  return ((p - lb).array() / res).cast<int>();
+  return ((p - lb) / res).cast<int>();
+}
+
+static inline Eigen::Vector3i PointToNode(const Eigen::Vector3d& p,
+                                          const Eigen::Vector3d& lb,
+                                          double res) {
+  return ((p - lb) / res).array().round().cast<int>();
+}
+
+static inline Eigen::Vector3d NodeToPoint(const Eigen::Vector3i& p,
+                                          const Eigen::Vector3d& lb,
+                                          double res) {
+  return (p.cast<double>() * res) + lb;
+}
+
+static inline Eigen::Vector3d VoxelToPoint(const Eigen::Vector3i& p,
+                                           const Eigen::Vector3d& lb,
+                                           double res) {
+  Eigen::Vector3d a = (p.cast<double>().array() + 0.5) * res;
+  return a + lb;
 }
 
 static inline int VoxelToElemIndex(const Eigen::Vector3i& v,
@@ -162,16 +181,23 @@ void GenerateTopyConfig(const PassiveGripper& psg,
   out_forbidden_voxels = forbidden_voxels;
 
   std::vector<Eigen::Vector3i> attachment_voxels;
-  int sample = psg.GetTopoOptSettings().attachment_samples;
-  double size = psg.GetTopoOptSettings().attachment_size;
-  for (int x = 0; x < sample; x++) {
-    for (int y = 0; y < sample; y++) {
-      Eigen::Vector3d attachment(((double)x - sample / 2 + 0.5) * size / sample,
-                                 ((double)y - sample / 2 + 0.5) * size / sample,
-                                 0);
-      attachment_voxels.push_back(PointToVoxel(attachment, lb, res));
+  double radius = psg.GetTopoOptSettings().attachment_size / 2;
+  double radius2 = radius * radius;
+
+  Eigen::Vector3i attachment_lb =
+      PointToNode(Eigen::Vector3d(-radius, -radius, 0), lb, res);
+  Eigen::Vector3i attachment_ub =
+      PointToNode(Eigen::Vector3d(radius, radius, 0), lb, res);
+
+  for (int x = attachment_lb.x(); x <= attachment_ub.x(); x++) {
+    for (int y = attachment_lb.y(); y <= attachment_ub.y(); y++) {
+      Eigen::Vector3i v = Eigen::Vector3i(x, y, 0);
+      if (NodeToPoint(v, lb, res).squaredNorm() < radius2) {
+        attachment_voxels.push_back(v);
+      }
     }
   }
+
   std::vector<int> attachment_indices =
       ConvertToNodeIndices(attachment_voxels, range);
   out_attachment_voxels = attachment_voxels;
@@ -185,7 +211,8 @@ void GenerateTopyConfig(const PassiveGripper& psg,
         forbidden_indices,
         range));
   }
-  std::vector<int> contact_indices = ConvertToNodeIndices(contact_voxels, range);
+  std::vector<int> contact_indices =
+      ConvertToNodeIndices(contact_voxels, range);
   out_contact_voxels = contact_voxels;
 
   size_t lastdot = filename.rfind('.');
