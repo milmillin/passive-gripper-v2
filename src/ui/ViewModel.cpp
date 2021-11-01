@@ -2,6 +2,7 @@
 
 #include "../core/GeometryUtils.h"
 #include "../core/robots/Robots.h"
+#include "../core/SweptVolume.h"
 
 namespace psg {
 namespace ui {
@@ -87,6 +88,14 @@ void ViewModel::NextFrame() {
   if (cur_step_ == kAnimationSteps) is_animating_ = false;
 }
 
+void ViewModel::ComputeNegativeVolume() {
+  if (!is_neg_valid_) {
+    NegativeSweptVolume(psg_, neg_V_, neg_F_);
+    is_neg_valid_ = true;
+    InvokeLayerInvalidated(Layer::kNegVol);
+  }
+}
+
 void ViewModel::ComputeIK() {
   Eigen::Affine3d trans =
       Eigen::Translation3d(eff_position_) *
@@ -134,12 +143,19 @@ void ViewModel::OnPsgInvalidated(PassiveGripper::InvalidatedReason reason) {
       InvokeLayerInvalidated(Layer::kTrajectory);
       InvokeLayerInvalidated(Layer::kSweptSurface);
       break;
+    case PassiveGripper::InvalidatedReason::kTopoOptSettings:
+      InvokeLayerInvalidated(Layer::kGripperBound);
+      is_neg_valid_ = false;
+      InvokeLayerInvalidated(Layer::kNegVol);
+      break;
   }
 }
 
 void ViewModel::PoseChanged() {
   InvokeLayerInvalidated(Layer::kFingers);
   InvokeLayerInvalidated(Layer::kRobot);
+  InvokeLayerInvalidated(Layer::kGripperBound);
+  InvokeLayerInvalidated(Layer::kNegVol);
 }
 
 }  // namespace ui

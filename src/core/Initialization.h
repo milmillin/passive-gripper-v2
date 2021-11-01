@@ -5,6 +5,7 @@
 #include "models/ContactPointMetric.h"
 #include "models/MeshDependentResource.h"
 #include "models/GripperSettings.h"
+#include "PassiveGripper.h"
 
 namespace psg {
 namespace core {
@@ -25,6 +26,10 @@ std::vector<ContactPointMetric> InitializeContactPoints(
     const GripperSettings& settings,
     size_t num_candidates,
     size_t num_seeds);
+
+void InitializeGripperBound(const PassiveGripper& psg,
+                            Eigen::Vector3d& out_lb,
+                            Eigen::Vector3d& out_ub);
 
 }  // namespace core
 }  // namespace psg

@@ -11,6 +11,8 @@ enum class Layer : int {
   kTrajectory,
   kAxis,
   kSweptSurface,
+  kGripperBound,
+  kNegVol,
   kRobot,
   kMax
 };

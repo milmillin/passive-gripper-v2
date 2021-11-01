@@ -35,7 +35,8 @@ class MainUI : public igl::opengl::glfw::imgui::ImGuiMenu {
     kContactPoint,
     kMeshPosition,
     kRobot,
-    kOptimization
+    kOptimization,
+    kTopoOpt
   };
   Tools selected_tools_ = Tools::kNone;
 
@@ -50,6 +51,7 @@ class MainUI : public igl::opengl::glfw::imgui::ImGuiMenu {
   void DrawTransformPanel();
   void DrawRobotPanel();
   void DrawOptimizationPanel();
+  void DrawTopoOptPanel();
   void DrawViewPanel();
   void DrawGuizmoOptionPanel();
   void DrawOptimizationStatusPanel();
@@ -74,6 +76,8 @@ class MainUI : public igl::opengl::glfw::imgui::ImGuiMenu {
   void OnRobotInvalidated();
   void OnTrajectoryInvalidated();
   void OnSweptSurfaceInvalidated();
+  void OnGripperBoundInvalidated();
+  void OnNegVolInvalidated();
 
   // Contact Point Candidates
   size_t cp_num_seeds = 1000;

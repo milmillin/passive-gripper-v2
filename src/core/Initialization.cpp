@@ -324,5 +324,26 @@ std::vector<ContactPointMetric> InitializeContactPoints(
   return prelim;
 }
 
+void InitializeGripperBound(const PassiveGripper& psg,
+                            Eigen::Vector3d& out_lb,
+                            Eigen::Vector3d& out_ub) {
+  out_lb.setZero();
+  out_ub.setZero();
+  Eigen::Affine3d finger_trans_inv = psg.GetFingerTransInv();
+  for (const Eigen::MatrixXd& finger : psg.GetFingers()) {
+    Eigen::MatrixXd transformedFinger =
+        (finger_trans_inv * finger.transpose().colwise().homogeneous())
+            .transpose();
+    out_lb =
+        out_lb.cwiseMin(transformedFinger.colwise().minCoeff().transpose());
+    out_ub =
+        out_ub.cwiseMax(transformedFinger.colwise().maxCoeff().transpose());
+  }
+  constexpr double padding = 0.03;
+  out_lb.array() -= padding;
+  out_ub.array() += padding;
+  out_lb.z() = 0;
+}
+
 }  // namespace core
 }  // namespace psg

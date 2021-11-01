@@ -7,6 +7,7 @@
 #include "../core/CostFunctions.h"
 #include "../core/GeometryUtils.h"
 #include "../core/Initialization.h"
+#include "../core/TopoOpt.h"
 #include "../core/models/GripperSettings.h"
 #include "../core/robots/Robots.h"
 #include "../core/serialization/Serialization.h"
@@ -152,6 +153,9 @@ void MainUI::draw_viewer_menu() {
       case Tools::kOptimization:
         DrawOptimizationPanel();
         break;
+      case Tools::kTopoOpt:
+        DrawTopoOptPanel();
+        break;
       case Tools::kNone:
         break;
       default:
@@ -185,6 +189,7 @@ void MainUI::DrawToolPanel() {
     DrawToolButton("Mesh Position", Tools::kMeshPosition, w);
     DrawToolButton("Trajectory", Tools::kRobot, w);
     DrawToolButton("Optimization", Tools::kOptimization, w);
+    DrawToolButton("Topo Opt", Tools::kTopoOpt, w);
     ImGui::PopID();
   }
 }
@@ -405,6 +410,51 @@ void MainUI::DrawOptimizationPanel() {
   ImGui::PopID();
 }
 
+void MainUI::DrawTopoOptPanel() {
+  ImGui::PushID("TopoOpt");
+  float w = ImGui::GetContentRegionAvailWidth();
+  if (ImGui::CollapsingHeader("Topo Opt", ImGuiTreeNodeFlags_DefaultOpen)) {
+    TopoOptSettings settings = vm_.PSG().GetTopoOptSettings();
+    bool update = false;
+    ImGui::Text("Lower Bound");
+    update |= MyInputDouble3("lb", settings.lower_bound.data(), 0.001, "%.3f");
+    ImGui::Text("Lower Bound");
+    update |= MyInputDouble3("ub", settings.upper_bound.data(), 0.001, "%.3f");
+    update |= ImGui::InputDouble(
+        "Topo Res (mm)", &settings.topo_res, 0.001, 0.001, "%.3f");
+    update |= ImGui::InputDouble(
+        "Neg Vol Res (mm)", &settings.neg_vol_res, 0.001, 0.001, "%.3f");
+    update |= ImGui::InputDouble("Attachment Size (mm)",
+                                 &settings.attachment_size,
+                                 0.001,
+                                 0.001,
+                                 "%.3f");
+    update |=
+        ImGui::InputInt("Attachment Samples", &settings.attachment_samples, 1);
+    update |= ImGui::InputDouble("Contact Pt Size (mm)",
+                                 &settings.contact_point_size,
+                                 0.001,
+                                 0.001,
+                                 "%.3f");
+    update |= ImGui::InputDouble(
+        "Base Thickness (mm)", &settings.base_thickness, 0.001, 0.001, "%.3f");
+
+    if (update) vm_.PSG().SetTopoOptSettings(settings);
+    if (ImGui::Button("Compute Neg Vol", ImVec2(w, 0))) {
+      vm_.ComputeNegativeVolume();
+    }
+    if (ImGui::Button("Generate Topy Config", ImVec2(w, 0))) {
+      std::string filename = igl::file_dialog_save();
+      if (!filename.empty()) {
+        vm_.ComputeNegativeVolume();
+        GenerateTopyConfig(
+            vm_.PSG(), vm_.GetNegVolV(), vm_.GetNegVolF(), filename);
+      }
+    }
+  }
+  ImGui::PopID();
+}
+
 void MainUI::DrawViewPanel() {
   if (ImGui::CollapsingHeader("View", ImGuiTreeNodeFlags_None)) {
     ImGui::PushID("View");
@@ -416,6 +466,8 @@ void MainUI::DrawViewPanel() {
     DrawLayerOptions(Layer::kFingers, "Fingers");
     DrawLayerOptions(Layer::kTrajectory, "Trajectory");
     DrawLayerOptions(Layer::kSweptSurface, "Swept Finger");
+    DrawLayerOptions(Layer::kGripperBound, "Gripper Bound");
+    DrawLayerOptions(Layer::kNegVol, "Negative Volume");
     ImGui::PopID();
   }
 }
@@ -636,6 +688,12 @@ void MainUI::OnLayerInvalidated(Layer layer) {
       break;
     case Layer::kSweptSurface:
       OnSweptSurfaceInvalidated();
+      break;
+    case Layer::kGripperBound:
+      OnGripperBoundInvalidated();
+      break;
+    case Layer::kNegVol:
+      OnNegVolInvalidated();
       break;
   }
 }
@@ -902,6 +960,31 @@ void MainUI::OnSweptSurfaceInvalidated() {
   layer.set_data(Cost);
   layer.set_face_based(true);
   layer.double_sided = true;
+}
+
+void MainUI::OnGripperBoundInvalidated() {
+  auto& layer = GetLayer(Layer::kGripperBound);
+  auto V = cube_V;
+  Eigen::Vector3d lb = vm_.PSG().GetTopoOptSettings().lower_bound;
+  Eigen::Vector3d ub = vm_.PSG().GetTopoOptSettings().upper_bound;
+  V = V.array().rowwise() * (ub - lb).transpose().array();
+  V = V.array().rowwise() + lb.transpose().array();
+  V = (robots::Forward(vm_.GetCurrentPose()) *
+       V.transpose().colwise().homogeneous())
+          .transpose();
+  layer.set_edges(V, cube_E, colors::kBlue);
+  layer.line_width = 2;
+}
+
+void MainUI::OnNegVolInvalidated() {
+  auto& layer = GetLayer(Layer::kNegVol);
+  layer.clear();
+  if (vm_.GetNegVolValid()) {
+    layer.set_mesh((robots::Forward(vm_.GetCurrentPose()) *
+                    vm_.GetNegVolV().transpose().colwise().homogeneous())
+                       .transpose(),
+                   vm_.GetNegVolF());
+  }
 }
 
 inline bool MainUI::IsGuizmoVisible() {

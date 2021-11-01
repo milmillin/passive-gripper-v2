@@ -1,11 +1,12 @@
 #pragma once
 
 #define DECLARE_GETTER(x, y) \
-  inline const decltype(y)& x() const { return y; }
+  inline constexpr const decltype(y)& x() const { return y; }
 
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 #include <array>
+#include <map>
 #include <vector>
 
 namespace psg {
@@ -51,6 +52,24 @@ const Pose kInitPose =
 static constexpr double kWrenchReg = 1e-10;
 // zero threshold
 static constexpr double kWrenchNormThresh = 1e-5;
+
+const std::map<std::string, std::string> kTopyConfig = {{"PROB_TYPE", "comp"},
+                                                        {"ETA", "0.4"},
+                                                        {"DOF_PN", "3"},
+                                                        {"VOL_FRAC", "0.04"},
+                                                        {"FILT_RAD", "1.8"},
+                                                        {"ELEM_K", "H8"},
+                                                        {"NUM_ITER", "50"},
+                                                        {"P_FAC", "1"},
+                                                        {"P_HOLD", "15"},
+                                                        {"P_INCR", "0.2"},
+                                                        {"P_CON", "1"},
+                                                        {"P_MAX", "3"},
+                                                        {"Q_FAC", "1"},
+                                                        {"Q_HOLD", "15"},
+                                                        {"Q_INCR", "0.05"},
+                                                        {"Q_CON", "1"},
+                                                        {"Q_MAX", "5"}};
 
 namespace labels {
 

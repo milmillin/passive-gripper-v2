@@ -8,6 +8,7 @@
 #include "models/GripperParams.h"
 #include "models/GripperSettings.h"
 #include "models/MeshDependentResource.h"
+#include "robots/Robots.h"
 #include "serialization/Serialization.h"
 
 namespace psg {
@@ -17,7 +18,13 @@ using namespace models;
 
 class PassiveGripper : public psg::core::serialization::Serializable {
  public:
-  enum class InvalidatedReason { kMesh, kContactPoints, kFingers, kTrajectory };
+  enum class InvalidatedReason {
+    kMesh,
+    kContactPoints,
+    kFingers,
+    kTrajectory,
+    kTopoOptSettings
+  };
   typedef std::function<void(InvalidatedReason)> InvalidatedDelegate;
 
   PassiveGripper();
@@ -50,6 +57,9 @@ class PassiveGripper : public psg::core::serialization::Serializable {
   void RemoveKeyframe(size_t index);
   void ClearKeyframe();
   inline const Trajectory& GetTrajectory() const { return params_.trajectory; }
+  inline Eigen::Affine3d& GetFingerTransInv() const {
+    return robots::Forward(params_.trajectory.front()).inverse();
+  }
 
   // Settings
   void SetContactSettings(const ContactSettings& settings);
@@ -110,11 +120,14 @@ class PassiveGripper : public psg::core::serialization::Serializable {
   void InvalidateContact();
   void InvalidateFinger();
   void InvalidateTrajectory();
+  void InvalidateTopoOptSettings();
   void InvalidateQuality();
   void InvalidateCost();
 
  public:
   DECLARE_GETTER(GetCenterOfMass, mdr_.center_of_mass)
+  DECLARE_GETTER(GetMeshV, mdr_.V)
+  DECLARE_GETTER(GetMeshF, mdr_.F)
   DECLARE_GETTER(GetMeshTrans, mesh_trans_)
   DECLARE_GETTER(IsMeshLoaded, mesh_loaded_)
   DECLARE_GETTER(GetContactPoints, params_.contact_points)

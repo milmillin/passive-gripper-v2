@@ -1,1 +1,1 @@
-#define DECLARE_GETTER(x, y) inline const decltype(y)& x() const { return y; }
+#define DECLARE_GETTER(x, y) inline constexpr const decltype(y)& x() const { return y; }

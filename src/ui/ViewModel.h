@@ -31,6 +31,8 @@ class ViewModel {
 
   void AnimateTo(const Pose& pose);
   void NextFrame();
+
+  void ComputeNegativeVolume();
  private:
   LayerInvalidatedDelegate LayerInvalidated_;
   void InvokeLayerInvalidated(Layer layer);
@@ -53,12 +55,19 @@ class ViewModel {
   Pose src_pose_;
   Pose dst_pose_;
   size_t cur_step_ = 0;
+
+  bool is_neg_valid_ = false;
+  Eigen::MatrixXd neg_V_;
+  Eigen::MatrixXi neg_F_;
  public:
   DECLARE_GETTER(PSG, psg_)
   DECLARE_GETTER(GetEffPosition, eff_position_)
   DECLARE_GETTER(GetEffAngles, eff_angles_)
   DECLARE_GETTER(GetCurrentPose, current_pose_)
   DECLARE_GETTER(GetIsAnimating, is_animating_)
+  DECLARE_GETTER(GetNegVolV, neg_V_)
+  DECLARE_GETTER(GetNegVolF, neg_F_)
+  DECLARE_GETTER(GetNegVolValid, is_neg_valid_)
 };
 
 }  // namespace ui
