@@ -99,7 +99,7 @@ int main(int argc, char** argv) {
                   r.name + "-" + std::to_string(r.cp_idx),
                   psg::kBoolStr[!r.failed],
                   r.name,
-                  r.cp_idx,
+                  std::to_string(r.cp_idx),
                   psg::kBoolStr[r.force_closure],
                   psg::kBoolStr[r.partial_force_closure],
                   std::to_string(r.min_wrench),
