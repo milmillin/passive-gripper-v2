@@ -31,17 +31,28 @@ void SettingsOverrider::Apply(psg::core::PassiveGripper& psg) const {
   bool tmp_reinit_trajectory = psg.reinit_trajectory;
   psg.reinit_fingers = false;
   psg.reinit_trajectory = false;
+
+  OptSettings opt_settings = psg.GetOptSettings();
+  bool opt_changed = false;
+
   for (const auto& kv : mp) {
     if (kv.first == "algorithm") {
-      OptSettings settings = psg.GetOptSettings();
-      settings.algorithm = (nlopt_algorithm)std::stoi(kv.second);
-      psg.SetOptSettings(settings);
+      opt_settings.algorithm = (nlopt_algorithm)std::stoi(kv.second);
+      opt_changed = true;
     } else if (kv.first == "tolerance") {
-      OptSettings settings = psg.GetOptSettings();
-      settings.tolerance = std::stod(kv.second);
-      psg.SetOptSettings(settings);
+      opt_settings.tolerance = std::stod(kv.second);
+      opt_changed = true;
+    } else if (kv.first == "max_runtime") {
+      opt_settings.max_runtime = std::stod(kv.second);
+      opt_changed = true;
+    } else if (kv.first == "max_iters") {
+      opt_settings.max_iters = std::stod(kv.second);
+      opt_changed = true;
     }
   }
+
+  if (opt_changed) psg.SetOptSettings(opt_settings);
+
   psg.reinit_fingers = tmp_reinit_fingers;
   psg.reinit_trajectory = tmp_reinit_trajectory;
 }

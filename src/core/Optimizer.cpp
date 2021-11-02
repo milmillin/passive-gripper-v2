@@ -102,7 +102,9 @@ void Optimizer::Optimize(const PassiveGripper& psg) {
     nlopt_set_ftol_rel(opt_, settings_.opt.tolerance);
     nlopt_set_ftol_abs(opt_, 1e-15);
   }
-  nlopt_set_maxeval(opt_, 10000);
+  if (settings_.opt.max_iters > 0) {
+    nlopt_set_maxeval(opt_, settings_.opt.max_iters);
+  }
 
   n_iters_ = 0;
   g_min_cost_ = t_min_cost_ = std::numeric_limits<double>::max();
