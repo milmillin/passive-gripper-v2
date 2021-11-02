@@ -102,10 +102,10 @@ int main(int argc, char** argv) {
                   std::to_string(r.cp_idx),
                   psg::kBoolStr[r.force_closure],
                   psg::kBoolStr[r.partial_force_closure],
-                  std::to_string(r.min_wrench),
-                  std::to_string(r.partial_min_wrench),
-                  std::to_string(r.cost),
-                  std::to_string(r.min_dist),
+                  ToString(r.min_wrench),
+                  ToString(r.partial_min_wrench),
+                  ToString(r.cost),
+                  ToString(r.min_dist),
                   std::to_string(r.duration));
       c.wait();
     }

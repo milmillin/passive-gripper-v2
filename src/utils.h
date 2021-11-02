@@ -4,6 +4,8 @@
 #include <ctime>
 #include <iostream>
 #include <string>
+#include <sstream>
+#include <iomanip>
 
 inline std::ostream& LogImpl(const char* type) {
   static thread_local char buf[64];
@@ -29,4 +31,10 @@ inline std::ostream& Out() {
   std::strftime(buf, 64, "%F %T", std::localtime(&t));
   *out << "[" << buf << "] ";
   return *out;
+}
+
+inline std::string ToString(double v) {
+  std::ostringstream ss;
+  ss << std::setprecision(8) << std::scientific << v;
+  return ss.str();
 }
