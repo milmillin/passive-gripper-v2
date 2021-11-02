@@ -71,6 +71,8 @@ const std::map<std::string, std::string> kTopyConfig = {{"PROB_TYPE", "comp"},
                                                         {"Q_CON", "1"},
                                                         {"Q_MAX", "5"}};
 
+const char* kBoolStr[2] = {"False", "True"};
+
 namespace labels {
 
 const char* const kAlgorithms[] = {

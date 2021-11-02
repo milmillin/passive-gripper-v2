@@ -1,14 +1,15 @@
+#include <omp.h>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <string>
 #include <vector>
-#include <omp.h>
 
 #include <boost/process.hpp>
 
 #include "../utils.h"
+#include "../Constants.h"
 #include "Psgtests.h"
 #include "Result.h"
 #include "SettingsOverrider.h"
@@ -77,7 +78,8 @@ int main(int argc, char** argv) {
               << std::endl;
     } else {
       ckpt_file >> ckpt_i >> ckpt_j >> ckpt_need;
-      Log() << "Checkpoint loaded: " << ckpt_i << ' ' << ckpt_j << ' ' << ckpt_need << std::endl;
+      Log() << "Checkpoint loaded: " << ckpt_i << ' ' << ckpt_j << ' '
+            << ckpt_need << std::endl;
       ckpt_j++;
     }
   }
@@ -93,7 +95,18 @@ int main(int argc, char** argv) {
       Log() << "Checkpoint updated: " << i << ' ' << j << std::endl;
     }
     if (hook_set) {
-      bp::child c(hook_str, std::to_string(i), std::to_string(j), r.name);
+      bp::child c(hook_str,
+                  r.name + "-" + std::to_string(r.cp_idx),
+                  psg::kBoolStr[!r.failed],
+                  r.name,
+                  r.cp_idx,
+                  psg::kBoolStr[r.force_closure],
+                  psg::kBoolStr[r.partial_force_closure],
+                  std::to_string(r.min_wrench),
+                  std::to_string(r.partial_min_wrench),
+                  std::to_string(r.cost),
+                  std::to_string(r.min_dist),
+                  std::to_string(r.duration));
       c.wait();
     }
   };

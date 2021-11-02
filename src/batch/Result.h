@@ -4,6 +4,8 @@
 #include <iostream>
 #include <string>
 
+#include "../Constants.h"
+
 struct Result {
   std::string name;
   size_t cp_idx;
@@ -18,14 +20,12 @@ struct Result {
   long long duration;
 };
 
-static const char* bool_str[2] = {"False", "True"};
-
 inline std::ostream& operator<<(std::ostream& f, const Result& r) {
   f << std::setprecision(5) << std::scientific;
-  f << r.name << '\t' << r.cp_idx << '\t' << bool_str[r.force_closure]
-    << '\t' << bool_str[r.partial_force_closure] << '\t' << r.min_wrench << '\t'
-    << r.partial_min_wrench << '\t' << r.cost << '\t' << r.min_dist << '\t'
-    << r.duration;
+  f << r.name << '\t' << r.cp_idx << '\t' << psg::kBoolStr[r.force_closure]
+    << '\t' << psg::kBoolStr[r.partial_force_closure] << '\t' << r.min_wrench
+    << '\t' << r.partial_min_wrench << '\t' << r.cost << '\t' << r.min_dist
+    << '\t' << r.duration;
   return f;
 }
 
