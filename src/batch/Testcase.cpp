@@ -58,7 +58,7 @@ void Testcase::ProcessFrom(size_t j_cp,
     psg.SetParams(optimizer.GetCurrentParams());
     bool failed = psg.GetMinDist() < -1e-5;
     std::string out_fn_fmt =
-        "output/" + ((failed ? "FAILED-" : "") + name) + "-optd-%03d.psg";
+        "../output/" + ((failed ? "__failed-" : "") + name) + "-optd-%03d.psg";
     snprintf(buf, bufsize, out_fn_fmt.c_str(), i);
     std::string out_filename = buf;
     std::ofstream out_file(out_filename, std::ios::out | std::ios::binary);
