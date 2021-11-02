@@ -66,8 +66,8 @@ int main(int argc, char** argv) {
     Log() << "Working directory set to " << root << std::endl;
   }
 
-  if (!fs::is_directory("output") || !fs::exists("output")) {
-    fs::create_directory("output");
+  if (!fs::is_directory("../output") || !fs::exists("../output")) {
+    fs::create_directory("../output");
     Log() << "Output directory created" << std::endl;
   }
 
