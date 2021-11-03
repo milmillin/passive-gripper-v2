@@ -176,6 +176,7 @@ void MainUI::DrawMetricPanel() {
     ImGui::Text("Partial Min Wrench: %.4e", vm_.PSG().GetPartialMinWrench());
     ImGui::Text("Cost: %.4e", vm_.PSG().GetCost());
     ImGui::Text("Min Dist: %.4e", vm_.PSG().GetMinDist());
+    ImGui::Text("Intersecting: %s", kFalseTrue[vm_.PSG().GetIntersecting()]);
     ImGui::PopID();
   }
 }

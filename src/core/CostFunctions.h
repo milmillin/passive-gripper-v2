@@ -22,5 +22,9 @@ double MinDistance(const GripperParams& params,
                    const GripperSettings& settings,
                    const MeshDependentResource& mdr);
 
+bool Intersects(const GripperParams& params,
+                const GripperSettings& settings,
+                const MeshDependentResource& mdr);
+
 }  // namespace core
 }  // namespace psg

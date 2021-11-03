@@ -2,6 +2,7 @@
 
 #include "GeometryUtils.h"
 #include "robots/Robots.h"
+#include <igl/copyleft/cgal/intersect_other.h>
 
 namespace psg {
 namespace core {
@@ -195,6 +196,62 @@ double MinDistance(const GripperParams& params,
     min_dist = std::min(min_dist, t_min_dist);
   }
   return min_dist;
+}
+
+bool Intersects(const GripperParams& params,
+                const GripperSettings& settings,
+                const MeshDependentResource& mdr) {
+  const size_t nTrajectorySteps = settings.cost.n_trajectory_steps;
+  const double trajectoryStep = 1. / nTrajectorySteps;
+
+  const size_t nKeyframes = params.trajectory.size();
+  const size_t nFingers = params.fingers.size();
+  const size_t nFingerJoints = settings.finger.n_finger_joints;
+  const size_t nFrames = (nKeyframes - 1) * nTrajectorySteps + 1;
+
+  if (params.trajectory.size() <= 1llu) return false;
+
+  std::vector<Eigen::MatrixXd> sv_V(
+      nFingers, Eigen::MatrixXd(nFingerJoints * nFrames, 3));
+  Eigen::MatrixXi sv_F((nFingerJoints - 1) * (nFrames - 1) * 2, 3);
+
+  Eigen::Affine3d finger_trans_inv =
+      robots::Forward(params.trajectory.front()).inverse();
+
+  Eigen::MatrixXi sv_F_template((nFingerJoints - 1) * 2, 3);
+  for (size_t i = 0; i < nFingerJoints - 1; i++) {
+    sv_F_template.row(i * 2) = Eigen::RowVector3i(i, i + nFingerJoints, i + 1);
+    sv_F_template.row(i * 2 + 1) =
+        Eigen::RowVector3i(i + 1, i + nFingerJoints, i + nFingerJoints + 1);
+  }
+  for (size_t j = 0; j < nFrames - 1; j++) {
+    sv_F.block(j * (nFingerJoints - 1) * 2, 0, (nFingerJoints - 1) * 2, 3) =
+        sv_F_template.array() + (j * nFingerJoints);
+  }
+  for (size_t i = 0; i < nFingers; i++) {
+    for (size_t j = 0; j < nFrames; j++) {
+      size_t a = j / nTrajectorySteps;
+      size_t b = j % nTrajectorySteps;
+      if (a == nKeyframes - 1) {
+        a--;
+        b = nTrajectorySteps;
+      }
+      double t = (double)b / nTrajectorySteps;
+
+      Pose l_pose =
+          params.trajectory[a] * (1. - t) + params.trajectory[a + 1] * (t);
+
+      Eigen::Affine3d cur_trans = robots::Forward(l_pose) * finger_trans_inv;
+      sv_V[i].block(j * nFingerJoints, 0, nFingerJoints, 3) =
+          (cur_trans * params.fingers[i].transpose().colwise().homogeneous())
+              .transpose();
+    }
+    Eigen::MatrixXi IF;
+    bool intersect = igl::copyleft::cgal::intersect_other(
+        mdr.V, mdr.F, sv_V[i], sv_F, true, IF);
+    if (intersect) return true;
+  }
+  return false;
 }
 
 }  // namespace core
