@@ -95,7 +95,9 @@ int main(int argc, char** argv) {
       Log() << "Checkpoint updated: " << i << ' ' << j << std::endl;
     }
     if (hook_set) {
+      bp::ipstream out;
       bp::child c(hook_str,
+                  bp::std_out > out,
                   r.name + "-" + std::to_string(r.cp_idx),
                   psg::kBoolStr[!r.failed],
                   r.name,
@@ -107,6 +109,15 @@ int main(int argc, char** argv) {
                   ToString(r.cost),
                   ToString(r.min_dist),
                   std::to_string(r.duration));
+      char a[1024];
+      auto& out_s = Log() << "[child proc]" << std::endl;
+      while (out.read(a, 1024)) {
+        int read = out.gcount();
+        for (int i = 0; i < read; i++) {
+          out_s << a[i];
+        }
+      }
+      out_s << std::endl;
       c.wait();
     }
   };
