@@ -58,7 +58,7 @@ void Testcase::ProcessFrom(size_t j_cp,
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
         stop_time - start_time);
     psg.SetParams(optimizer.GetCurrentParams());
-    bool failed = psg.GetMinDist() < -1e-5;
+    bool failed = psg.GetIntersecting();
 
     std::string out_fn_fmt =
         "../output/" + ((failed ? "__failed-" : "") + name) + "-optd-%03d";
