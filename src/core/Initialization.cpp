@@ -367,7 +367,7 @@ void InitializeConservativeBound(const PassiveGripper& psg,
                .transpose();
 
   out_lb = out_lb.cwiseMin(V.colwise().minCoeff().transpose());
-  out_ub = out_ub.cwiseMin(V.colwise().minCoeff().transpose());
+  out_ub = out_ub.cwiseMax(V.colwise().maxCoeff().transpose());
 
   constexpr double padding = 0.03;
   out_lb.array() -= padding;
