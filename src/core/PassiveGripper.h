@@ -73,6 +73,9 @@ class PassiveGripper : public psg::core::serialization::Serializable {
   // Params
   void SetParams(const GripperParams& params, bool invalidate = true);
 
+  // Initialization
+  void InitGripperBound();
+
   bool reinit_trajectory = true;
   bool reinit_fingers = true;
 

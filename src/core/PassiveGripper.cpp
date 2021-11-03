@@ -200,6 +200,16 @@ void PassiveGripper::SetParams(const GripperParams& params, bool invalidate) {
   reinit_trajectory = tmp_reinit_trajectory;
 }
 
+void PassiveGripper::InitGripperBound() {
+  Eigen::Vector3d lb;
+  Eigen::Vector3d ub;
+  InitializeGripperBound(*this, lb, ub);
+  settings_.topo_opt.lower_bound = lb;
+  settings_.topo_opt.upper_bound = ub;
+  topo_opt_settings_changed_ = true;
+  Invalidate();
+}
+
 // State Invalidation
 
 // [] -> [Mesh]
@@ -208,7 +218,7 @@ void PassiveGripper::SetParams(const GripperParams& params, bool invalidate) {
 // [Contact] -> [Quality]
 // [Contact, FingerSettings] -> [Finger]
 // [Finger, TrajectorySettings] -> [Trajectory]
-// [Finger, Trajectory] -> [TopoOptSettings]
+// [] -> [TopoOptSettings]
 // [Finger, Trajectory, CostSettings] -> [Cost]
 
 void PassiveGripper::Invalidate() {
@@ -313,7 +323,6 @@ void PassiveGripper::InvalidateFinger() {
     trajectory_changed_ = true;
   }
   cost_changed_ = true;
-  topo_opt_settings_changed_ = true;
 }
 
 void PassiveGripper::InvalidateTrajectory() {
@@ -326,16 +335,10 @@ void PassiveGripper::InvalidateTrajectory() {
   }
   InvokeInvalidated(InvalidatedReason::kTrajectory);
   cost_changed_ = true;
-  topo_opt_settings_changed_ = true;
 }
 
 void PassiveGripper::InvalidateTopoOptSettings() {
   topo_opt_settings_changed_ = false;
-  Eigen::Vector3d lb;
-  Eigen::Vector3d ub;
-  InitializeGripperBound(*this, lb, ub);
-  settings_.topo_opt.lower_bound = lb;
-  settings_.topo_opt.upper_bound = ub;
   InvokeInvalidated(InvalidatedReason::kTopoOptSettings);
 }
 
