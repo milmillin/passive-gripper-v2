@@ -70,7 +70,9 @@ void Testcase::ProcessFrom(size_t j_cp,
       psg.InitGripperBound();
       Eigen::MatrixXd neg_V;
       Eigen::MatrixXi neg_F;
-      NegativeSweptVolume(psg, neg_V, neg_F);
+      Eigen::MatrixXd sv_V;
+      Eigen::MatrixXi sv_F;
+      NegativeSweptVolume(psg, neg_V, neg_F, sv_V, sv_F);
       GenerateTopyConfig(psg, neg_V, neg_F, tpd_out_fn);
     }
 
