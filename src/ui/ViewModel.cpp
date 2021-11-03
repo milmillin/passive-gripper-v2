@@ -3,6 +3,7 @@
 #include "../core/GeometryUtils.h"
 #include "../core/robots/Robots.h"
 #include "../core/SweptVolume.h"
+#include "../core/TopoOpt.h"
 
 namespace psg {
 namespace ui {
@@ -96,6 +97,15 @@ void ViewModel::ComputeNegativeVolume() {
   }
 }
 
+void ViewModel::LoadResultBin(const std::string& filename) {
+  ComputeNegativeVolume();
+  Eigen::MatrixXd V;
+  Eigen::MatrixXi F;
+  psg::core::LoadResultBin(psg_, filename, V, F);
+  RefineGripper(psg_, V, F, sv_V_, sv_F_, gripper_V_, gripper_F_);
+  InvokeLayerInvalidated(Layer::kGripper);
+}
+
 void ViewModel::ComputeIK() {
   Eigen::Affine3d trans =
       Eigen::Translation3d(eff_position_) *
@@ -156,6 +166,7 @@ void ViewModel::PoseChanged() {
   InvokeLayerInvalidated(Layer::kRobot);
   InvokeLayerInvalidated(Layer::kGripperBound);
   InvokeLayerInvalidated(Layer::kNegVol);
+  InvokeLayerInvalidated(Layer::kGripper);
 }
 
 }  // namespace ui

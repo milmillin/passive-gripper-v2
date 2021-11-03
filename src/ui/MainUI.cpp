@@ -430,8 +430,6 @@ void MainUI::DrawTopoOptPanel() {
                                  0.001,
                                  0.001,
                                  "%.3f");
-    update |=
-        ImGui::InputInt("Attachment Samples", &settings.attachment_samples, 1);
     update |= ImGui::InputDouble("Contact Pt Size (mm)",
                                  &settings.contact_point_size,
                                  0.001,
@@ -455,6 +453,12 @@ void MainUI::DrawTopoOptPanel() {
             vm_.PSG(), vm_.GetNegVolV(), vm_.GetNegVolF(), filename);
       }
     }
+    if (ImGui::Button("Load Result Bin", ImVec2(w, 0))) {
+      std::string filename = igl::file_dialog_open();
+      if (!filename.empty()) {
+        vm_.LoadResultBin(filename);
+      }
+    }
   }
   ImGui::PopID();
 }
@@ -472,6 +476,7 @@ void MainUI::DrawViewPanel() {
     DrawLayerOptions(Layer::kSweptSurface, "Swept Finger");
     DrawLayerOptions(Layer::kGripperBound, "Gripper Bound");
     DrawLayerOptions(Layer::kNegVol, "Negative Volume");
+    DrawLayerOptions(Layer::kGripper, "Gripper");
     ImGui::PopID();
   }
 }
@@ -698,6 +703,9 @@ void MainUI::OnLayerInvalidated(Layer layer) {
       break;
     case Layer::kNegVol:
       OnNegVolInvalidated();
+      break;
+    case Layer::kGripper:
+      OnGripperInvalidated();
       break;
   }
 }
@@ -989,6 +997,15 @@ void MainUI::OnNegVolInvalidated() {
                        .transpose(),
                    vm_.GetNegVolF());
   }
+}
+
+void MainUI::OnGripperInvalidated() {
+  auto& layer = GetLayer(Layer::kNegVol);
+  layer.clear();
+  layer.set_mesh((robots::Forward(vm_.GetCurrentPose()) *
+                  vm_.GetGripperV().transpose().colwise().homogeneous())
+                     .transpose(),
+                 vm_.GetGripperF());
 }
 
 inline bool MainUI::IsGuizmoVisible() {

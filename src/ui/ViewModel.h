@@ -33,6 +33,7 @@ class ViewModel {
   void NextFrame();
 
   void ComputeNegativeVolume();
+  void LoadResultBin(const std::string& filename);
  private:
   LayerInvalidatedDelegate LayerInvalidated_;
   void InvokeLayerInvalidated(Layer layer);
@@ -61,6 +62,8 @@ class ViewModel {
   Eigen::MatrixXi neg_F_;
   Eigen::MatrixXd sv_V_;
   Eigen::MatrixXi sv_F_;
+  Eigen::MatrixXd gripper_V_;
+  Eigen::MatrixXi gripper_F_;
  public:
   DECLARE_GETTER(PSG, psg_)
   DECLARE_GETTER(GetEffPosition, eff_position_)
@@ -69,6 +72,10 @@ class ViewModel {
   DECLARE_GETTER(GetIsAnimating, is_animating_)
   DECLARE_GETTER(GetNegVolV, neg_V_)
   DECLARE_GETTER(GetNegVolF, neg_F_)
+  DECLARE_GETTER(GetSweptVolV, sv_V_)
+  DECLARE_GETTER(GetSweptVolF, sv_F_)
+  DECLARE_GETTER(GetGripperV, gripper_V_)
+  DECLARE_GETTER(GetGripperF, gripper_F_)
   DECLARE_GETTER(GetNegVolValid, is_neg_valid_)
 };
 

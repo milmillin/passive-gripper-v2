@@ -6,6 +6,8 @@
 #include <map>
 #include <vector>
 
+#include <igl/copyleft/cgal/mesh_boolean.h>
+#include <igl/copyleft/marching_cubes.h>
 #include "GeometryUtils.h"
 #include "Initialization.h"
 #include "PassiveGripper.h"
@@ -249,6 +251,134 @@ void GenerateTopyConfig(const PassiveGripper& psg,
   config["PASV_ELEM"] = FormatNodeList(forbidden_indices);
 
   WriteToFile(filename, config);
+}
+
+void LoadResultBin(const PassiveGripper& psg,
+                   const std::string& filename,
+                   Eigen::MatrixXd& out_V,
+                   Eigen::MatrixXi& out_F) {
+  if (!filename.empty()) {
+    std::ifstream myfile(filename, std::ios::in | std::ios::binary);
+    Eigen::MatrixXi voxels;
+    Eigen::VectorXd values;
+    serialization::Deserialize(voxels, myfile);
+    serialization::Deserialize(values, myfile);
+
+    Eigen::Vector3d lb = psg.GetTopoOptSettings().lower_bound;
+    Eigen::Vector3d ub = psg.GetTopoOptSettings().upper_bound;
+    double res = psg.GetTopoOptSettings().topo_res;
+
+    // flip-y
+    int sy = (ub.y() - lb.y()) / res;
+    voxels.col(1) *= -1;
+    voxels.col(1).array() += sy - 1;
+
+    // marching cube
+    Eigen::Vector3i range = ((ub - lb).array() / res).cast<int>();
+    range.array() += 2;
+
+    long long total_size = range.prod();
+
+    Eigen::VectorXd S(total_size);
+    Eigen::MatrixXd P(total_size, 3);
+
+    S.setConstant(0.5);
+    for (long long i = 0; i < total_size; i++) {
+      long long ex = i % range.x() - 1;
+      long long ey = (i / range.x()) % range.y() - 1;
+      long long ez = i / ((long long)range.x() * range.y()) - 1;
+      P.row(i) = VoxelToPoint(Eigen::Vector3i(ex, ey, ez), lb, res);
+    }
+
+    for (size_t i = 0; i < values.size(); i++) {
+      long long index = (voxels(i, 0) + 1ll) +
+                        (voxels(i, 1) + 1ll) * (long long)range.x() +
+                        (voxels(i, 2) + 1ll) * (long long)range.x() * range.y();
+      S(index) = 0.5 - values(i);
+    }
+
+    igl::copyleft::marching_cubes(
+        S, P, range.x(), range.y(), range.z(), 0., out_V, out_F);
+  }
+}
+
+void RefineGripper(const PassiveGripper& psg,
+                   const Eigen::MatrixXd& V,
+                   const Eigen::MatrixXi& F,
+                   const Eigen::MatrixXd& sv_V,
+                   const Eigen::MatrixXi& sv_F,
+                   Eigen::MatrixXd& out_V,
+                   Eigen::MatrixXi& out_F) {
+  Eigen::MatrixXd V1, V2, VR;
+  Eigen::MatrixXi F1, F2, FR;
+
+  // std::cout << "Adding contact points" << std::endl;
+  Eigen::MatrixX3d CP(psg.GetContactPoints().size(), 3);
+  for (size_t i = 0; i < psg.GetContactPoints().size(); i++) {
+    CP.row(i) = psg.GetContactPoints()[i].position.transpose();
+  }
+  CP = (psg.GetFingerTransInv() * CP.transpose().colwise().homogeneous())
+           .transpose();
+
+  CreateSpheres(CP, psg.GetTopoOptSettings().contact_point_size, 10, V2, F2);
+
+  igl::copyleft::cgal::mesh_boolean(
+      V, F, V2, F2, igl::MESH_BOOLEAN_TYPE_UNION, VR, FR);
+
+  // std::cout << "Adding base" << std::endl;
+  constexpr int cyl_res = 16;
+  double thickness = psg.GetTopoOptSettings().base_thickness;
+  V1 = VR;
+  F1 = FR;
+  CreateCylinderXY(Eigen::Vector3d::Zero(), 0.0315, thickness, cyl_res, V2, F2);
+
+  igl::copyleft::cgal::mesh_boolean(
+      V1, F1, V2, F2, igl::MESH_BOOLEAN_TYPE_UNION, VR, FR);
+
+  // subtracting holes
+  for (int i = 0; i < 4; i++) {
+    V1 = VR;
+    F1 = FR;
+
+    double ang = (2. * kPi * i) / 4. + (kPi / 4.);
+    CreateCylinderXY(Eigen::Vector3d(cos(ang) * 0.025, sin(ang) * 0.025, -0.01),
+                     0.0035,
+                     thickness + 0.01,
+                     cyl_res,
+                     VR,
+                     FR);
+    igl::copyleft::cgal::mesh_boolean(
+        V1, F1, VR, FR, igl::MESH_BOOLEAN_TYPE_MINUS, V2, F2);
+
+    CreateCylinderXY(
+        Eigen::Vector3d(cos(ang) * 0.025, sin(ang) * 0.025, thickness),
+        0.0055,
+        0.025,
+        cyl_res,
+        V1,
+        F1);
+
+    igl::copyleft::cgal::mesh_boolean(
+        V2, F2, V1, F1, igl::MESH_BOOLEAN_TYPE_MINUS, VR, FR);
+  }
+  // subtracting pin holes
+  V1 = VR;
+  F1 = FR;
+  CreateCylinderXY(Eigen::Vector3d(0, 0.025, -0.01),
+                   0.003,
+                   thickness + 0.01,
+                   cyl_res,
+                   V2,
+                   F2);
+  igl::copyleft::cgal::mesh_boolean(
+      V1, F1, V2, F2, igl::MESH_BOOLEAN_TYPE_MINUS, VR, FR);
+
+  // std::cout << "Subtracting swept volume" << std::endl;
+  V1 = VR;
+  F1 = FR;
+
+  igl::copyleft::cgal::mesh_boolean(
+      V1, F1, sv_V, sv_F, igl::MESH_BOOLEAN_TYPE_MINUS, out_V, out_F);
 }
 
 }  // namespace core

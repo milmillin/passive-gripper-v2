@@ -14,6 +14,7 @@ enum class Layer : int {
   kGripperBound,
   kNegVol,
   kRobot,
+  kGripper,
   kMax
 };
 

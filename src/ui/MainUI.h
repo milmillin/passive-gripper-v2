@@ -78,6 +78,7 @@ class MainUI : public igl::opengl::glfw::imgui::ImGuiMenu {
   void OnSweptSurfaceInvalidated();
   void OnGripperBoundInvalidated();
   void OnNegVolInvalidated();
+  void OnGripperInvalidated();
 
   // Contact Point Candidates
   size_t cp_num_seeds = 1000;

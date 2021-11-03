@@ -145,5 +145,69 @@ Eigen::MatrixXd CreateCubeV(const Eigen::Vector3d& lb,
   return R.array().rowwise() + lb.transpose().array();
 }
 
+void CreateSpheres(const Eigen::MatrixXd& P,
+                   double r,
+                   int res,
+                   Eigen::MatrixXd& out_V,
+                   Eigen::MatrixXi& out_F) {
+  out_V.resize(res * res * P.rows(), 3);
+  out_F.resize(2 * (res - 1) * res * P.rows(), 3);
+
+  for (long long i = 0; i < P.rows(); i++) {
+    Eigen::RowVector3d center = P.row(i);
+
+    // creating vertices
+    for (int j = 0; j < res; j++) {
+      double z = center(2) + r * cos(kPi * (double)j / (double(res - 1)));
+      for (int k = 0; k < res; k++) {
+        double x = center(0) + r * sin(kPi * (double)j / (double(res - 1))) *
+                                   cos(2 * kPi * (double)k / (double(res - 1)));
+        double y = center(1) + r * sin(kPi * (double)j / (double(res - 1))) *
+                                   sin(2 * kPi * (double)k / (double(res - 1)));
+        out_V.row((res * res) * i + j * res + k) << x, y, z;
+      }
+    }
+
+    // creating faces
+    for (int j = 0; j < res - 1; j++) {
+      for (int k = 0; k < res; k++) {
+        int v1 = (res * res) * i + j * res + k;
+        int v2 = (res * res) * i + (j + 1) * res + k;
+        int v3 = (res * res) * i + (j + 1) * res + (k + 1) % res;
+        int v4 = (res * res) * i + j * res + (k + 1) % res;
+        out_F.row(2 * (((res - 1) * res) * i + res * j + k)) << v1, v2, v3;
+        out_F.row(2 * (((res - 1) * res) * i + res * j + k) + 1) << v4, v1, v3;
+      }
+    }
+  }
+}
+
+void CreateCylinderXY(const Eigen::Vector3d& o,
+                      double r,
+                      double h,
+                      int res,
+                      Eigen::MatrixXd& out_V,
+                      Eigen::MatrixXi& out_F) {
+  out_V.resize(res * 2, 3);
+  out_F.resize(res * 2 + (res - 2) * 2, 3);
+
+  for (int i = 0; i < res; i++) {
+    double ang = (2. * kPi * i) / res;
+    out_V.row(i) << cos(ang) * r, sin(ang) * r, 0;
+  }
+  out_V.block(res, 0, res, 3) = out_V.block(0, 0, res, 3).array().rowwise() +
+                                Eigen::Array3d(0, 0, h).transpose();
+  out_V = out_V.array().rowwise() + o.transpose().array();
+
+  for (int i = 0; i < res; i++) {
+    out_F.row(i * 2) << i, i + res, ((i + 1) % res) + res;
+    out_F.row(i * 2 + 1) << i, ((i + 1) % res) + res, (i + 1) % res;
+  }
+  for (int i = 2; i < res; i++) {
+    out_F.row(2 * res + i) << 0, i, i - 1;
+    out_F.row(2 * res + res - 2 + i) << res, res + i - 1, res + i;
+  }
+}
+
 }  // namespace core
 }  // namespace psg

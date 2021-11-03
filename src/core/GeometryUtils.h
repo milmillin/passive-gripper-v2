@@ -48,6 +48,34 @@ double Volume(const Eigen::MatrixXd& V, const Eigen::MatrixXi& F);
 Eigen::MatrixXd CreateCubeV(const Eigen::Vector3d& lb,
                             const Eigen::Vector3d& ub);
 
+// Creates sphere meshes
+// Input:
+//  P:      #P by 3 coordinates of the centers of spheres
+//  r:      radii of the spheres
+//  res:    the resolution of the sphere discretization
+// extendMesh if to extend the V,T,TC, or to overwrite them
+// Output:
+//  out_V:  #V by 3 sphere mesh coordinates
+//  out_F:  #T by 3 sphere mesh triangles
+// From
+// https://github.com/avaxman/Directional/blob/master/include/directional/point_spheres.h
+// Copyright (C) 2018 Amir Vaxman <avaxman@gmail.com>
+// License: http://mozilla.org/MPL/2.0/
+void CreateSpheres(const Eigen::MatrixXd& P,
+                   double r,
+                   int res,
+                   Eigen::MatrixXd& out_V,
+                   Eigen::MatrixXi& out_F);
+
+// Creates cylinder mesh with axis of rotation on z-axis starting
+// at o with height h in +z direction and radius r.
+void CreateCylinderXY(const Eigen::Vector3d& o,
+                      double r,
+                      double h,
+                      int res,
+                      Eigen::MatrixXd& out_V,
+                      Eigen::MatrixXi& out_F);
+
 // clang-format off
 // Inline mesh of a cube
 const Eigen::Matrix<double, 8, 3> cube_V = (Eigen::MatrixXd(8, 3) <<
