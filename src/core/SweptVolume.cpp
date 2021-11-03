@@ -2,12 +2,14 @@
 
 #include <igl/AABB.h>
 #include <igl/WindingNumberAABB.h>
+#include <igl/copyleft/marching_cubes.h>
 #include <igl/fast_winding_number.h>
 #include <igl/random_points_on_mesh.h>
 #include <cmath>
 #include <vector>
 
-#include <igl/copyleft/marching_cubes.h>
+#include <igl/copyleft/cgal/mesh_boolean.h>
+#include "GeometryUtils.h"
 #include "robots/Robots.h"
 #include "swept_volume/gradient_descent_test.h"
 #include "swept_volume/sparse_continuation.h"
@@ -408,28 +410,48 @@ static void SweptVolumeWrapper(const PassiveGripper& psg,
 void NegativeSweptVolume(const PassiveGripper& psg,
                          Eigen::MatrixXd& out_V,
                          Eigen::MatrixXi& out_F,
+                         Eigen::MatrixXd& out_SV_V,
+                         Eigen::MatrixXi& out_SV_F,
                          const int num_seeds) {
   Eigen::Vector3d floor(0, psg.GetCostSettings().floor, 0);
-  Eigen::Vector3d floorN(0, 1, 0);
-  Eigen::Affine3d finger_trans_inv =
-      robots::Forward(psg.GetTrajectory().front()).inverse();
-
-  floor = finger_trans_inv * floor;
-  floorN = finger_trans_inv.linear() * floorN;
   Eigen::Vector3d boxUB = psg.GetTopoOptSettings().upper_bound;
   Eigen::Vector3d boxLB = psg.GetTopoOptSettings().lower_bound;
 
-  ImplicitMeshFunc f = [floor, floorN, boxUB, boxLB](
-                           double sgd,
-                           const Eigen::RowVector3d& P,
-                           const Eigen::RowVector3d& pos) {
-    double floorD = (pos.transpose() - floor).dot(floorN);
-    double boxD = std::max((P.transpose() - boxUB).maxCoeff(),
-                           (boxLB - P.transpose()).maxCoeff());
-    return -std::max(boxD, -std::min(sgd, floorD));
-  };
+  SweptVolume(psg, out_SV_V, out_SV_F, num_seeds);
 
-  SweptVolumeWrapper(psg, f, out_V, out_F, -1., num_seeds);
+  // Create box
+  Eigen::MatrixXd box_V =
+      cube_V.array().rowwise() * (boxUB - boxLB).transpose().array();
+  box_V = box_V.array().rowwise() + boxLB.transpose().array();
+
+  Eigen::MatrixXd RV;
+  Eigen::MatrixXi RF;
+
+  igl::copyleft::cgal::mesh_boolean(
+      box_V, cube_F, out_SV_V, out_SV_F, igl::MESH_BOOLEAN_TYPE_MINUS, RV, RF);
+
+  // Create Floor
+  auto R2_V = (robots::Forward(psg.GetTrajectory().front()) *
+               RV.transpose().colwise().homogeneous())
+                  .transpose();
+
+  Eigen::Vector3d lb = R2_V.colwise().minCoeff().transpose();
+  Eigen::Vector3d ub = R2_V.colwise().maxCoeff().transpose();
+
+  constexpr double padding = 0.03;
+  lb.array() -= padding;
+  ub.array() += padding;
+  lb.y() = -5;
+  ub.y() = 0;
+
+  Eigen::MatrixXd floor_V = cube_V.array().rowwise() * (ub - lb).transpose().array();
+  floor_V = floor_V.array().rowwise() + lb.transpose().array();
+  floor_V =
+      (psg.GetFingerTransInv() * floor_V.transpose().colwise().homogeneous())
+          .transpose();
+
+  igl::copyleft::cgal::mesh_boolean(
+      RV, RF, floor_V, cube_F, igl::MESH_BOOLEAN_TYPE_MINUS, out_V, out_F);
 }
 
 void SweptVolume(const PassiveGripper& psg,

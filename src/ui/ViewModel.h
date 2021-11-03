@@ -59,6 +59,8 @@ class ViewModel {
   bool is_neg_valid_ = false;
   Eigen::MatrixXd neg_V_;
   Eigen::MatrixXi neg_F_;
+  Eigen::MatrixXd sv_V_;
+  Eigen::MatrixXi sv_F_;
  public:
   DECLARE_GETTER(PSG, psg_)
   DECLARE_GETTER(GetEffPosition, eff_position_)

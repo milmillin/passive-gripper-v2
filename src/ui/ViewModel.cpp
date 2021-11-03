@@ -90,7 +90,7 @@ void ViewModel::NextFrame() {
 
 void ViewModel::ComputeNegativeVolume() {
   if (!is_neg_valid_) {
-    NegativeSweptVolume(psg_, neg_V_, neg_F_);
+    NegativeSweptVolume(psg_, neg_V_, neg_F_, sv_V_, sv_F_);
     is_neg_valid_ = true;
     InvokeLayerInvalidated(Layer::kNegVol);
   }
