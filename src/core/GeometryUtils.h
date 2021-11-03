@@ -43,6 +43,8 @@ std::vector<ContactPoint> GenerateContactCone(const ContactPoint& contact_point,
                                               size_t cone_res,
                                               double friction);
 
+double Volume(const Eigen::MatrixXd& V, const Eigen::MatrixXi& F);
+
 // clang-format off
 // Inline mesh of a cube
 const Eigen::Matrix<double, 8, 3> cube_V = (Eigen::MatrixXd(8, 3) <<
