@@ -165,10 +165,7 @@ static void WriteToFile(std::string fileName,
 void GenerateTopyConfig(const PassiveGripper& psg,
                         const Eigen::MatrixXd& neg_V,
                         const Eigen::MatrixXi& neg_F,
-                        const std::string& filename,
-                        std::vector<Eigen::Vector3i>& out_attachment_voxels,
-                        std::vector<Eigen::Vector3i>& out_contact_voxels,
-                        std::vector<Eigen::Vector3i>& out_forbidden_voxels) {
+                        const std::string& filename) {
   Eigen::Vector3d lb = psg.GetTopoOptSettings().lower_bound;
   Eigen::Vector3d ub = psg.GetTopoOptSettings().upper_bound;
   double res = psg.GetTopoOptSettings().topo_res;
@@ -178,7 +175,6 @@ void GenerateTopyConfig(const PassiveGripper& psg,
       GetForbiddenVoxels(neg_V, neg_F, lb, ub, res, range);
   std::vector<int> forbidden_indices =
       ConvertToElemIndices(forbidden_voxels, range);
-  out_forbidden_voxels = forbidden_voxels;
 
   std::vector<Eigen::Vector3i> attachment_voxels;
   double radius = psg.GetTopoOptSettings().attachment_size / 2;
@@ -200,7 +196,6 @@ void GenerateTopyConfig(const PassiveGripper& psg,
 
   std::vector<int> attachment_indices =
       ConvertToNodeIndices(attachment_voxels, range);
-  out_attachment_voxels = attachment_voxels;
 
   Eigen::Affine3d finger_trans_inv =
       robots::Forward(psg.GetTrajectory().front()).inverse();
@@ -213,7 +208,6 @@ void GenerateTopyConfig(const PassiveGripper& psg,
   }
   std::vector<int> contact_indices =
       ConvertToNodeIndices(contact_voxels, range);
-  out_contact_voxels = contact_voxels;
 
   size_t lastdot = filename.rfind('.');
   size_t lastslash = filename.rfind('/');
