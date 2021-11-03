@@ -98,7 +98,7 @@ int main(int argc, char** argv) {
       bp::ipstream out;
       bp::child c(hook_str,
                   bp::std_out > out,
-                  r.name + "-" + std::to_string(r.cp_idx),
+                  r.out_fn,
                   psg::kBoolStr[!r.failed],
                   r.name,
                   std::to_string(r.cp_idx),
@@ -108,6 +108,8 @@ int main(int argc, char** argv) {
                   ToString(r.partial_min_wrench),
                   ToString(r.cost),
                   ToString(r.min_dist),
+                  ToString(r.volume),
+                  ToString(r.csv_volume),
                   std::to_string(r.duration));
       char a[1024];
       auto& out_s = Log() << "[child proc]" << std::endl;

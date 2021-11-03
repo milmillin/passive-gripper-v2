@@ -1,11 +1,15 @@
 #include "Testcase.h"
 
+#include <igl/copyleft/cgal/mesh_boolean.h>
+#include <igl/writeSTL.h>
 #include <exception>
 #include <fstream>
 #include <iostream>
 #include <string>
 #include <vector>
 
+#include "../core/GeometryUtils.h"
+#include "../core/Initialization.h"
 #include "../core/Optimizer.h"
 #include "../core/PassiveGripper.h"
 #include "../core/SweptVolume.h"
@@ -57,13 +61,20 @@ void Testcase::ProcessFrom(size_t j_cp,
     auto stop_time = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
         stop_time - start_time);
+    Log() << "> Optimization took " << duration.count() << " ms." << std::endl;
+
     psg.SetParams(optimizer.GetCurrentParams());
     bool failed = psg.GetIntersecting();
 
     std::string out_fn_fmt =
         "../output/" + ((failed ? "__failed-" : "") + name) + "-optd-%03d";
-    snprintf(buf, bufsize, out_fn_fmt.c_str(), i);
-    std::string out_fn = buf;
+    snprintf(buf, bufsize, "%s-optd-%03d", name.c_str(), i);
+    std::string raw_fn = buf;
+    if (failed) raw_fn = "__failed-" + raw_fn;
+    std::string out_fn = "../output/" + raw_fn;
+
+    double csv_volume = -1.;
+    double volume = -1.;
 
     if (!failed) {
       std::string tpd_out_fn = out_fn + ".tpd";
@@ -73,7 +84,28 @@ void Testcase::ProcessFrom(size_t j_cp,
       Eigen::MatrixXd sv_V;
       Eigen::MatrixXi sv_F;
       NegativeSweptVolume(psg, neg_V, neg_F, sv_V, sv_F);
+      volume = psg::core::Volume(neg_V, neg_F);
       GenerateTopyConfig(psg, neg_V, neg_F, tpd_out_fn);
+
+      std::string stl_out_fn = out_fn + "_sv.stl";
+      igl::writeSTL(stl_out_fn, sv_V, sv_F, igl::FileEncoding::Binary);
+      Log() << "> Swept volume written to " << stl_out_fn << std::endl;
+
+      // Compute negative volume
+      Eigen::Vector3d lb;
+      Eigen::Vector3d ub;
+      psg::core::InitializeConservativeBound(psg, lb, ub);
+      Eigen::MatrixXd CV = psg::core::CreateCubeV(lb, ub);
+      Eigen::MatrixXd RV;
+      Eigen::MatrixXi RF;
+      igl::copyleft::cgal::mesh_boolean(CV,
+                                        psg::core::cube_F,
+                                        sv_V,
+                                        sv_F,
+                                        igl::MESH_BOOLEAN_TYPE_MINUS,
+                                        RV,
+                                        RF);
+      csv_volume = psg::core::Volume(RV, RF);
     }
 
     std::string psg_out_fn = out_fn + ".psg";
@@ -84,12 +116,11 @@ void Testcase::ProcessFrom(size_t j_cp,
       continue;
     }
     psg.Serialize(psg_out_f);
-
-    Log() << "> Optimization took " << duration.count() << " ms." << std::endl;
     Log() << "> Optimized gripper written to " << psg_out_fn << std::endl;
+
     Result res{name,
                i,
-               out_fn,
+               raw_fn,
                failed,
                psg.GetIsForceClosure(),
                psg.GetIsPartialClosure(),

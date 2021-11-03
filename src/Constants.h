@@ -56,7 +56,6 @@ static constexpr double kWrenchNormThresh = 1e-5;
 const std::map<std::string, std::string> kTopyConfig = {{"PROB_TYPE", "comp"},
                                                         {"ETA", "0.4"},
                                                         {"DOF_PN", "3"},
-                                                        {"VOL_FRAC", "0.04"},
                                                         {"FILT_RAD", "1.8"},
                                                         {"ELEM_K", "H8"},
                                                         {"NUM_ITER", "50"},

@@ -6,6 +6,8 @@
 #include <map>
 #include <vector>
 
+#include "GeometryUtils.h"
+#include "Initialization.h"
 #include "PassiveGripper.h"
 #include "SweptVolume.h"
 #include "models/MeshDependentResource.h"
@@ -166,6 +168,14 @@ void GenerateTopyConfig(const PassiveGripper& psg,
                         const Eigen::MatrixXd& neg_V,
                         const Eigen::MatrixXi& neg_F,
                         const std::string& filename) {
+  Eigen::Vector3d csv_lb;
+  Eigen::Vector3d csv_ub;
+  InitializeConservativeBound(psg, csv_lb, csv_ub);
+
+  double csv_volume = (csv_ub - csv_lb).prod();
+  double volume = Volume(neg_V, neg_F);
+  double vol_frac = (csv_volume * psg.GetTopoOptSettings().vol_frac) / volume;
+
   Eigen::Vector3d lb = psg.GetTopoOptSettings().lower_bound;
   Eigen::Vector3d ub = psg.GetTopoOptSettings().upper_bound;
   double res = psg.GetTopoOptSettings().topo_res;
@@ -218,6 +228,7 @@ void GenerateTopyConfig(const PassiveGripper& psg,
       filename.substr(lastslash + 1,
                       (lastdot == std::string::npos) ? std::string::npos
                                                      : lastdot - lastslash - 1);
+  config["VOL_FRAC"] = std::to_string(vol_frac);
   config["NUM_ELEM_X"] = std::to_string(range(0));
   config["NUM_ELEM_Y"] = std::to_string(range(1));
   config["NUM_ELEM_Z"] = std::to_string(range(2));
