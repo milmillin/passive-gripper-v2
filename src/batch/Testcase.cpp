@@ -8,6 +8,8 @@
 
 #include "../core/Optimizer.h"
 #include "../core/PassiveGripper.h"
+#include "../core/SweptVolume.h"
+#include "../core/TopoOpt.h"
 #include "../core/serialization/Serialization.h"
 #include "../utils.h"
 #include "Result.h"
@@ -57,22 +59,35 @@ void Testcase::ProcessFrom(size_t j_cp,
         stop_time - start_time);
     psg.SetParams(optimizer.GetCurrentParams());
     bool failed = psg.GetMinDist() < -1e-5;
+
     std::string out_fn_fmt =
-        "../output/" + ((failed ? "__failed-" : "") + name) + "-optd-%03d.psg";
+        "../output/" + ((failed ? "__failed-" : "") + name) + "-optd-%03d";
     snprintf(buf, bufsize, out_fn_fmt.c_str(), i);
-    std::string out_filename = buf;
-    std::ofstream out_file(out_filename, std::ios::out | std::ios::binary);
-    if (!out_file.is_open()) {
-      Error() << "> Cannot open out file " << out_filename << std::endl;
+    std::string out_fn = buf;
+
+    if (!failed) {
+      std::string tpd_out_fn = out_fn + ".tpd";
+      psg.InitGripperBound();
+      Eigen::MatrixXd neg_V;
+      Eigen::MatrixXi neg_F;
+      NegativeSweptVolume(psg, neg_V, neg_F);
+      GenerateTopyConfig(psg, neg_V, neg_F, tpd_out_fn);
+    }
+
+    std::string psg_out_fn = out_fn + ".psg";
+    std::ofstream psg_out_f(psg_out_fn, std::ios::out | std::ios::binary);
+    if (!psg_out_f.is_open()) {
+      Error() << "> Cannot open out file " << psg_out_fn << std::endl;
       Error() << ">> Skipping" << std::endl;
       continue;
     }
-    psg.Serialize(out_file);
+    psg.Serialize(psg_out_f);
+
     Log() << "> Optimization took " << duration.count() << " ms." << std::endl;
-    Log() << "> Optimized gripper written to " << out_filename << std::endl;
+    Log() << "> Optimized gripper written to " << psg_out_fn << std::endl;
     Result res{name,
                i,
-               out_filename,
+               out_fn,
                failed,
                psg.GetIsForceClosure(),
                psg.GetIsPartialClosure(),
