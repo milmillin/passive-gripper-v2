@@ -1,11 +1,11 @@
 #pragma once
 
 #include <Eigen/Core>
+#include "PassiveGripper.h"
 #include "models/ContactPoint.h"
 #include "models/ContactPointMetric.h"
-#include "models/MeshDependentResource.h"
 #include "models/GripperSettings.h"
-#include "PassiveGripper.h"
+#include "models/MeshDependentResource.h"
 
 namespace psg {
 namespace core {
@@ -30,6 +30,10 @@ std::vector<ContactPointMetric> InitializeContactPoints(
 void InitializeGripperBound(const PassiveGripper& psg,
                             Eigen::Vector3d& out_lb,
                             Eigen::Vector3d& out_ub);
+
+void InitializeConservativeBound(const PassiveGripper& psg,
+                                 Eigen::Vector3d& out_lb,
+                                 Eigen::Vector3d& out_ub);
 
 }  // namespace core
 }  // namespace psg
