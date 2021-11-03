@@ -139,5 +139,11 @@ double Volume(const Eigen::MatrixXd& V, const Eigen::MatrixXi& F) {
   return std::abs(vol.sum());
 }
 
+Eigen::MatrixXd CreateCubeV(const Eigen::Vector3d& lb,
+                            const Eigen::Vector3d& ub) {
+  auto R = cube_V.array().rowwise() * (ub - lb).transpose().array();
+  return R.array().rowwise() + lb.transpose().array();
+}
+
 }  // namespace core
 }  // namespace psg

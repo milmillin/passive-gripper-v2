@@ -45,6 +45,9 @@ std::vector<ContactPoint> GenerateContactCone(const ContactPoint& contact_point,
 
 double Volume(const Eigen::MatrixXd& V, const Eigen::MatrixXi& F);
 
+Eigen::MatrixXd CreateCubeV(const Eigen::Vector3d& lb,
+                            const Eigen::Vector3d& ub);
+
 // clang-format off
 // Inline mesh of a cube
 const Eigen::Matrix<double, 8, 3> cube_V = (Eigen::MatrixXd(8, 3) <<

@@ -420,9 +420,7 @@ void NegativeSweptVolume(const PassiveGripper& psg,
   SweptVolume(psg, out_SV_V, out_SV_F, num_seeds);
 
   // Create box
-  Eigen::MatrixXd box_V =
-      cube_V.array().rowwise() * (boxUB - boxLB).transpose().array();
-  box_V = box_V.array().rowwise() + boxLB.transpose().array();
+  Eigen::MatrixXd box_V = CreateCubeV(boxLB, boxUB);
 
   Eigen::MatrixXd RV;
   Eigen::MatrixXi RF;
@@ -444,8 +442,7 @@ void NegativeSweptVolume(const PassiveGripper& psg,
   lb.y() = -5;
   ub.y() = 0;
 
-  Eigen::MatrixXd floor_V = cube_V.array().rowwise() * (ub - lb).transpose().array();
-  floor_V = floor_V.array().rowwise() + lb.transpose().array();
+  Eigen::MatrixXd floor_V = CreateCubeV(lb, ub);
   floor_V =
       (psg.GetFingerTransInv() * floor_V.transpose().colwise().homogeneous())
           .transpose();
