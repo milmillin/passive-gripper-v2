@@ -71,11 +71,11 @@ void ProcessFrom(std::string raw_fn,
     Log() << "> Optimization took " << duration.count() << " ms." << std::endl;
 
     psg.SetParams(optimizer.GetCurrentParams());
-    bool failed = psg.GetIntersecting();
+    bool failed = psg.GetMinDist() < -1e-5;
 
     Log() << "> Success: " << psg::kBoolStr[!failed] << std::endl;
 
-    snprintf(buf, bufsize, "%s-optd-%03d", wopath_fn.c_str(), i);
+    snprintf(buf, bufsize, "%s-optd-%03d", wopath_fn.c_str(), (int)i);
     std::string out_raw_fn = buf;
     if (failed) out_raw_fn = "__failed-" + out_raw_fn;
     std::string out_fn = output_dir + '/' + out_raw_fn;
@@ -123,6 +123,7 @@ void ProcessFrom(std::string raw_fn,
                psg.GetPartialMinWrench(),
                psg.GetCost(),
                psg.GetMinDist(),
+               psg.GetIntersecting(),
                volume,
                pi_volume,
                duration.count()};

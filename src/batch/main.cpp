@@ -115,6 +115,7 @@ int main(int argc, char** argv) {
                   ToString(r.partial_min_wrench),
                   ToString(r.cost),
                   ToString(r.min_dist),
+                  psg::kBoolStr[r.intersecting],
                   ToString(r.volume),
                   ToString(r.pi_volume),
                   std::to_string(r.duration),
