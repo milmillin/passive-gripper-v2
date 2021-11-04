@@ -25,6 +25,21 @@ static std::vector<Eigen::Vector3i> GetForbiddenVoxels(
     const Eigen::Vector3d& ub,
     double res,
     Eigen::Vector3i& out_range) {
+  // Holes
+  std::vector<Eigen::Vector2d> h_centers;
+  std::vector<double> h_radius2;
+  std::vector<double> h_height;
+  for (int i = 0; i < 4; i++) {
+    double ang = (2. * kPi * i) / 4. + (kPi / 4.);
+    h_centers.push_back(Eigen::Vector2d(cos(ang) * 0.025, sin(ang) * 0.025));
+    h_radius2.push_back(0.0055 * 0.0055);
+    h_height.push_back(0.035);
+  }
+  h_centers.push_back(Eigen::Vector2d(0, 0.025));
+  h_radius2.push_back(0.003 * 0.003);
+  h_height.push_back(0.01);
+
+  // Intersect neg vol
   igl::embree::EmbreeIntersector intersector;
   intersector.init(V.cast<float>(), F, true);
   std::vector<Eigen::Vector3i> voxels;
@@ -33,8 +48,23 @@ static std::vector<Eigen::Vector3i> GetForbiddenVoxels(
   for (x = 0, cx = lb(0); cx < ub(0); x++, cx += res) {
     for (y = 0, cy = lb(1); cy < ub(1); y++, cy += res) {
       for (z = 0, cz = lb(2); cz < ub(2); z++, cz += res) {
-        auto position = Eigen::Vector3d(cx, cy, cz);
-        position += Eigen::Vector3d(res, res, res) / 2;
+        Eigen::Vector3d position(cx, cy, cz);
+        position.array() += res / 2;
+
+        bool work = true;
+        if (position.z() <= 0.035) {
+          for (size_t i = 0; i < h_centers.size(); i++) {
+            if (position.z() > h_height[i]) continue;
+            if ((Eigen::Vector2d(position.x(), position.y()) - h_centers[i])
+                    .squaredNorm() <= h_radius2[i]) {
+              voxels.push_back(Eigen::Vector3i(x, y, z));            
+              work = false;
+              break;
+            }
+          }
+        }
+        if (!work) continue;
+
         std::vector<igl::Hit> hits;
         int numRays;
         intersector.intersectRay(
