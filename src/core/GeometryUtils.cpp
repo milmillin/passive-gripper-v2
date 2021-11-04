@@ -200,12 +200,12 @@ void CreateCylinderXY(const Eigen::Vector3d& o,
   out_V = out_V.array().rowwise() + o.transpose().array();
 
   for (int i = 0; i < res; i++) {
-    out_F.row(i * 2) << i, i + res, ((i + 1) % res) + res;
-    out_F.row(i * 2 + 1) << i, ((i + 1) % res) + res, (i + 1) % res;
+    out_F.row(i * 2) << i, ((i + 1) % res) + res, i + res;
+    out_F.row(i * 2 + 1) << i, (i + 1) % res, ((i + 1) % res) + res;
   }
   for (int i = 2; i < res; i++) {
-    out_F.row(2 * res + i) << 0, i, i - 1;
-    out_F.row(2 * res + res - 2 + i) << res, res + i - 1, res + i;
+    out_F.row(2 * res + i - 2) << 0, i, i - 1;
+    out_F.row(2 * res + res - 4 + i) << res, res + i - 1, res + i;
   }
 }
 
