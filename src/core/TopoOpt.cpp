@@ -285,14 +285,41 @@ void LoadResultBin(const PassiveGripper& psg,
       P.row(i) = VoxelToPoint(Eigen::Vector3i(ex, ey, ez), lb, res);
     }
 
-    for (size_t i = 0; i < values.size(); i++) {
+    Eigen::VectorXd fltr_values;
+    fltr_values.resize(values.rows(), 1);
+    for (size_t i = 0; i < values.rows(); i++) {
+      long long ex = i % rx;
+      long long ey = (i / rx) % ry;
+      long long ez = (i / (rx * ry));
+
+      int count = 0;
+      double val = 0;
+      for (int ii = -1; ii <= 1; ii++) {
+        for (int jj = -1; jj <= 1; jj++) {
+          for (int kk = -1; kk <= 1; kk++) {
+            long long fx = ex + ii;
+            long long fy = ey + jj;
+            long long fz = ez + kk;
+            if (fx < 0 || fy < 0 || fz < 0 || fx >= rx || fy >= ry || fz >= rz)
+              continue;
+            long long findex = fz * (rx * ry) + fy * rx + fx;
+            val += values(findex);
+            count++;
+          }
+        }
+      }
+      fltr_values(i) = (count == 0) ? 0 : (val / count);
+    }
+    // std::cout << fltr_values << std::endl;
+
+    for (size_t i = 0; i < values.rows(); i++) {
       long long ex = i % rx;
       long long ey = (i / rx) % ry;
       long long ez = (i / (rx * ry));
       long long index = (ex + 1ll) +
                         (ey + 1ll) * (long long)range.x() +
                         (ez + 1ll) * (long long)range.x() * range.y();
-      S(index) = 0.5 - values(i);
+      S(index) = 0.5 - fltr_values(i);
     }
 
     igl::copyleft::marching_cubes(
