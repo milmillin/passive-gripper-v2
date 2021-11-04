@@ -58,7 +58,7 @@ void ProcessFrom(std::string raw_fn,
   constexpr size_t bufsize = 48;
   char* buf = new char[bufsize];
 
-  size_t n_cps = cps.size();
+  size_t n_cps = std::min(cps.size(), maxiters);
   for (size_t i = i_cp; i < n_cps && need > 0; i++) {
     psg.reinit_trajectory = true;
     psg.SetContactPoints(cps[i]);
