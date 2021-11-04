@@ -11,7 +11,7 @@ namespace models {
 
 struct OptSettings : psg::core::serialization::Serializable {
   double max_runtime = 0;  // seconds
-  double max_iters = 10000; 
+  size_t max_iters = 10000;
   double finger_wiggle = 0.01;
   Pose trajectory_wiggle = (Pose() << 4. * kDegToRad,
                             4. * kDegToRad,
@@ -25,7 +25,7 @@ struct OptSettings : psg::core::serialization::Serializable {
   size_t population = 20000;
 
   DECL_SERIALIZE() {
-    constexpr int version = 2;
+    constexpr int version = 3;
     SERIALIZE(version);
     SERIALIZE(max_runtime);
     SERIALIZE(max_iters);
@@ -37,6 +37,7 @@ struct OptSettings : psg::core::serialization::Serializable {
   }
 
   DECL_DESERIALIZE() {
+    double __unused;
     int version = 1;
     DESERIALIZE(version);
     if (version == 1) {
@@ -47,6 +48,14 @@ struct OptSettings : psg::core::serialization::Serializable {
       DESERIALIZE(algorithm);
       DESERIALIZE(population);
     } else if (version == 2) {
+      DESERIALIZE(max_runtime);
+      DESERIALIZE(__unused);  // double
+      DESERIALIZE(finger_wiggle);
+      DESERIALIZE(trajectory_wiggle);
+      DESERIALIZE(tolerance);
+      DESERIALIZE(algorithm);
+      DESERIALIZE(population);
+    } else if (version == 3) {
       DESERIALIZE(max_runtime);
       DESERIALIZE(max_iters);
       DESERIALIZE(finger_wiggle);

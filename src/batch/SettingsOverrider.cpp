@@ -33,7 +33,9 @@ void SettingsOverrider::Apply(psg::core::PassiveGripper& psg) const {
   psg.reinit_trajectory = false;
 
   OptSettings opt_settings = psg.GetOptSettings();
+  TopoOptSettings topo_opt_settings = psg.GetTopoOptSettings();
   bool opt_changed = false;
+  bool topo_opt_changed = false;
 
   for (const auto& kv : mp) {
     if (kv.first == "algorithm") {
@@ -42,16 +44,29 @@ void SettingsOverrider::Apply(psg::core::PassiveGripper& psg) const {
     } else if (kv.first == "tolerance") {
       opt_settings.tolerance = std::stod(kv.second);
       opt_changed = true;
+    } else if (kv.first == "population") {
+      opt_settings.population = std::stoull(kv.second);
+      opt_changed = true;
     } else if (kv.first == "max_runtime") {
       opt_settings.max_runtime = std::stod(kv.second);
       opt_changed = true;
     } else if (kv.first == "max_iters") {
-      opt_settings.max_iters = std::stod(kv.second);
+      opt_settings.max_iters = std::stoull(kv.second);
       opt_changed = true;
+    } else if (kv.first == "vol_frac") {
+      topo_opt_settings.vol_frac = std::stod(kv.second);
+      topo_opt_changed = true;
+    } else if (kv.first == "topo_res") {
+      topo_opt_settings.topo_res = std::stod(kv.second);
+      topo_opt_changed = true;
+    } else if (kv.first == "neg_vol_res") {
+      topo_opt_settings.neg_vol_res = std::stod(kv.second);
+      topo_opt_changed = true;
     }
   }
 
   if (opt_changed) psg.SetOptSettings(opt_settings);
+  if (topo_opt_changed) psg.SetTopoOptSettings(topo_opt_settings);
 
   psg.reinit_fingers = tmp_reinit_fingers;
   psg.reinit_trajectory = tmp_reinit_trajectory;
