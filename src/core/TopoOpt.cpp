@@ -259,24 +259,19 @@ void LoadResultBin(const PassiveGripper& psg,
                    Eigen::MatrixXi& out_F) {
   if (!filename.empty()) {
     std::ifstream myfile(filename, std::ios::in | std::ios::binary);
-    Eigen::MatrixXi voxels;
+    long long rx, ry, rz;
     Eigen::VectorXd values;
-    serialization::Deserialize(voxels, myfile);
+    serialization::Deserialize(rx, myfile);
+    serialization::Deserialize(ry, myfile);
+    serialization::Deserialize(rz, myfile);
     serialization::Deserialize(values, myfile);
 
     Eigen::Vector3d lb = psg.GetTopoOptSettings().lower_bound;
     Eigen::Vector3d ub = psg.GetTopoOptSettings().upper_bound;
     double res = psg.GetTopoOptSettings().topo_res;
 
-    // flip-y
-    int sy = (ub.y() - lb.y()) / res;
-    voxels.col(1) *= -1;
-    voxels.col(1).array() += sy - 1;
-
     // marching cube
-    Eigen::Vector3i range = ((ub - lb).array() / res).cast<int>();
-    range.array() += 2;
-
+    Eigen::Vector3i range(rx + 2, ry + 2, rz + 2);
     long long total_size = range.prod();
 
     Eigen::VectorXd S(total_size);
@@ -291,9 +286,12 @@ void LoadResultBin(const PassiveGripper& psg,
     }
 
     for (size_t i = 0; i < values.size(); i++) {
-      long long index = (voxels(i, 0) + 1ll) +
-                        (voxels(i, 1) + 1ll) * (long long)range.x() +
-                        (voxels(i, 2) + 1ll) * (long long)range.x() * range.y();
+      long long ex = i % rx;
+      long long ey = (i / rx) % ry;
+      long long ez = (i / (rx * ry));
+      long long index = (ex + 1ll) +
+                        (ey + 1ll) * (long long)range.x() +
+                        (ez + 1ll) * (long long)range.x() * range.y();
       S(index) = 0.5 - values(i);
     }
 

@@ -98,10 +98,10 @@ void ViewModel::ComputeNegativeVolume() {
 }
 
 void ViewModel::LoadResultBin(const std::string& filename) {
-  ComputeNegativeVolume();
   Eigen::MatrixXd V;
   Eigen::MatrixXi F;
   psg::core::LoadResultBin(psg_, filename, V, F);
+  ComputeNegativeVolume();
   RefineGripper(psg_, V, F, sv_V_, sv_F_, gripper_V_, gripper_F_);
   InvokeLayerInvalidated(Layer::kGripper);
 }
