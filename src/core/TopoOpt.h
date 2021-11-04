@@ -14,7 +14,7 @@ void GenerateTopyConfig(const PassiveGripper& psg,
                         const Eigen::MatrixXi& neg_F,
                         const std::string& filename);
 
-void LoadResultBin(const PassiveGripper& psg,
+bool LoadResultBin(const PassiveGripper& psg,
                    const std::string& filename,
                    Eigen::MatrixXd& out_V,
                    Eigen::MatrixXi& out_F);

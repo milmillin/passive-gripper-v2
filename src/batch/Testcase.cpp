@@ -73,6 +73,8 @@ void ProcessFrom(std::string raw_fn,
     psg.SetParams(optimizer.GetCurrentParams());
     bool failed = psg.GetIntersecting();
 
+    Log() << "> Success: " << psg::kBoolStr[!failed] << std::endl;
+
     snprintf(buf, bufsize, "%s-optd-%03d", wopath_fn.c_str(), i);
     std::string out_raw_fn = buf;
     if (failed) out_raw_fn = "__failed-" + out_raw_fn;
@@ -80,25 +82,25 @@ void ProcessFrom(std::string raw_fn,
 
     double pi_volume = -1.;
     double volume = -1.;
+    Eigen::MatrixXd neg_V;
+    Eigen::MatrixXi neg_F;
 
     if (!failed) {
+      Log() << "> Generating TPD file" << std::endl;
       std::string tpd_out_fn = out_fn + ".tpd";
       psg.InitGripperBound();
-      Eigen::MatrixXd neg_V;
-      Eigen::MatrixXi neg_F;
       NegativeSweptVolumePSG(psg, neg_V, neg_F);
       volume = psg::core::Volume(neg_V, neg_F);
       GenerateTopyConfig(psg, neg_V, neg_F, tpd_out_fn);
-
-      std::string stl_out_fn = out_fn + "_nv.stl";
-      igl::writeSTL(stl_out_fn, neg_V, neg_F, igl::FileEncoding::Binary);
-      Log() << "> Swept volume written to " << stl_out_fn << std::endl;
+      Log() << ">> Done: TPD file written to " << tpd_out_fn << std::endl;
 
       // Compute negative volume
+      Log() << "> Computing PI Volume" << std::endl;
       Eigen::MatrixXd pi_neg_V;
       Eigen::MatrixXi pi_neg_F;
       PiNegativeSweptVolumePSG(psg, pi_neg_V, pi_neg_F);
       pi_volume = psg::core::Volume(pi_neg_V, pi_neg_F);
+      Log() << ">> Done" << std::endl;
     }
 
     std::string psg_out_fn = out_fn + ".psg";
@@ -109,7 +111,7 @@ void ProcessFrom(std::string raw_fn,
       continue;
     }
     psg.Serialize(psg_out_f);
-    Log() << "> Optimized gripper written to " << psg_out_fn << std::endl;
+    Log() << "> Done: Optimized gripper written to " << psg_out_fn << std::endl;
 
     Result res{wopath_fn,
                i,
@@ -127,6 +129,31 @@ void ProcessFrom(std::string raw_fn,
     Out() << res << std::endl;
     if (!failed) need--;
     if (cb) cb(i, need, res);
+    if (!failed) {
+      // Load topology optimization results
+      std::string bin_fn = out_fn + ".bin";
+      std::string gripper_fn = out_fn + ".stl";
+      Eigen::MatrixXd r_V;
+      Eigen::MatrixXi r_F;
+      Eigen::MatrixXd gripper_V;
+      Eigen::MatrixXi gripper_F;
+      Log() << "> Loading Result Bin " << bin_fn
+            << std::endl;
+      if (!psg::core::LoadResultBin(psg, bin_fn, r_V, r_F)) {
+        Error() << ">> Error loading result bin" << std::endl;
+        Error() << ">> Skipping" << std::endl;
+        continue;
+      }
+      psg::core::RefineGripper(
+          psg, r_V, r_F, neg_V, neg_F, gripper_V, gripper_F);
+      Log() << "> Writing Gripper STL " << gripper_fn << std::endl;
+      if (!igl::writeSTL(
+              gripper_fn, gripper_V, gripper_F, igl::FileEncoding::Binary)) {
+        Error() << ">> Error saving gripper STL" << std::endl;
+        Error() << ">> Skipping" << std::endl;
+        continue;
+      }
+    }
   }
   Log() << "Done processing " << wopath_fn << std::endl;
   delete[] buf;

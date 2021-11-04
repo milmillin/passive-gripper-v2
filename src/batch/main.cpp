@@ -91,7 +91,7 @@ int main(int argc, char** argv) {
     Out() << ResultHeader() << std::endl;
   }
 
-  TestcaseCallback cb = [hook_set, &ckpt_fn, &hook_str](
+  TestcaseCallback cb = [hook_set, &ckpt_fn, &hook_str, &out_dir](
                             size_t i, size_t need, const Result& r) {
     std::ofstream ckpt_file(ckpt_fn);
     if (!ckpt_file.is_open()) {
@@ -116,8 +116,9 @@ int main(int argc, char** argv) {
                   ToString(r.cost),
                   ToString(r.min_dist),
                   ToString(r.volume),
-                  ToString(r.csv_volume),
-                  std::to_string(r.duration));
+                  ToString(r.pi_volume),
+                  std::to_string(r.duration),
+                  out_dir);
       char a[1024];
       auto& out_s = Log() << "[child proc]" << std::endl;
       while (out.read(a, 1024)) {

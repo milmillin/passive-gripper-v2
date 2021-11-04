@@ -57,7 +57,7 @@ static std::vector<Eigen::Vector3i> GetForbiddenVoxels(
             if (position.z() > h_height[i]) continue;
             if ((Eigen::Vector2d(position.x(), position.y()) - h_centers[i])
                     .squaredNorm() <= h_radius2[i]) {
-              voxels.push_back(Eigen::Vector3i(x, y, z));            
+              voxels.push_back(Eigen::Vector3i(x, y, z));
               work = false;
               break;
             }
@@ -283,76 +283,77 @@ void GenerateTopyConfig(const PassiveGripper& psg,
   WriteToFile(filename, config);
 }
 
-void LoadResultBin(const PassiveGripper& psg,
+bool LoadResultBin(const PassiveGripper& psg,
                    const std::string& filename,
                    Eigen::MatrixXd& out_V,
                    Eigen::MatrixXi& out_F) {
-  if (!filename.empty()) {
-    std::ifstream myfile(filename, std::ios::in | std::ios::binary);
-    long long rx, ry, rz;
-    Eigen::VectorXd values;
-    serialization::Deserialize(rx, myfile);
-    serialization::Deserialize(ry, myfile);
-    serialization::Deserialize(rz, myfile);
-    serialization::Deserialize(values, myfile);
+  if (filename.empty()) return false;
+  std::ifstream myfile(filename, std::ios::in | std::ios::binary);
+  if (!myfile.is_open()) return false;
+  long long rx, ry, rz;
+  Eigen::VectorXd values;
+  serialization::Deserialize(rx, myfile);
+  serialization::Deserialize(ry, myfile);
+  serialization::Deserialize(rz, myfile);
+  serialization::Deserialize(values, myfile);
 
-    Eigen::Vector3d lb = psg.GetTopoOptSettings().lower_bound;
-    Eigen::Vector3d ub = psg.GetTopoOptSettings().upper_bound;
-    double res = psg.GetTopoOptSettings().topo_res;
+  Eigen::Vector3d lb = psg.GetTopoOptSettings().lower_bound;
+  Eigen::Vector3d ub = psg.GetTopoOptSettings().upper_bound;
+  double res = psg.GetTopoOptSettings().topo_res;
 
-    // marching cube
-    Eigen::Vector3i range(rx + 2, ry + 2, rz + 2);
-    long long total_size = range.prod();
+  // marching cube
+  Eigen::Vector3i range(rx + 2, ry + 2, rz + 2);
+  long long total_size = range.prod();
 
-    Eigen::VectorXd S(total_size);
-    Eigen::MatrixXd P(total_size, 3);
+  Eigen::VectorXd S(total_size);
+  Eigen::MatrixXd P(total_size, 3);
 
-    S.setConstant(0.5);
-    for (long long i = 0; i < total_size; i++) {
-      long long ex = i % range.x() - 1;
-      long long ey = (i / range.x()) % range.y() - 1;
-      long long ez = i / ((long long)range.x() * range.y()) - 1;
-      P.row(i) = VoxelToPoint(Eigen::Vector3i(ex, ey, ez), lb, res);
-    }
+  S.setConstant(0.5);
+  for (long long i = 0; i < total_size; i++) {
+    long long ex = i % range.x() - 1;
+    long long ey = (i / range.x()) % range.y() - 1;
+    long long ez = i / ((long long)range.x() * range.y()) - 1;
+    P.row(i) = VoxelToPoint(Eigen::Vector3i(ex, ey, ez), lb, res);
+  }
 
-    Eigen::VectorXd fltr_values;
-    fltr_values.resize(values.rows(), 1);
-    for (size_t i = 0; i < values.rows(); i++) {
-      long long ex = i % rx;
-      long long ey = (i / rx) % ry;
-      long long ez = (i / (rx * ry));
+  Eigen::VectorXd fltr_values;
+  fltr_values.resize(values.rows(), 1);
+  for (size_t i = 0; i < values.rows(); i++) {
+    long long ex = i % rx;
+    long long ey = (i / rx) % ry;
+    long long ez = (i / (rx * ry));
 
-      int count = 0;
-      double val = 0;
-      for (int ii = -1; ii <= 1; ii++) {
-        for (int jj = -1; jj <= 1; jj++) {
-          for (int kk = -1; kk <= 1; kk++) {
-            long long fx = ex + ii;
-            long long fy = ey + jj;
-            long long fz = ez + kk;
-            if (fx < 0 || fy < 0 || fz < 0 || fx >= rx || fy >= ry || fz >= rz)
-              continue;
-            long long findex = fz * (rx * ry) + fy * rx + fx;
-            val += values(findex);
-            count++;
-          }
+    int count = 0;
+    double val = 0;
+    for (int ii = -1; ii <= 1; ii++) {
+      for (int jj = -1; jj <= 1; jj++) {
+        for (int kk = -1; kk <= 1; kk++) {
+          long long fx = ex + ii;
+          long long fy = ey + jj;
+          long long fz = ez + kk;
+          if (fx < 0 || fy < 0 || fz < 0 || fx >= rx || fy >= ry || fz >= rz)
+            continue;
+          long long findex = fz * (rx * ry) + fy * rx + fx;
+          val += values(findex);
+          count++;
         }
       }
-      fltr_values(i) = (count == 0) ? 0 : (val / count);
     }
-
-    for (size_t i = 0; i < values.rows(); i++) {
-      long long ex = i % rx;
-      long long ey = (i / rx) % ry;
-      long long ez = (i / (rx * ry));
-      long long index = (ex + 1ll) + (ey + 1ll) * (long long)range.x() +
-                        (ez + 1ll) * (long long)range.x() * range.y();
-      S(index) = 0.5 - fltr_values(i);
-    }
-
-    igl::copyleft::marching_cubes(
-        S, P, range.x(), range.y(), range.z(), 0., out_V, out_F);
+    fltr_values(i) = (count == 0) ? 0 : (val / count);
   }
+
+  for (size_t i = 0; i < values.rows(); i++) {
+    long long ex = i % rx;
+    long long ey = (i / rx) % ry;
+    long long ez = (i / (rx * ry));
+    long long index = (ex + 1ll) + (ey + 1ll) * (long long)range.x() +
+                      (ez + 1ll) * (long long)range.x() * range.y();
+    S(index) = 0.5 - fltr_values(i);
+  }
+
+  igl::copyleft::marching_cubes(
+      S, P, range.x(), range.y(), range.z(), 0., out_V, out_F);
+  return true;
 }
 
 void RefineGripper(const PassiveGripper& psg,
