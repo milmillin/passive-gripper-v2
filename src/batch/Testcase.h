@@ -1,16 +1,17 @@
 #pragma once
 
-#include <string>
 #include <functional>
+#include <string>
 
 #include "Result.h"
 #include "SettingsOverrider.h"
 
-typedef std::function<void(size_t, size_t, size_t, const Result&)> ProcessCallback;
-typedef std::function<void(const Result&)> TestcaseCallback;
+typedef std::function<void(size_t, size_t, const Result&)> TestcaseCallback;
 
-struct Testcase {
-  std::string name;
-
-  void ProcessFrom(size_t j_cp, size_t need, const SettingsOverrider& stgo, const TestcaseCallback& cb) const;
-};
+void ProcessFrom(std::string raw_fn,
+                 std::string output_dir,
+                 size_t i_cp,
+                 size_t need,
+                 size_t maxiters,
+                 const SettingsOverrider& stgo,
+                 const TestcaseCallback& cb);

@@ -8,47 +8,53 @@
 
 #include <boost/process.hpp>
 
-#include "../utils.h"
 #include "../Constants.h"
-#include "Psgtests.h"
+#include "../utils.h"
 #include "Result.h"
 #include "SettingsOverrider.h"
+#include "Testcase.h"
 
 namespace fs = std::filesystem;
 namespace bp = boost::process;
 
+void Usage(char* argv0) {
+  Error() << "Usage: " << argv0
+          << " psg output_dir [-s stgo] [-h hook] [-x] [-m maxiters]"
+          << std::endl;
+}
+
 int main(int argc, char** argv) {
   Log() << "Num threads: " << omp_get_max_threads() << std::endl;
-  if (argc < 2) {
-    Error() << ".psgtests file required." << std::endl;
+  if (argc < 3) {
+    Usage(argv[0]);
     return 1;
   }
 
-  bool root_set = false;
-  std::string root;
+  // psg_fn
+  std::string psg_fn = argv[1];
+  size_t lastdot = psg_fn.rfind('.');
+  std::string raw_fn = psg_fn.substr(0, lastdot);
+  std::string ckpt_fn = raw_fn + ".ckpt";
 
-  std::string ckpt_fn = ".checkpoint";
-  size_t ckpt_i = 0;
-  size_t ckpt_j = 0;
-  constexpr size_t kNeed = 1;
-  size_t ckpt_need = kNeed;
+  // output_dir
+  std::string out_dir = argv[2];
+
+  // -x
   bool restart_set = false;
 
+  // -h
   bool hook_set = false;
   std::string hook_str;
 
+  // -s
   bool stgo_set = false;
   std::string stgo_fn;
 
-  for (int i = 2; i < argc; i++) {
-    if (strncmp(argv[i], "-r", 4) == 0) {
-      root_set = true;
-      root = argv[i + 1];
-      i++;
-    } else if (strncmp(argv[i], "-c", 4) == 0) {
-      ckpt_fn = argv[i + 1];
-      i++;
-    } else if (strncmp(argv[i], "-x", 4) == 0) {
+  // -m
+  int maxiters = 15;
+
+  for (int i = 3; i < argc; i++) {
+    if (strncmp(argv[i], "-x", 4) == 0) {
       restart_set = true;
     } else if (strncmp(argv[i], "-h", 4) == 0) {
       hook_set = true;
@@ -58,41 +64,42 @@ int main(int argc, char** argv) {
       stgo_set = true;
       stgo_fn = argv[i + 1];
       i++;
+    } else if (strncmp(argv[i], "-m", 4) == 0) {
+      maxiters = std::stoi(argv[i + 1]);
+      i++;
     }
   }
 
-  if (root_set) {
-    fs::current_path(root);
-    Log() << "Working directory set to " << root << std::endl;
+  if (!fs::is_directory(out_dir) || !fs::exists(out_dir)) {
+    fs::create_directory(out_dir);
+    Log() << out_dir << " directory created " << std::endl;
   }
 
-  if (!fs::is_directory("../output") || !fs::exists("../output")) {
-    fs::create_directory("../output");
-    Log() << "Output directory created" << std::endl;
-  }
-
+  int ckpt_i = 0;
+  int ckpt_need = 1;
   if (!restart_set) {
     std::ifstream ckpt_file(ckpt_fn);
     if (!ckpt_file.is_open()) {
       Error() << "Warning: cannot open checkpoint file: " << ckpt_fn
               << std::endl;
     } else {
-      ckpt_file >> ckpt_i >> ckpt_j >> ckpt_need;
-      Log() << "Checkpoint loaded: " << ckpt_i << ' ' << ckpt_j << ' '
-            << ckpt_need << std::endl;
-      ckpt_j++;
+      ckpt_file >> ckpt_i >> ckpt_need;
+      Log() << "Checkpoint loaded: " << ckpt_i << ' ' << ckpt_need << std::endl;
+      ckpt_i++;
     }
+  } else {
+    Out() << ResultHeader() << std::endl;
   }
 
-  ProcessCallback cb = [hook_set, &ckpt_fn, &hook_str](
-                           size_t i, size_t j, size_t need, const Result& r) {
+  TestcaseCallback cb = [hook_set, &ckpt_fn, &hook_str](
+                            size_t i, size_t need, const Result& r) {
     std::ofstream ckpt_file(ckpt_fn);
     if (!ckpt_file.is_open()) {
       Error() << "Warning: cannot open checkpoint file: " << ckpt_fn
               << std::endl;
     } else {
-      ckpt_file << i << ' ' << j << ' ' << need << std::endl;
-      Log() << "Checkpoint updated: " << i << ' ' << j << std::endl;
+      ckpt_file << i << ' ' << need << std::endl;
+      Log() << "Checkpoint updated: " << i << ' ' << need << std::endl;
     }
     if (hook_set) {
       bp::ipstream out;
@@ -127,9 +134,7 @@ int main(int argc, char** argv) {
   try {
     SettingsOverrider stgo;
     if (stgo_set) stgo.Load(stgo_fn);
-    Psgtests psgtests(argv[1], stgo);
-    Out() << ResultHeader() << std::endl;
-    psgtests.ProcessFrom(ckpt_i, ckpt_j, ckpt_need, kNeed, cb);
+    ProcessFrom(raw_fn, out_dir, ckpt_i, ckpt_need, maxiters, stgo, cb);
   } catch (const std::exception& e) {
     Error() << e.what() << std::endl;
   }

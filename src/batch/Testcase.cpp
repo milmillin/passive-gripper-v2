@@ -20,20 +20,27 @@
 
 using namespace psg::core::models;
 
-void Testcase::ProcessFrom(size_t j_cp,
-                           size_t need,
-                           const SettingsOverrider& stgo,
-                           const TestcaseCallback& cb) const {
-  Log() << "Processing " << name << std::endl;
+void ProcessFrom(std::string raw_fn,
+                 std::string output_dir,
+                 size_t i_cp,
+                 size_t need,
+                 size_t maxiters,
+                 const SettingsOverrider& stgo,
+                 const TestcaseCallback& cb) {
+  size_t lastslash = raw_fn.rfind('/');
+  if (lastslash == std::string::npos) lastslash = raw_fn.rfind('\\');
+  std::string wopath_fn = raw_fn.substr(lastslash + 1, std::string::npos);
 
-  std::string psg_fn = name + ".psg";
+  Log() << "Processing " << raw_fn << std::endl;
+
+  std::string psg_fn = raw_fn + ".psg";
   std::ifstream psg_file(psg_fn, std::ios::in | std::ios::binary);
   if (!psg_file.is_open()) {
     throw std::invalid_argument("> Cannot open psg file " + psg_fn);
   }
   Log() << "> Loaded " << psg_fn << std::endl;
 
-  std::string cp_fn = name + ".cp";
+  std::string cp_fn = raw_fn + ".cp";
   std::ifstream cp_file(cp_fn, std::ios::in | std::ios::binary);
   if (!cp_file.is_open()) {
     throw std::invalid_argument("> Cannot open cp file " + cp_fn);
@@ -52,7 +59,7 @@ void Testcase::ProcessFrom(size_t j_cp,
   char* buf = new char[bufsize];
 
   size_t n_cps = cps.size();
-  for (size_t i = j_cp; i < n_cps && need > 0; i++) {
+  for (size_t i = i_cp; i < n_cps && need > 0; i++) {
     psg.reinit_trajectory = true;
     psg.SetContactPoints(cps[i]);
     auto start_time = std::chrono::high_resolution_clock::now();
@@ -66,12 +73,10 @@ void Testcase::ProcessFrom(size_t j_cp,
     psg.SetParams(optimizer.GetCurrentParams());
     bool failed = psg.GetIntersecting();
 
-    std::string out_fn_fmt =
-        "../output/" + ((failed ? "__failed-" : "") + name) + "-optd-%03d";
-    snprintf(buf, bufsize, "%s-optd-%03d", name.c_str(), i);
-    std::string raw_fn = buf;
-    if (failed) raw_fn = "__failed-" + raw_fn;
-    std::string out_fn = "../output/" + raw_fn;
+    snprintf(buf, bufsize, "%s-optd-%03d", wopath_fn.c_str(), i);
+    std::string out_raw_fn = buf;
+    if (failed) out_raw_fn = "__failed-" + out_raw_fn;
+    std::string out_fn = output_dir + '/' + out_raw_fn;
 
     double csv_volume = -1.;
     double volume = -1.;
@@ -118,9 +123,9 @@ void Testcase::ProcessFrom(size_t j_cp,
     psg.Serialize(psg_out_f);
     Log() << "> Optimized gripper written to " << psg_out_fn << std::endl;
 
-    Result res{name,
+    Result res{wopath_fn,
                i,
-               raw_fn,
+               out_raw_fn,
                failed,
                psg.GetIsForceClosure(),
                psg.GetIsPartialClosure(),
@@ -131,8 +136,10 @@ void Testcase::ProcessFrom(size_t j_cp,
                duration.count()};
     Out() << res << std::endl;
     if (!failed) need--;
-    if (cb) cb(res);
+    if (cb) cb(i, need, res);
   }
-  Log() << "Done processing " << name << std::endl;
+  Log() << "Done processing " << wopath_fn << std::endl;
   delete[] buf;
+
+
 }
