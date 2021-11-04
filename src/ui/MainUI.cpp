@@ -548,6 +548,11 @@ void MainUI::DrawLayerOptions(Layer layer, const char* id) {
   ImGui::SameLine();
   ImGui::Checkbox("##F", (bool*)&data.show_faces);
   ImGui::SameLine();
+  bool face_based = data.face_based;
+  if (ImGui::Checkbox("##S", &face_based)) {
+    data.set_face_based(face_based);
+  }
+  ImGui::SameLine();
   ImGui::Text(id);
   ImGui::PopID();
 }
@@ -1000,7 +1005,7 @@ void MainUI::OnNegVolInvalidated() {
 }
 
 void MainUI::OnGripperInvalidated() {
-  auto& layer = GetLayer(Layer::kNegVol);
+  auto& layer = GetLayer(Layer::kGripper);
   layer.clear();
   layer.set_mesh((robots::Forward(vm_.GetCurrentPose()) *
                   vm_.GetGripperV().transpose().colwise().homogeneous())
