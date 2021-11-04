@@ -74,20 +74,6 @@ if (OPENMP_FOUND)
     set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
 endif()
 
-# Link libigl
-option(LIBIGL_WITH_OPENGL            "Use OpenGL"         ON)
-option(LIBIGL_WITH_PNG               "Use PNG"            ON)
-option(LIBIGL_WITH_OPENGL_GLFW       "Use GLFW"           ON)
-option(LIBIGL_WITH_OPENGL_GLFW_IMGUI "Use IMGUI"          ON)
-option(LIBIGL_WITH_EMBREE            "Use Embree"         ON)
-option(LIBIGL_WITH_CGAL              "Use CGAL"           ON)
-
-
-find_package(LIBIGL REQUIRED QUIET)
-
-# Link Embree
-find_package(embree 3 CONFIG REQUIRED)
-
 # Qhull
 find_package(Qhull CONFIG REQUIRED)
 
@@ -100,9 +86,18 @@ find_package(CGAL CONFIG REQUIRED)
 # Boost
 find_package(Boost COMPONENTS system filesystem REQUIRED)
 
+# Link libigl
+option(LIBIGL_WITH_OPENGL            "Use OpenGL"         ON)
+option(LIBIGL_WITH_PNG               "Use PNG"            ON)
+option(LIBIGL_WITH_OPENGL_GLFW       "Use GLFW"           ON)
+option(LIBIGL_WITH_OPENGL_GLFW_IMGUI "Use IMGUI"          ON)
+option(LIBIGL_WITH_EMBREE            "Use Embree"         ON)
+option(LIBIGL_WITH_CGAL              "Use CGAL"           ON)
+
+find_package(LIBIGL REQUIRED QUIET)
 
 # Linking
-set(CORE_LINK_LIBS igl::core igl::embree igl::png igl::cgal embree lapack Qhull::qhullcpp NLopt::nlopt CGAL::CGAL)
+set(CORE_LINK_LIBS igl::core igl::embree igl::png igl::cgal lapack Qhull::qhullcpp NLopt::nlopt CGAL::CGAL)
 if (NOT MSVC)
     list(APPEND CORE_LINK_LIBS stdc++fs Qhull::qhullstatic_r)
 else()
