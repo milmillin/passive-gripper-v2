@@ -9,7 +9,7 @@ namespace models {
 struct TopoOptSettings : psg::core::serialization::Serializable {
   Eigen::Vector3d lower_bound = Eigen::Vector3d(-0.2, -0.05, 0.5);
   Eigen::Vector3d upper_bound = Eigen::Vector3d(0.05, 0.2, 0.8);
-  double neg_vol_res = 0.002;
+  double neg_vol_res = 0.004;
   double topo_res = 0.002;
   double attachment_size = 0.038; // diameter
   double vol_frac = 0.02; // percentage wrt pi bound
