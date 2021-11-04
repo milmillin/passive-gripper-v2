@@ -78,7 +78,7 @@ void ProcessFrom(std::string raw_fn,
     if (failed) out_raw_fn = "__failed-" + out_raw_fn;
     std::string out_fn = output_dir + '/' + out_raw_fn;
 
-    double csv_volume = -1.;
+    double pi_volume = -1.;
     double volume = -1.;
 
     if (!failed) {
@@ -86,31 +86,19 @@ void ProcessFrom(std::string raw_fn,
       psg.InitGripperBound();
       Eigen::MatrixXd neg_V;
       Eigen::MatrixXi neg_F;
-      Eigen::MatrixXd sv_V;
-      Eigen::MatrixXi sv_F;
-      NegativeSweptVolume(psg, neg_V, neg_F, sv_V, sv_F);
+      NegativeSweptVolumePSG(psg, neg_V, neg_F);
       volume = psg::core::Volume(neg_V, neg_F);
       GenerateTopyConfig(psg, neg_V, neg_F, tpd_out_fn);
 
-      std::string stl_out_fn = out_fn + "_sv.stl";
-      igl::writeSTL(stl_out_fn, sv_V, sv_F, igl::FileEncoding::Binary);
+      std::string stl_out_fn = out_fn + "_nv.stl";
+      igl::writeSTL(stl_out_fn, neg_V, neg_F, igl::FileEncoding::Binary);
       Log() << "> Swept volume written to " << stl_out_fn << std::endl;
 
       // Compute negative volume
-      Eigen::Vector3d lb;
-      Eigen::Vector3d ub;
-      psg::core::InitializeConservativeBound(psg, lb, ub);
-      Eigen::MatrixXd CV = psg::core::CreateCubeV(lb, ub);
-      Eigen::MatrixXd RV;
-      Eigen::MatrixXi RF;
-      igl::copyleft::cgal::mesh_boolean(CV,
-                                        psg::core::cube_F,
-                                        sv_V,
-                                        sv_F,
-                                        igl::MESH_BOOLEAN_TYPE_MINUS,
-                                        RV,
-                                        RF);
-      csv_volume = psg::core::Volume(RV, RF);
+      Eigen::MatrixXd pi_neg_V;
+      Eigen::MatrixXi pi_neg_F;
+      PiNegativeSweptVolumePSG(psg, pi_neg_V, pi_neg_F);
+      pi_volume = psg::core::Volume(pi_neg_V, pi_neg_F);
     }
 
     std::string psg_out_fn = out_fn + ".psg";
@@ -133,6 +121,8 @@ void ProcessFrom(std::string raw_fn,
                psg.GetPartialMinWrench(),
                psg.GetCost(),
                psg.GetMinDist(),
+               volume,
+               pi_volume,
                duration.count()};
     Out() << res << std::endl;
     if (!failed) need--;
@@ -140,6 +130,4 @@ void ProcessFrom(std::string raw_fn,
   }
   Log() << "Done processing " << wopath_fn << std::endl;
   delete[] buf;
-
-
 }

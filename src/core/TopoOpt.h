@@ -26,8 +26,8 @@ void LoadResultBin(const PassiveGripper& psg,
 void RefineGripper(const PassiveGripper& psg,
                    const Eigen::MatrixXd& V,
                    const Eigen::MatrixXi& F,
-                   const Eigen::MatrixXd& sv_V,
-                   const Eigen::MatrixXi& sv_F,
+                   const Eigen::MatrixXd& neg_V,
+                   const Eigen::MatrixXi& neg_F,
                    Eigen::MatrixXd& out_V,
                    Eigen::MatrixXi& out_F);
 

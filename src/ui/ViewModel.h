@@ -60,8 +60,6 @@ class ViewModel {
   bool is_neg_valid_ = false;
   Eigen::MatrixXd neg_V_;
   Eigen::MatrixXi neg_F_;
-  Eigen::MatrixXd sv_V_;
-  Eigen::MatrixXi sv_F_;
   Eigen::MatrixXd gripper_V_;
   Eigen::MatrixXi gripper_F_;
  public:
@@ -72,8 +70,6 @@ class ViewModel {
   DECLARE_GETTER(GetIsAnimating, is_animating_)
   DECLARE_GETTER(GetNegVolV, neg_V_)
   DECLARE_GETTER(GetNegVolF, neg_F_)
-  DECLARE_GETTER(GetSweptVolV, sv_V_)
-  DECLARE_GETTER(GetSweptVolF, sv_F_)
   DECLARE_GETTER(GetGripperV, gripper_V_)
   DECLARE_GETTER(GetGripperF, gripper_F_)
   DECLARE_GETTER(GetNegVolValid, is_neg_valid_)

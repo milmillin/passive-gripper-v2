@@ -91,7 +91,7 @@ void ViewModel::NextFrame() {
 
 void ViewModel::ComputeNegativeVolume() {
   if (!is_neg_valid_) {
-    NegativeSweptVolume(psg_, neg_V_, neg_F_, sv_V_, sv_F_);
+    NegativeSweptVolumePSG(psg_, neg_V_, neg_F_);
     is_neg_valid_ = true;
     InvokeLayerInvalidated(Layer::kNegVol);
   }
@@ -102,7 +102,7 @@ void ViewModel::LoadResultBin(const std::string& filename) {
   Eigen::MatrixXi F;
   psg::core::LoadResultBin(psg_, filename, V, F);
   ComputeNegativeVolume();
-  RefineGripper(psg_, V, F, sv_V_, sv_F_, gripper_V_, gripper_F_);
+  RefineGripper(psg_, V, F, neg_V_, neg_F_, gripper_V_, gripper_F_);
   InvokeLayerInvalidated(Layer::kGripper);
 }
 

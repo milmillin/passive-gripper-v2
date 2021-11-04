@@ -10,6 +10,7 @@
 
 #include <igl/copyleft/cgal/mesh_boolean.h>
 #include "GeometryUtils.h"
+#include "Initialization.h"
 #include "robots/Robots.h"
 #include "swept_volume/gradient_descent_test.h"
 #include "swept_volume/sparse_continuation.h"
@@ -41,9 +42,9 @@ static void SweptVolumeImpl(const Eigen::MatrixXd& V,
                             const Eigen::MatrixXi& F,
                             const std::vector<Eigen::Matrix4d>& Transformations,
                             ImplicitMeshFunc f,
-                            Eigen::MatrixXi& out_CI,
-                            Eigen::MatrixXd& out_CV,
-                            Eigen::VectorXd& out_CS,
+                            Eigen::MatrixXd& out_V,
+                            Eigen::MatrixXi& out_F,
+                            bool flipped,
                             const double eps,
                             const int num_seeds) {
   const double iso = 0.001;
@@ -343,6 +344,9 @@ static void SweptVolumeImpl(const Eigen::MatrixXd& V,
     init_voxels.push_back(Eigen::RowVector3i(ix, iy, iz));
   }
 
+  Eigen::MatrixXi CI;
+  Eigen::MatrixXd CV;
+  Eigen::VectorXd CS;
   Eigen::VectorXd CV_argmins;
   // CS: value, CV: vertex position, CI: indices
   sparse_continuation(p0,
@@ -351,10 +355,12 @@ static void SweptVolumeImpl(const Eigen::MatrixXd& V,
                       scalarFunc,
                       eps,
                       1000000,
-                      out_CS,
-                      out_CV,
-                      out_CI,
+                      CS,
+                      CV,
+                      CI,
                       CV_argmins);
+  if (flipped) CS *= -1.;
+  igl::copyleft::marching_cubes(CS, CV, CI, 0., out_V, out_F);
 }
 
 static std::vector<Eigen::Matrix4d> GetTransformations(
@@ -383,83 +389,128 @@ static std::vector<Eigen::Matrix4d> GetTransformations(
   return transformations;
 }
 
-static void SweptVolumeWrapper(const PassiveGripper& psg,
-                               const ImplicitMeshFunc& f,
-                               Eigen::MatrixXd& out_V,
-                               Eigen::MatrixXi& out_F,
-                               const double CS_factor,
-                               const int num_seeds) {
+void SweptVolume(const Eigen::MatrixXd& V,
+                 const Eigen::MatrixXi& F,
+                 const std::vector<Eigen::Matrix4d>& transformations,
+                 double res,
+                 Eigen::MatrixXd& out_V,
+                 Eigen::MatrixXi& out_F,
+                 int num_seeds) {
   Eigen::MatrixXi CI;
   Eigen::MatrixXd CV;
   Eigen::VectorXd CS;
-  SweptVolumeImpl((psg.GetFingerTransInv() *
-                   psg.GetMeshV().transpose().colwise().homogeneous())
-                      .transpose(),
-                  psg.GetMeshF(),
-                  GetTransformations(psg),
-                  f,
-                  CI,
-                  CV,
-                  CS,
-                  psg.GetTopoOptSettings().neg_vol_res,
-                  num_seeds);
-  CS *= CS_factor;
-  igl::copyleft::marching_cubes(CS, CV, CI, 0., out_V, out_F);
-}
-
-void NegativeSweptVolume(const PassiveGripper& psg,
-                         Eigen::MatrixXd& out_V,
-                         Eigen::MatrixXi& out_F,
-                         Eigen::MatrixXd& out_SV_V,
-                         Eigen::MatrixXi& out_SV_F,
-                         const int num_seeds) {
-  Eigen::Vector3d floor(0, psg.GetCostSettings().floor, 0);
-  Eigen::Vector3d boxUB = psg.GetTopoOptSettings().upper_bound;
-  Eigen::Vector3d boxLB = psg.GetTopoOptSettings().lower_bound;
-
-  SweptVolume(psg, out_SV_V, out_SV_F, num_seeds);
-
-  // Create box
-  Eigen::MatrixXd box_V = CreateCubeV(boxLB, boxUB);
-
-  Eigen::MatrixXd RV;
-  Eigen::MatrixXi RF;
-
-  igl::copyleft::cgal::mesh_boolean(
-      box_V, cube_F, out_SV_V, out_SV_F, igl::MESH_BOOLEAN_TYPE_MINUS, RV, RF);
-
-  // Create Floor
-  auto R2_V = (robots::Forward(psg.GetTrajectory().front()) *
-               RV.transpose().colwise().homogeneous())
-                  .transpose();
-
-  Eigen::Vector3d lb = R2_V.colwise().minCoeff().transpose();
-  Eigen::Vector3d ub = R2_V.colwise().maxCoeff().transpose();
-
-  constexpr double padding = 0.03;
-  lb.array() -= padding;
-  ub.array() += padding;
-  lb.y() = -5;
-  ub.y() = 0;
-
-  Eigen::MatrixXd floor_V = CreateCubeV(lb, ub);
-  floor_V =
-      (psg.GetFingerTransInv() * floor_V.transpose().colwise().homogeneous())
-          .transpose();
-
-  igl::copyleft::cgal::mesh_boolean(
-      RV, RF, floor_V, cube_F, igl::MESH_BOOLEAN_TYPE_MINUS, out_V, out_F);
-}
-
-void SweptVolume(const PassiveGripper& psg,
-                 Eigen::MatrixXd& out_V,
-                 Eigen::MatrixXi& out_F,
-                 const int num_seeds) {
   ImplicitMeshFunc f = [](double sgd,
                           const Eigen::RowVector3d& P,
                           const Eigen::RowVector3d& pos) { return sgd; };
-  SweptVolumeWrapper(psg, f, out_V, out_F, 1., num_seeds);
+  SweptVolumeImpl(
+      V, F, transformations, f, out_V, out_F, false, res, num_seeds);
 }
+
+void NegativeSweptVolume(const Eigen::MatrixXd& V,
+                         const Eigen::MatrixXi& F,
+                         const std::vector<Eigen::Matrix4d>& transformations,
+                         const Eigen::Vector3d& box_lb,
+                         const Eigen::Vector3d& box_ub,
+                         const Eigen::Vector3d& floor,
+                         const Eigen::Vector3d& floor_N,
+                         double res,
+                         Eigen::MatrixXd& out_V,
+                         Eigen::MatrixXi& out_F,
+                         const int num_seeds) {
+  Eigen::Vector3d box_elb = box_lb.array() - res;
+  Eigen::Vector3d box_eub = box_ub.array() + res;
+  ImplicitMeshFunc f = [box_elb, box_eub, floor, floor_N](
+                           double sgd,
+                           const Eigen::RowVector3d& P,
+                           const Eigen::RowVector3d& pos) {
+    double floorD = (pos.transpose() - floor).dot(floor_N);
+    double boxD = std::max((P.transpose() - box_eub).maxCoeff(),
+                           (box_elb - P.transpose()).maxCoeff());
+    return -std::max(boxD, -std::min(sgd, floorD));
+  };
+
+  Eigen::MatrixXd tmp_V;
+  Eigen::MatrixXi tmp_F;
+  SweptVolumeImpl(V, F, transformations, f, tmp_V, tmp_F, true, res, num_seeds);
+  Eigen::MatrixXd box_V = CreateCubeV(box_lb, box_ub);
+  igl::copyleft::cgal::mesh_boolean(tmp_V,
+                                    tmp_F,
+                                    box_V,
+                                    cube_F,
+                                    igl::MESH_BOOLEAN_TYPE_INTERSECT,
+                                    out_V,
+                                    out_F);
+}
+
+void NegativeSweptVolumePSG(const PassiveGripper& psg,
+                            Eigen::MatrixXd& out_V,
+                            Eigen::MatrixXi& out_F,
+                            const int num_seeds) {
+  Eigen::Vector3d floor(0, psg.GetCostSettings().floor, 0);
+  Eigen::Vector3d floor_N(0, 1, 0);
+  Eigen::Affine3d finger_trans_inv = psg.GetFingerTransInv();
+  floor = finger_trans_inv * floor;
+  floor_N = finger_trans_inv.linear() * floor_N;
+
+  NegativeSweptVolume(
+      (finger_trans_inv * psg.GetMeshV().transpose().colwise().homogeneous())
+          .transpose(),
+      psg.GetMeshF(),
+      GetTransformations(psg),
+      psg.GetTopoOptSettings().lower_bound,
+      psg.GetTopoOptSettings().upper_bound,
+      floor,
+      floor_N,
+      psg.GetTopoOptSettings().neg_vol_res,
+      out_V,
+      out_F,
+      num_seeds);
+}
+
+void PiNegativeSweptVolumePSG(const PassiveGripper& psg,
+                              Eigen::MatrixXd& out_V,
+                              Eigen::MatrixXi& out_F,
+                              const int num_seeds) {
+  Eigen::Vector3d floor(0, psg.GetCostSettings().floor, 0);
+  Eigen::Vector3d floor_N(0, 1, 0);
+  Eigen::Affine3d finger_trans_inv = psg.GetFingerTransInv();
+  floor = finger_trans_inv * floor;
+  floor_N = finger_trans_inv.linear() * floor_N;
+
+  Eigen::Vector3d pi_lb;
+  Eigen::Vector3d pi_ub;
+  InitializeConservativeBound(psg, pi_lb, pi_ub);
+  NegativeSweptVolume(
+      (finger_trans_inv * psg.GetMeshV().transpose().colwise().homogeneous())
+          .transpose(),
+      psg.GetMeshF(),
+      GetTransformations(psg),
+      pi_lb,
+      pi_ub,
+      floor,
+      floor_N,
+      psg.GetTopoOptSettings().neg_vol_res,
+      out_V,
+      out_F,
+      num_seeds);
+}
+
+/*
+void SweptVolumePSG(const PassiveGripper& psg,
+                    Eigen::MatrixXd& out_V,
+                    Eigen::MatrixXi& out_F,
+                    const int num_seeds) {
+  SweptVolume((psg.GetFingerTransInv() *
+               psg.GetMeshV().transpose().colwise().homogeneous())
+                  .transpose(),
+              psg.GetMeshF(),
+              GetTransformations(psg),
+              psg.GetTopoOptSettings().neg_vol_res,
+              out_V,
+              out_F,
+              num_seeds);
+}
+*/
 
 }  // namespace core
 }  // namespace psg

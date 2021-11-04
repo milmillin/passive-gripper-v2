@@ -9,21 +9,37 @@
 namespace psg {
 namespace core {
 
-// Compute Swept Volume of the box minus swept volume of mesh and floor
-// V, F        : Mesh
-// out_V, out_F : Neg Vol
-// out_SV_V, out_SV_F : Swept Vol
-void NegativeSweptVolume(const PassiveGripper& psg,
+void NegativeSweptVolume(const Eigen::MatrixXd& V,
+                         const Eigen::MatrixXi& F,
+                         const std::vector<Eigen::Matrix4d>& transformations,
+                         const Eigen::Vector3d& box_lb,
+                         const Eigen::Vector3d& box_ub,
+                         const Eigen::Vector3d& floor,
+                         const Eigen::Vector3d& floor_N,
+                         double res,
                          Eigen::MatrixXd& out_V,
                          Eigen::MatrixXi& out_F,
-                         Eigen::MatrixXd& out_SV_V,
-                         Eigen::MatrixXi& out_SV_F,
-                         const int num_seeds = 100);
+                         int num_seeds = 100);
 
-void SweptVolume(const PassiveGripper& psg,
+void SweptVolume(const Eigen::MatrixXd& V,
+                 const Eigen::MatrixXi& F,
+                 const std::vector<Eigen::Matrix4d>& transformations,
+                 double res,
                  Eigen::MatrixXd& out_V,
                  Eigen::MatrixXi& out_F,
-                 const int num_seeds = 100);
+                 int num_seeds = 100);
+
+// Bound - Swept Volume
+void NegativeSweptVolumePSG(const PassiveGripper& psg,
+                            Eigen::MatrixXd& out_V,
+                            Eigen::MatrixXi& out_F,
+                            const int num_seeds = 100);
+
+// Params-Independent-Bound - Swept Volume
+void PiNegativeSweptVolumePSG(const PassiveGripper& psg,
+                              Eigen::MatrixXd& out_V,
+                              Eigen::MatrixXi& out_F,
+                              const int num_seeds = 100);
 
 }  // namespace core
 }  // namespace psg
