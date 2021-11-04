@@ -12,7 +12,7 @@ struct TopoOptSettings : psg::core::serialization::Serializable {
   double neg_vol_res = 0.002;
   double topo_res = 0.002;
   double attachment_size = 0.038; // diameter
-  double vol_frac = 0.04; // percentage wrt csv bound
+  double vol_frac = 0.02; // percentage wrt pi bound
 
   double contact_point_size = 0.01;
   double base_thickness = 0.01;
