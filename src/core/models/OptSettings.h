@@ -50,6 +50,7 @@ struct OptSettings : psg::core::serialization::Serializable {
     } else if (version == 2) {
       DESERIALIZE(max_runtime);
       DESERIALIZE(__unused);  // double
+      max_iters = __unused;
       DESERIALIZE(finger_wiggle);
       DESERIALIZE(trajectory_wiggle);
       DESERIALIZE(tolerance);
