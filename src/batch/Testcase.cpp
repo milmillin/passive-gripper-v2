@@ -104,13 +104,15 @@ void ProcessFrom(std::string raw_fn,
     }
 
     std::string psg_out_fn = out_fn + ".psg";
-    std::ofstream psg_out_f(psg_out_fn, std::ios::out | std::ios::binary);
-    if (!psg_out_f.is_open()) {
-      Error() << "> Cannot open out file " << psg_out_fn << std::endl;
-      Error() << ">> Skipping" << std::endl;
-      continue;
+    {
+      std::ofstream psg_out_f(psg_out_fn, std::ios::out | std::ios::binary);
+      if (!psg_out_f.is_open()) {
+        Error() << "> Cannot open out file " << psg_out_fn << std::endl;
+        Error() << ">> Skipping" << std::endl;
+        continue;
+      }
+      psg.Serialize(psg_out_f);
     }
-    psg.Serialize(psg_out_f);
     Log() << "> Done: Optimized gripper written to " << psg_out_fn << std::endl;
 
     Result res{wopath_fn,
