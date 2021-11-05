@@ -480,8 +480,23 @@ void MainUI::DrawTopoOptPanel() {
 }
 
 void MainUI::DrawViewPanel() {
+  float w = ImGui::GetContentRegionAvailWidth();
   if (ImGui::CollapsingHeader("View", ImGuiTreeNodeFlags_None)) {
     ImGui::PushID("View");
+    if (ImGui::Button("View All", ImVec2(w, 0))) {
+      for (int i = 0; i < (int)Layer::kMax; i++) {
+        GetLayer((Layer)i).set_visible(true);
+      }
+    }
+    if (ImGui::Button("Visualization", ImVec2(w, 0))) {
+      for (int i = 0; i < (int)Layer::kMax; i++) {
+        GetLayer((Layer)i).set_visible(false);
+      }
+      GetLayer(Layer::kRobot).set_visible(true);
+      GetLayer(Layer::kMesh).set_visible(true);
+      GetLayer(Layer::kGripper).set_visible(true);
+    }
+
     DrawLayerOptions(Layer::kMesh, "Mesh");
     DrawLayerOptions(Layer::kContactPoints, "Contact Points");
     DrawLayerOptions(Layer::kRobot, "Robot");
