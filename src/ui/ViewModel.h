@@ -34,6 +34,7 @@ class ViewModel {
 
   void ComputeNegativeVolume();
   void LoadResultBin(const std::string& filename);
+  bool LoadGripper(const std::string& filename);
  private:
   LayerInvalidatedDelegate LayerInvalidated_;
   void InvokeLayerInvalidated(Layer layer);

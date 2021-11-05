@@ -638,6 +638,12 @@ void MainUI::OnLoadPSGClicked() {
   std::ifstream myfile(filename, std::ios::in | std::ios::binary);
   psg::core::serialization::Deserialize(vm_.PSG(), myfile);
   std::cout << filename << " psg loaded!" << std::endl;
+
+  // try load stl
+  std::string stl_fn = filename.substr(0, last_dot) + ".stl";
+  if (vm_.LoadGripper(stl_fn)) {
+    std::cout << stl_fn << " gripper stl loaded!" << std::endl;
+  }
   OnAlignCameraCenter();
 }
 

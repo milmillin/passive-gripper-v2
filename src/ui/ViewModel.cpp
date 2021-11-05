@@ -1,9 +1,12 @@
 #include "ViewModel.h"
 
+#include <igl/readSTL.h>
+#include <fstream>
+
 #include "../core/GeometryUtils.h"
-#include "../core/robots/Robots.h"
 #include "../core/SweptVolume.h"
 #include "../core/TopoOpt.h"
+#include "../core/robots/Robots.h"
 
 namespace psg {
 namespace ui {
@@ -24,7 +27,8 @@ void ViewModel::SetMesh(const Eigen::MatrixXd& V, const Eigen::MatrixXi& F) {
       -minimum.x() / 2. - maximum.x() / 2., -minimum.y(), 0.07 - minimum.z());
 
   Eigen::MatrixXd SV = V.rowwise() + translate.transpose();
-  Eigen::Translation3d mesh_trans((SV.colwise().minCoeff() + SV.colwise().maxCoeff()) / 2.);
+  Eigen::Translation3d mesh_trans(
+      (SV.colwise().minCoeff() + SV.colwise().maxCoeff()) / 2.);
 
   Eigen::Affine3d trans = robots::Forward(current_pose_);
   SV = (trans * (SV.transpose().colwise().homogeneous())).transpose();
@@ -104,6 +108,15 @@ void ViewModel::LoadResultBin(const std::string& filename) {
   ComputeNegativeVolume();
   RefineGripper(psg_, V, F, neg_V_, neg_F_, gripper_V_, gripper_F_);
   InvokeLayerInvalidated(Layer::kGripper);
+}
+
+bool ViewModel::LoadGripper(const std::string& filename) {
+  std::ifstream f(filename, std::ios::in | std::ios::binary);
+  if (!f.is_open()) return false;
+  Eigen::MatrixXd N;
+  igl::readSTL(f, gripper_V_, gripper_F_, N);
+  InvokeLayerInvalidated(Layer::kGripper);
+  return true;
 }
 
 void ViewModel::ComputeIK() {
