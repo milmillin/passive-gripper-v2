@@ -1,6 +1,7 @@
 #include "ViewModel.h"
 
 #include <igl/readSTL.h>
+#include <igl/writeSTL.h>
 #include <fstream>
 
 #include "../core/GeometryUtils.h"
@@ -102,11 +103,15 @@ void ViewModel::ComputeNegativeVolume() {
 }
 
 void ViewModel::LoadResultBin(const std::string& filename) {
-  Eigen::MatrixXd V;
-  Eigen::MatrixXi F;
-  psg::core::LoadResultBin(psg_, filename, V, F);
+  psg::core::LoadResultBin(psg_, filename, gripper_V_, gripper_F_);
+  InvokeLayerInvalidated(Layer::kGripper);
+}
+
+void ViewModel::RefineGripper() {
+  Eigen::MatrixXd V = gripper_V_;
+  Eigen::MatrixXi F = gripper_F_;
   ComputeNegativeVolume();
-  RefineGripper(psg_, V, F, neg_V_, neg_F_, gripper_V_, gripper_F_);
+  psg::core::RefineGripper(psg_, V, F, neg_V_, neg_F_, gripper_V_, gripper_F_);
   InvokeLayerInvalidated(Layer::kGripper);
 }
 
@@ -117,6 +122,11 @@ bool ViewModel::LoadGripper(const std::string& filename) {
   igl::readSTL(f, gripper_V_, gripper_F_, N);
   InvokeLayerInvalidated(Layer::kGripper);
   return true;
+}
+
+bool ViewModel::SaveGripper(const std::string& filename) {
+  return igl::writeSTL(
+      filename, gripper_V_, gripper_F_, igl::FileEncoding::Binary);
 }
 
 void ViewModel::ComputeIK() {

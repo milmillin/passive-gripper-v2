@@ -133,6 +133,19 @@ void MainUI::draw_viewer_menu() {
     OnSavePSGClicked();
   }
   if (vm_.PSG().IsMeshLoaded()) {
+    if (ImGui::Button("Load Gripper STL", ImVec2((w - p) / 2, 0))) {
+      std::string filename = igl::file_dialog_open();
+      if (!filename.empty()) {
+        vm_.LoadGripper(filename);
+      }
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Save Gripper STL", ImVec2((w - p) / 2, 0))) {
+      std::string filename = igl::file_dialog_save();
+      if (!filename.empty()) {
+        vm_.SaveGripper(filename);
+      }
+    }
     if (optimizer_.IsRunning() || optimizer_.IsResultAvailable()) {
       DrawOptimizationStatusPanel();
     }
@@ -458,6 +471,9 @@ void MainUI::DrawTopoOptPanel() {
       if (!filename.empty()) {
         vm_.LoadResultBin(filename);
       }
+    }
+    if (ImGui::Button("Refine Result", ImVec2(w, 0))) {
+      vm_.RefineGripper();
     }
   }
   ImGui::PopID();
@@ -1017,6 +1033,7 @@ void MainUI::OnGripperInvalidated() {
                   vm_.GetGripperV().transpose().colwise().homogeneous())
                      .transpose(),
                  vm_.GetGripperF());
+  layer.set_colors(colors::kBrown);
 }
 
 inline bool MainUI::IsGuizmoVisible() {
