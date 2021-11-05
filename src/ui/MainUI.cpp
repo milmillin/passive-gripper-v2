@@ -12,6 +12,7 @@
 #include "../core/robots/Robots.h"
 #include "../core/serialization/Serialization.h"
 #include "Components.h"
+#include "Assets.h"
 
 using namespace psg::core;
 
@@ -855,27 +856,65 @@ void MainUI::OnRobotInvalidated() {
   std::vector<Eigen::Affine3d> trans;
   robots::ForwardIntermediate(vm_.GetCurrentPose(), trans);
 
+  size_t v_count = 0;
+  size_t f_count = 0;
+  std::vector<Eigen::MatrixXd> VS(6);
+
+  Eigen::Matrix4d loc_mat;
+  loc_mat.setZero();
+  loc_mat(0, 0) = -1;
+  loc_mat(1, 2) = 1;
+  loc_mat(2, 1) = 1;
+  loc_mat(3, 3) = 1;
+  Eigen::Affine3d loc_trans(loc_mat);
+
+  for (int i = 0; i < 6; i++) {
+    VS[i] =
+        ((trans[i] * loc_trans) * kAssets[i + 1].first.transpose().colwise().homogeneous())
+            .transpose();
+    v_count += kAssets[i + 1].first.rows();
+    f_count += kAssets[i + 1].second.rows();
+  }
+  Eigen::MatrixXd V(v_count, 3);
+  Eigen::MatrixXi F(f_count, 3);
+  v_count = 0;
+  f_count = 0;
+  for (int i = 0; i < 6; i++) {
+    size_t cur_v = VS[i].rows();
+    size_t cur_f = kAssets[i + 1].second.rows();
+    V.block(v_count, 0, cur_v, 3) = VS[i];      
+    F.block(f_count, 0, cur_f, 3) = kAssets[i + 1].second.array() + v_count;
+    v_count += cur_v;
+    f_count += cur_f;
+  }
+  robotLayer.set_mesh(V, F);
+
   Eigen::MatrixXd AV(6 * 4, 3);
   Eigen::MatrixXi AE(6 * 3, 2);
 
+  /*
   Eigen::MatrixXd V(6 * 8, 3);
   Eigen::MatrixXi F(6 * 12, 3);
+  */
 
   for (size_t i = 0; i < 6; i++) {
     Eigen::Affine3d curTrans = trans[i];
+    /*
     F.block<12, 3>(i * 12, 0) = cube_F.array() + (8 * i);
     V.block<8, 3>(i * 8, 0).transpose() =
         (curTrans * kLocalTrans[i] * cube_V.transpose());
-
+    */
     AV.block<4, 3>(i * 4, 0).transpose() =
         curTrans * (0.1 * axis_V).transpose();
     AE.block<3, 2>(i * 3, 0) = axis_E.array() + (4 * i);
   }
 
-  robotLayer.set_mesh(V, F);
   robotLayer.set_edges(AV, AE, Eigen::Matrix3d::Identity().replicate<6, 1>());
+  /*
+  robotLayer.set_mesh(V, F);
   robotLayer.set_face_based(true);
   robotLayer.line_width = 2;
+  */
 }
 
 void MainUI::OnTrajectoryInvalidated() {

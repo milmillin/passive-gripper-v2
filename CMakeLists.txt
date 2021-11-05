@@ -66,6 +66,9 @@ else()
   find_package(LAPACK)
 endif()
 
+message(STATUS "Copying assets")
+file(COPY assets DESTINATION ${PROJECT_BINARY_DIR})
+
 # Link OpenMP
 find_package(OpenMP)
 if (OPENMP_FOUND)
@@ -107,7 +110,7 @@ endif()
 add_library(core ${CORE_SRCFILES})
 target_link_libraries(core ${CORE_LINK_LIBS})
 
-set(UI_LINK_LIBS core igl::core igl::opengl_glfw igl::opengl_glfw_imgui)
+set(UI_LINK_LIBS core igl::core igl::opengl_glfw igl::opengl_glfw_imgui Boost::filesystem Boost::system)
 
 add_executable(${PROJECT_NAME} ${UI_SRCFILES})
 target_link_libraries(${PROJECT_NAME} ${UI_LINK_LIBS})
