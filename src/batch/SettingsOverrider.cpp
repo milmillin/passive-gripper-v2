@@ -23,6 +23,10 @@ void SettingsOverrider::Load(std::string fn) {
   while (f >> key) {
     f >> value;      
     mp.insert({key, value});
+    Log() << key << ": " << value << std::endl;
+    if (key == "algorithm") {
+      Log() << "  > " << psg::labels::kAlgorithms[std::stoi(value)] << std::endl;
+    }
   }
 }
 

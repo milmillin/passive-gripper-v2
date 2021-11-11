@@ -4,7 +4,6 @@
 
 #include "../serialization/Serialization.h"
 
-
 namespace psg {
 namespace core {
 namespace models {
@@ -33,7 +32,14 @@ struct ContactPoint : psg::core::serialization::Serializable {
   }
 };
 
+inline std::ostream& operator<<(std::ostream& f, const ContactPoint& c) {
+  f << "ContactPoint:\n"
+    << "  position: " << c.position.transpose() << "\n"
+    << "  normal: " << c.normal.transpose() << "\n"
+    << "  fid: " << c.fid << std::endl;
+  return f;
+}
+
 }  // namespace models
 }  // namespace core
 }  // namespace psg
-

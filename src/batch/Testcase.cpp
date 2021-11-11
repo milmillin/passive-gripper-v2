@@ -38,22 +38,26 @@ void ProcessFrom(std::string raw_fn,
   if (!psg_file.is_open()) {
     throw std::invalid_argument("> Cannot open psg file " + psg_fn);
   }
-  Log() << "> Loaded " << psg_fn << std::endl;
 
   std::string cp_fn = raw_fn + ".cp";
   std::ifstream cp_file(cp_fn, std::ios::in | std::ios::binary);
   if (!cp_file.is_open()) {
     throw std::invalid_argument("> Cannot open cp file " + cp_fn);
   }
-  Log() << "> Loaded " << cp_fn << std::endl;
 
   psg::core::PassiveGripper psg;
   psg.Deserialize(psg_file);
+  Log() << "> Loaded " << psg_fn << std::endl;
+
   stgo.Apply(psg);
   psg::core::Optimizer optimizer;
 
+  Log() << psg.GetOptSettings() << std::endl;
+  Log() << psg.GetTopoOptSettings() << std::endl;
+
   std::vector<std::vector<ContactPoint>> cps;
   psg::core::serialization::Deserialize(cps, cp_file);
+  Log() << "> Loaded " << cp_fn << std::endl;
 
   constexpr size_t bufsize = 48;
   char* buf = new char[bufsize];

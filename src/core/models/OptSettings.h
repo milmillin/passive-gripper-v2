@@ -68,6 +68,18 @@ struct OptSettings : psg::core::serialization::Serializable {
   }
 };
 
+inline std::ostream& operator<<(std::ostream& f, const OptSettings& c) {
+  f << "OptSettings:\n"
+    << "  max_runtime: " << c.max_runtime << "\n"
+    << "  max_iters: " << c.max_iters << "\n"
+    << "  finger_wiggle: " << c.finger_wiggle << "\n"
+    << "  trajectory_wiggle: " << c.trajectory_wiggle.transpose() << "\n"
+    << "  tolerance: " << c.tolerance << "\n"
+    << "  algorithm: " << psg::labels::kAlgorithms[c.algorithm] << "\n"
+    << "  population: " << c.population << std::endl;
+  return f;
+}
+
 }  // namespace models
 }  // namespace core
 }  // namespace psg

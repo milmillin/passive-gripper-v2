@@ -56,6 +56,14 @@ struct TopoOptSettings : psg::core::serialization::Serializable {
   }
 };
 
+inline std::ostream& operator<<(std::ostream& f, const TopoOptSettings& c) {
+  f << "TopoOptSettings:\n"
+    << "  neg_vol_res: " << c.neg_vol_res << "\n"
+    << "  topo_res: " << c.topo_res << "\n"
+    << "  vol_frac: " << c.vol_frac << std::endl;
+  return f;
+}
+
 }  // namespace models
 }  // namespace core
 }  // namespace psg
