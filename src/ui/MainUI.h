@@ -36,7 +36,8 @@ class MainUI : public igl::opengl::glfw::imgui::ImGuiMenu {
     kMeshPosition,
     kRobot,
     kOptimization,
-    kTopoOpt
+    kTopoOpt,
+    kDebug
   };
   Tools selected_tools_ = Tools::kNone;
 
@@ -45,6 +46,8 @@ class MainUI : public igl::opengl::glfw::imgui::ImGuiMenu {
   bool is_swap_yz_ = false;
 
   // Draw Panel
+  void DrawViewPanel();
+
   void DrawMetricPanel();
   void DrawToolPanel();
   void DrawContactPointPanel();
@@ -52,9 +55,9 @@ class MainUI : public igl::opengl::glfw::imgui::ImGuiMenu {
   void DrawRobotPanel();
   void DrawOptimizationPanel();
   void DrawTopoOptPanel();
-  void DrawViewPanel();
   void DrawGuizmoOptionPanel();
   void DrawOptimizationStatusPanel();
+  void DrawDebugPanel();
 
   // Draw Component
   void DrawLayerOptions(Layer layer, const char* id);
@@ -72,9 +75,9 @@ class MainUI : public igl::opengl::glfw::imgui::ImGuiMenu {
   void OnMeshInvalidated();
   void OnCenterOfMassInvalidated();
   void OnContactPointsInvalidated();
-  void OnFingersInvalidated();
+  void OnFingersInvalidated(Layer layer);
   void OnRobotInvalidated();
-  void OnTrajectoryInvalidated();
+  void OnTrajectoryInvalidated(Layer layer);
   void OnSweptSurfaceInvalidated();
   void OnGripperBoundInvalidated();
   void OnNegVolInvalidated();

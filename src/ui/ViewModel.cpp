@@ -5,6 +5,7 @@
 #include <fstream>
 
 #include "../core/GeometryUtils.h"
+#include "../core/Initialization.h"
 #include "../core/SweptVolume.h"
 #include "../core/TopoOpt.h"
 #include "../core/robots/Robots.h"
@@ -167,6 +168,9 @@ void ViewModel::OnPsgInvalidated(PassiveGripper::InvalidatedReason reason) {
       break;
     case PassiveGripper::InvalidatedReason::kContactPoints:
       InvokeLayerInvalidated(Layer::kContactPoints);
+      is_init_params_valid_ = false;
+      InvokeLayerInvalidated(Layer::kInitFingers);
+      InvokeLayerInvalidated(Layer::kInitTrajectory);
       break;
     case PassiveGripper::InvalidatedReason::kFingers:
       InvokeLayerInvalidated(Layer::kFingers);
@@ -182,6 +186,28 @@ void ViewModel::OnPsgInvalidated(PassiveGripper::InvalidatedReason reason) {
       InvokeLayerInvalidated(Layer::kNegVol);
       break;
   }
+}
+
+bool ViewModel::ComputeInitParams() {
+  Eigen::Vector3d effector_pos =
+      robots::Forward(psg_.GetTrajectory().front()).translation();
+  init_params_.fingers.resize(psg_.GetContactPoints().size());
+  for (size_t i = 0; i < psg_.GetContactPoints().size(); i++) {
+    init_params_.fingers[i] =
+        InitializeFinger(psg_.GetContactPoints()[i],
+                         psg_.GetMDR(),
+                         effector_pos,
+                         psg_.GetFingerSettings().n_finger_joints);
+  }
+  init_params_.trajectory =
+      InitializeTrajectory(init_params_.fingers,
+                           psg_.GetTrajectory().front(),
+                           psg_.GetTrajectorySettings().n_keyframes);
+  init_params_.contact_points = psg_.GetContactPoints();
+  is_init_params_valid_ = true;
+
+  InvokeLayerInvalidated(Layer::kInitFingers);
+  InvokeLayerInvalidated(Layer::kInitTrajectory);
 }
 
 void ViewModel::PoseChanged() {

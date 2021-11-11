@@ -37,6 +37,8 @@ class ViewModel {
   void RefineGripper();
   bool LoadGripper(const std::string& filename);
   bool SaveGripper(const std::string& filename);
+
+  bool ComputeInitParams();
  private:
   LayerInvalidatedDelegate LayerInvalidated_;
   void InvokeLayerInvalidated(Layer layer);
@@ -65,6 +67,9 @@ class ViewModel {
   Eigen::MatrixXi neg_F_;
   Eigen::MatrixXd gripper_V_;
   Eigen::MatrixXi gripper_F_;
+
+  bool is_init_params_valid_ = false;
+  GripperParams init_params_;
  public:
   DECLARE_GETTER(PSG, psg_)
   DECLARE_GETTER(GetEffPosition, eff_position_)
@@ -76,6 +81,8 @@ class ViewModel {
   DECLARE_GETTER(GetGripperV, gripper_V_)
   DECLARE_GETTER(GetGripperF, gripper_F_)
   DECLARE_GETTER(GetNegVolValid, is_neg_valid_)
+  DECLARE_GETTER(GetInitParamValid, is_init_params_valid_)
+  DECLARE_GETTER(GetInitParam, init_params_)
 };
 
 }  // namespace ui

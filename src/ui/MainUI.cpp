@@ -5,6 +5,7 @@
 #include <iostream>
 
 #include "../core/CostFunctions.h"
+#include "../core/Debug.h"
 #include "../core/GeometryUtils.h"
 #include "../core/Initialization.h"
 #include "../core/TopoOpt.h"
@@ -169,6 +170,9 @@ void MainUI::draw_viewer_menu() {
       case Tools::kTopoOpt:
         DrawTopoOptPanel();
         break;
+      case Tools::kDebug:
+        DrawDebugPanel();
+        break;
       case Tools::kNone:
         break;
       default:
@@ -204,6 +208,7 @@ void MainUI::DrawToolPanel() {
     DrawToolButton("Trajectory", Tools::kRobot, w);
     DrawToolButton("Optimization", Tools::kOptimization, w);
     DrawToolButton("Topo Opt", Tools::kTopoOpt, w);
+    DrawToolButton("Debug", Tools::kDebug, w);
     ImGui::PopID();
   }
 }
@@ -508,6 +513,8 @@ void MainUI::DrawViewPanel() {
     DrawLayerOptions(Layer::kGripperBound, "Gripper Bound");
     DrawLayerOptions(Layer::kNegVol, "Negative Volume");
     DrawLayerOptions(Layer::kGripper, "Gripper");
+    DrawLayerOptions(Layer::kInitFingers, "Init Finger");
+    DrawLayerOptions(Layer::kInitTrajectory, "Init Trajectory");
     ImGui::PopID();
   }
 }
@@ -565,6 +572,22 @@ void MainUI::DrawOptimizationStatusPanel() {
       if (ImGui::Button("Load Result", ImVec2(w, 0))) {
         vm_.PSG().SetParams(optimizer_.GetCurrentParams());
       }
+    }
+  }
+  ImGui::PopID();
+}
+
+void MainUI::DrawDebugPanel() {
+  float w = ImGui::GetContentRegionAvailWidth();
+  float p = ImGui::GetStyle().FramePadding.x;
+
+  ImGui::PushID("Debug");
+  if (ImGui::CollapsingHeader("Debug", ImGuiTreeNodeFlags_DefaultOpen)) {
+    if (ImGui::Button("Subdivision Check", ImVec2(w, 0))) {
+      DebugSubdivision(vm_.PSG());
+    }
+    if (ImGui::Button("Compute Init Params", ImVec2(w, 0))) {
+      vm_.ComputeInitParams();
     }
   }
   ImGui::PopID();
@@ -729,13 +752,15 @@ void MainUI::OnLayerInvalidated(Layer layer) {
       OnContactPointsInvalidated();
       break;
     case Layer::kFingers:
-      OnFingersInvalidated();
+    case Layer::kInitFingers:
+      OnFingersInvalidated(layer);
       break;
     case Layer::kRobot:
       OnRobotInvalidated();
       break;
+    case Layer::kInitTrajectory:
     case Layer::kTrajectory:
-      OnTrajectoryInvalidated();
+      OnTrajectoryInvalidated(layer);
       break;
     case Layer::kSweptSurface:
       OnSweptSurfaceInvalidated();
@@ -811,12 +836,23 @@ void MainUI::OnContactPointsInvalidated() {
   cpLayer.show_overlay = true;
 }
 
-void MainUI::OnFingersInvalidated() {
-  auto& fingerLayer = GetLayer(Layer::kFingers);
+void MainUI::OnFingersInvalidated(Layer layer) {
+  auto& fingerLayer = GetLayer(layer);
 
-  const auto& fingers = vm_.PSG().GetFingers();
+  Eigen::RowVector3d color;
+  if (layer == Layer::kFingers)
+    color = colors::kRed;
+  else {
+    if (!vm_.GetInitParamValid()) return;
+    color = colors::kPurple;
+  }
+
+  const auto& params =
+      (layer == Layer::kFingers) ? vm_.PSG().GetParams() : vm_.GetInitParam();
+
+  const auto& fingers = params.fingers;
   const auto& finger_settings = vm_.PSG().GetFingerSettings();
-  const Pose& first = vm_.PSG().GetTrajectory().front();
+  const Pose& first = params.trajectory.front();
   const Pose& current_pose = vm_.GetCurrentPose();
 
   Eigen::Affine3d finger_trans_inv = robots::Forward(first).inverse();
@@ -843,7 +879,7 @@ void MainUI::OnFingersInvalidated() {
   }
 
   fingerLayer.set_points(V, Eigen::RowVector3d(0.8, 0.4, 0));
-  fingerLayer.set_edges(V, E, colors::kRed);
+  fingerLayer.set_edges(V, E, color);
   fingerLayer.line_width = 5;
   fingerLayer.point_size = 9;
 }
@@ -878,12 +914,23 @@ void MainUI::OnRobotInvalidated() {
   robotLayer.line_width = 2;
 }
 
-void MainUI::OnTrajectoryInvalidated() {
-  const Trajectory& trajectory = vm_.PSG().GetTrajectory();
+void MainUI::OnTrajectoryInvalidated(Layer layer) {
+  auto& trajectoryLayer = GetLayer(layer);
+
+  Eigen::RowVector3d color;
+  if (layer == Layer::kTrajectory)
+    color = Eigen::RowVector3d(0.7, 0, 0.8);
+  else {
+    if (!vm_.GetInitParamValid()) return;
+    color = Eigen::RowVector3d(0.7, 0.8, 0);
+  }
+
+  const Trajectory& trajectory = (layer == Layer::kTrajectory)
+                                     ? vm_.PSG().GetTrajectory()
+                                     : vm_.GetInitParam().trajectory;
+
   size_t nKeyframe = trajectory.size();
   if (nKeyframe == 0) return;
-
-  auto& trajectoryLayer = GetLayer(Layer::kTrajectory);
 
   Eigen::MatrixXd V(4 * nKeyframe, 3);
   Eigen::MatrixXi E(4 * nKeyframe - 1, 2);
@@ -897,7 +944,7 @@ void MainUI::OnTrajectoryInvalidated() {
     if (i + 1 < nKeyframe) {
       E(3 * nKeyframe + i, 0) = i * 4;
       E(3 * nKeyframe + i, 1) = (i + 1) * 4;
-      C.row(3 * nKeyframe + i) = Eigen::RowVector3d(0.7, 0, 0.8);
+      C.row(3 * nKeyframe + i) = color;
     }
   }
 
