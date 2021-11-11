@@ -215,6 +215,7 @@ Trajectory InitializeTrajectory(const std::vector<Eigen::MatrixXd>& fingers,
   Eigen::Affine3d curTrans = robots::Forward(initPose);
   for (size_t i = 1; i < n_keyframes; i++) {
     curTrans = Eigen::Translation3d(trans.row(i)) * curTrans;
+    curTrans.translation().y() = std::max(curTrans.translation().y(), 0.05);
     std::vector<Pose> candidates;
     if (robots::Inverse(curTrans, candidates)) {
       double best = std::numeric_limits<double>::max();
