@@ -1,8 +1,8 @@
 #include "CostFunctions.h"
 
+#include <igl/copyleft/cgal/intersect_other.h>
 #include "GeometryUtils.h"
 #include "robots/Robots.h"
-#include <igl/copyleft/cgal/intersect_other.h>
 
 namespace psg {
 namespace core {
@@ -117,6 +117,7 @@ double ComputeCost(const GripperParams& params,
         double curCost = 0.;
 #pragma omp parallel for reduction(+ : curCost)
         for (long long jj = 1; jj < nEvalsPerFingerPerFrame; jj++) {
+          /*
           curCost +=
               (curEval[i][jj - 1] + curEval[i][jj] + lastEval[i][jj - 1]) *
               DoubleTriangleArea(curFinger[i][jj - 1],
@@ -126,6 +127,11 @@ double ComputeCost(const GripperParams& params,
               (lastEval[i][jj] + curEval[i][jj] + lastEval[i][jj - 1]) *
               DoubleTriangleArea(
                   lastFinger[i][jj], curFinger[i][jj], lastFinger[i][jj - 1]);
+          */
+          double finger_len = (curFinger[i][jj] - curFinger[i][jj - 1]).norm();
+          curCost += (curEval[i][jj - 1] + 2 * curEval[i][jj] +
+                      2 * lastEval[i][jj - 1] + lastEval[i][jj]) *
+                     finger_len * trajectoryStep;
         }
         totalCost += curCost;
       }
