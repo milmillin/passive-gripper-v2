@@ -43,6 +43,11 @@ std::vector<ContactPoint> GenerateContactCone(const ContactPoint& contact_point,
                                               size_t cone_res,
                                               double friction);
 
+std::vector<ContactPoint> GenerateContactCones(
+    const std::vector<ContactPoint>& cps,
+    size_t cone_res,
+    double friction);
+
 double Volume(const Eigen::MatrixXd& V, const Eigen::MatrixXi& F);
 
 Eigen::MatrixXd CreateCubeV(const Eigen::Vector3d& lb,

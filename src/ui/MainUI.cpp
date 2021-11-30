@@ -8,6 +8,7 @@
 #include "../core/Debug.h"
 #include "../core/GeometryUtils.h"
 #include "../core/Initialization.h"
+#include "../core/QualityMetric.h"
 #include "../core/TopoOpt.h"
 #include "../core/models/GripperSettings.h"
 #include "../core/robots/Robots.h"
@@ -275,9 +276,11 @@ void MainUI::DrawContactPointPanel() {
     ImGui::PopID();
     ImGui::Separator();
     ImGui::InputInt("# Export", (int*)&cp_export_size, 10);
-    ImGui::Text("Select filename as a format, e.g. bunny_%%03d.cp");
     if (ImGui::Button("Save Candidates", ImVec2(w, 0))) {
       OnExportContactPointCandidates();
+    }
+    if (ImGui::Button("Load Candidates", ImVec2(w, 0))) {
+      OnLoadContactPointCandidates();
     }
   }
 }
@@ -728,16 +731,49 @@ void MainUI::OnAlignCameraCenter() {
 }
 
 void MainUI::OnExportContactPointCandidates() {
-  static thread_local char buf[64];
   std::string filename = igl::file_dialog_save();
   if (filename.empty()) return;
   size_t n_export = std::min(cp_export_size, contact_point_candidates_.size());
+  std::vector<std::vector<ContactPoint>> cp_list;
   for (size_t i = 0; i < n_export; i++) {
-    snprintf(buf, 64, filename.c_str(), i);
-    std::ofstream f(buf, std::ios::out | std::ios::binary);
-    psg::core::serialization::Serialize(
-        contact_point_candidates_[i].contact_points, f);
+    cp_list.push_back(contact_point_candidates_[i].contact_points);
   }
+  std::ofstream f(filename, std::ios::out | std::ios::binary);
+  psg::core::serialization::Serialize(cp_list, f);
+}
+
+void MainUI::OnLoadContactPointCandidates() {
+  std::string filename = igl::file_dialog_open();
+  if (filename.empty()) return;
+  std::ifstream f(filename, std::ios::in | std::ios::binary);
+  std::vector<std::vector<ContactPoint>> cp_list;
+  psg::core::serialization::Deserialize(cp_list, f);
+  contact_point_candidates_.clear();
+#pragma omp parallel for
+  for (int64_t i = 0; i < (int64_t)cp_list.size(); i++) {
+    ContactPointMetric m;
+    const std::vector<ContactPoint>& cp = cp_list[i];
+    m.contact_points = cp;
+    std::vector<ContactPoint> cones =
+        GenerateContactCones(cp,
+                             vm_.PSG().GetContactSettings().cone_res,
+                             vm_.PSG().GetContactSettings().friction);
+    m.min_wrench = ComputeMinWrenchQP(cones, vm_.PSG().GetCenterOfMass());
+    m.partial_min_wrench =
+        ComputePartialMinWrenchQP(cones,
+                                  vm_.PSG().GetCenterOfMass(),
+                                  -Eigen::Vector3d::UnitY(),
+                                  Eigen::Vector3d::Zero());
+#pragma omp critical
+    contact_point_candidates_.push_back(m);
+  }
+  std::sort(contact_point_candidates_.begin(),
+            contact_point_candidates_.end(),
+            [](const ContactPointMetric& a, const ContactPointMetric& b) {
+              if (a.min_wrench == b.min_wrench)
+                return a.partial_min_wrench > b.partial_min_wrench;
+              return a.min_wrench > b.min_wrench;
+            });
 }
 
 void MainUI::OnLayerInvalidated(Layer layer) {

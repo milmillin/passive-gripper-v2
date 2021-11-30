@@ -126,6 +126,19 @@ std::vector<ContactPoint> GenerateContactCone(const ContactPoint& contactPoint,
   return contactCones;
 }
 
+std::vector<ContactPoint> GenerateContactCones(
+    const std::vector<ContactPoint>& cps,
+    size_t cone_res,
+    double friction) {
+  std::vector<ContactPoint> cones;
+  for (const auto& cp : cps) {
+    std::vector<ContactPoint>&& cone =
+        GenerateContactCone(cp, cone_res, friction);
+    cones.insert(cones.end(), cone.begin(), cone.end());
+  }
+  return cones;
+}
+
 // From https://github.com/libigl/libigl/issues/694
 double Volume(const Eigen::MatrixXd& V, const Eigen::MatrixXi& F) {
   Eigen::MatrixXd V2(V.rows() + 1, V.cols());

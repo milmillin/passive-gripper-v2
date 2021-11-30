@@ -69,6 +69,7 @@ class MainUI : public igl::opengl::glfw::imgui::ImGuiMenu {
   void OnSavePSGClicked();
   void OnAlignCameraCenter();
   void OnExportContactPointCandidates();
+  void OnLoadContactPointCandidates();
 
   // Layer Invalidation
   void OnLayerInvalidated(Layer layer);
