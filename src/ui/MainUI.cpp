@@ -42,8 +42,6 @@ void MainUI::init(igl::opengl::glfw::Viewer* viewer_) {
   axisLayer.line_width = 2;
 
   GetLayer(Layer::kSweptSurface).show_lines = false;
-  GetLayer(Layer::kRobot).show_lines = false;
-  GetLayer(Layer::kRobot).set_face_based(true);
 }
 
 inline bool MainUI::pre_draw() {
@@ -499,6 +497,9 @@ void MainUI::DrawViewPanel() {
       GetLayer(Layer::kMesh).set_visible(true);
       GetLayer(Layer::kGripper).set_visible(true);
     }
+    if (ImGui::Checkbox("Robot Viz", &robot_viz_)) {
+      OnRobotInvalidated();
+    }
 
     DrawLayerOptions(Layer::kMesh, "Mesh");
     DrawLayerOptions(Layer::kContactPoints, "Contact Points");
@@ -852,77 +853,85 @@ void MainUI::OnFingersInvalidated() {
 }
 
 void MainUI::OnRobotInvalidated() {
-  auto& robotLayer = GetLayer(Layer::kRobot);
-  robotLayer.clear();
-
-  Pose current_pose = vm_.GetCurrentPose();
-  Eigen::Affine3d cur_trans;
-  cur_trans.setIdentity();
-
   static const Eigen::Affine3d globalTrans =
       (Eigen::Affine3d)(Eigen::Matrix3d() << -1, 0, 0, 0, 0, 1, 0, 1, 0)
           .finished();
-  std::vector<Eigen::Affine3d> trans(6);
-  // robots::ForwardIntermediate(vm_.GetCurrentPose(), trans);
 
-  size_t v_count = 0;
-  size_t f_count = 0;
-  std::vector<Eigen::MatrixXd> VS(7);
+  auto& robotLayer = GetLayer(Layer::kRobot);
+  robotLayer.clear();
 
-  VS[0] =
-      (globalTrans * kAssets[0].first.transpose().colwise().homogeneous())
-          .transpose();
-  v_count += kAssets[0].first.rows();
-  f_count += kAssets[0].second.rows();
+  if (robot_viz_) {
+    Pose current_pose = vm_.GetCurrentPose();
+    Eigen::Affine3d cur_trans;
+    cur_trans.setIdentity();
 
-  for (size_t i = 0; i < 6; i++) {
-    cur_trans = cur_trans * kUrdfTrans[i] *
-                Eigen::AngleAxisd(current_pose(i), kUrdfAxis[i]);
-    trans[i] = globalTrans * cur_trans;
-    VS[i + 1] =
-        (trans[i] * kAssets[i + 1].first.transpose().colwise().homogeneous())
-            .transpose();
-    v_count += kAssets[i + 1].first.rows();
-    f_count += kAssets[i + 1].second.rows();
+    std::vector<Eigen::Affine3d> trans(6);
+    // robots::ForwardIntermediate(vm_.GetCurrentPose(), trans);
+
+    size_t v_count = 0;
+    size_t f_count = 0;
+    std::vector<Eigen::MatrixXd> VS(7);
+
+    VS[0] = (globalTrans * kAssets[0].first.transpose().colwise().homogeneous())
+                .transpose();
+    v_count += kAssets[0].first.rows();
+    f_count += kAssets[0].second.rows();
+
+    for (size_t i = 0; i < 6; i++) {
+      cur_trans = cur_trans * kUrdfTrans[i] *
+                  Eigen::AngleAxisd(current_pose(i), kUrdfAxis[i]);
+      trans[i] = globalTrans * cur_trans;
+      VS[i + 1] =
+          (trans[i] * kAssets[i + 1].first.transpose().colwise().homogeneous())
+              .transpose();
+      v_count += kAssets[i + 1].first.rows();
+      f_count += kAssets[i + 1].second.rows();
+    }
+    Eigen::MatrixXd V(v_count, 3);
+    Eigen::MatrixXi F(f_count, 3);
+    v_count = 0;
+    f_count = 0;
+    for (size_t i = 0; i < 7; i++) {
+      size_t cur_v = VS[i].rows();
+      size_t cur_f = kAssets[i].second.rows();
+      V.block(v_count, 0, cur_v, 3) = VS[i];
+      F.block(f_count, 0, cur_f, 3) = kAssets[i].second.array() + v_count;
+      v_count += cur_v;
+      f_count += cur_f;
+    }
+    robotLayer.show_lines = false;
+    robotLayer.set_mesh(V, F);
+    robotLayer.set_face_based(false);
+  } else {
+    std::vector<Eigen::Affine3d> trans;
+    robots::ForwardIntermediate(vm_.GetCurrentPose(), trans);
+
+    Eigen::MatrixXd AV(6 * 4, 3);
+    Eigen::MatrixXi AE(6 * 3, 2);
+
+    Eigen::MatrixXd V(6 * 8, 3);
+    Eigen::MatrixXi F(6 * 12, 3);
+
+    for (size_t i = 0; i < 6; i++) {
+      Eigen::Affine3d curTrans = trans[i];
+      F.block<12, 3>(i * 12, 0) = cube_F.array() + (8 * i);
+      V.block<8, 3>(i * 8, 0).transpose() =
+          (curTrans * kLocalTrans[i] * cube_V.transpose());
+
+      AV.block<4, 3>(i * 4, 0).transpose() =
+          curTrans * (0.1 * axis_V).transpose();
+      AE.block<3, 2>(i * 3, 0) = axis_E.array() + (4 * i);
+    }
+
+    robotLayer.show_lines = true;
+    robotLayer.line_width = 2;
+    robotLayer.set_mesh(V, F);
+    robotLayer.set_edges(AV, AE, Eigen::Matrix3d::Identity().replicate<6, 1>());
+    robotLayer.set_face_based(true);
   }
-  Eigen::MatrixXd V(v_count, 3);
-  Eigen::MatrixXi F(f_count, 3);
-  v_count = 0;
-  f_count = 0;
-  for (size_t i = 0; i < 7; i++) {
-    size_t cur_v = VS[i].rows();
-    size_t cur_f = kAssets[i].second.rows();
-    V.block(v_count, 0, cur_v, 3) = VS[i];
-    F.block(f_count, 0, cur_f, 3) = kAssets[i].second.array() + v_count;
-    v_count += cur_v;
-    f_count += cur_f;
-  }
-  robotLayer.set_mesh(V, F);
-
-  /*
-  Eigen::MatrixXd AV(6 * 4, 3);
-  Eigen::MatrixXi AE(6 * 3, 2);
-
-  Eigen::MatrixXd V(6 * 8, 3);
-  Eigen::MatrixXi F(6 * 12, 3);
-
-  for (size_t i = 0; i < 6; i++) {
-    const Eigen::Affine3d& curTrans = trans[i];
-    /*
-    F.block<12, 3>(i * 12, 0) = cube_F.array() + (8 * i);
-    V.block<8, 3>(i * 8, 0).transpose() =
-        (curTrans * kLocalTrans[i] * cube_V.transpose());
-    AV.block<4, 3>(i * 4, 0).transpose() =
-        curTrans * (0.1 * axis_V).transpose();
-    AE.block<3, 2>(i * 3, 0) = axis_E.array() + (4 * i);
-  }
-
-  robotLayer.set_edges(AV, AE, Eigen::Matrix3d::Identity().replicate<6, 1>());
-  /*
-  robotLayer.set_mesh(V, F);
-  robotLayer.set_face_based(true);
-  robotLayer.line_width = 2;
-  */
+  robotLayer.uniform_colors((Eigen::Vector3d)Eigen::Vector3d::Constant(0.1),
+                            Eigen::Vector3d::Constant(0.41984),
+                            Eigen::Vector3d::Constant(0.5));
 }
 
 void MainUI::OnTrajectoryInvalidated() {
