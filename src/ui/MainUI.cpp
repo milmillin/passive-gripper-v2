@@ -11,8 +11,8 @@
 #include "../core/models/GripperSettings.h"
 #include "../core/robots/Robots.h"
 #include "../core/serialization/Serialization.h"
-#include "Components.h"
 #include "Assets.h"
+#include "Components.h"
 
 using namespace psg::core;
 
@@ -853,24 +853,26 @@ void MainUI::OnRobotInvalidated() {
   auto& robotLayer = GetLayer(Layer::kRobot);
   robotLayer.clear();
 
-  std::vector<Eigen::Affine3d> trans;
-  robots::ForwardIntermediate(vm_.GetCurrentPose(), trans);
+  Pose current_pose = vm_.GetCurrentPose();
+  Eigen::Affine3d cur_trans;
+  cur_trans.setIdentity();
+
+  static const Eigen::Affine3d globalTrans =
+      (Eigen::Affine3d)(Eigen::Matrix3d() << -1, 0, 0, 0, 0, 1, 0, 1, 0)
+          .finished();
+  std::vector<Eigen::Affine3d> trans(6);
+  // robots::ForwardIntermediate(vm_.GetCurrentPose(), trans);
 
   size_t v_count = 0;
   size_t f_count = 0;
   std::vector<Eigen::MatrixXd> VS(6);
 
-  Eigen::Matrix4d loc_mat;
-  loc_mat.setZero();
-  loc_mat(0, 0) = -1;
-  loc_mat(1, 2) = 1;
-  loc_mat(2, 1) = 1;
-  loc_mat(3, 3) = 1;
-  Eigen::Affine3d loc_trans(loc_mat);
-
   for (int i = 0; i < 6; i++) {
+    cur_trans = cur_trans * kUrdfTrans[i] *
+                Eigen::AngleAxisd(current_pose(i), kUrdfAxis[i]);
+    trans[i] = globalTrans * cur_trans;
     VS[i] =
-        ((trans[i] * loc_trans) * kAssets[i + 1].first.transpose().colwise().homogeneous())
+        (trans[i] * kAssets[i + 1].first.transpose().colwise().homogeneous())
             .transpose();
     v_count += kAssets[i + 1].first.rows();
     f_count += kAssets[i + 1].second.rows();
@@ -882,7 +884,7 @@ void MainUI::OnRobotInvalidated() {
   for (int i = 0; i < 6; i++) {
     size_t cur_v = VS[i].rows();
     size_t cur_f = kAssets[i + 1].second.rows();
-    V.block(v_count, 0, cur_v, 3) = VS[i];      
+    V.block(v_count, 0, cur_v, 3) = VS[i];
     F.block(f_count, 0, cur_f, 3) = kAssets[i + 1].second.array() + v_count;
     v_count += cur_v;
     f_count += cur_f;
@@ -898,7 +900,7 @@ void MainUI::OnRobotInvalidated() {
   */
 
   for (size_t i = 0; i < 6; i++) {
-    Eigen::Affine3d curTrans = trans[i];
+    const Eigen::Affine3d& curTrans = trans[i];
     /*
     F.block<12, 3>(i * 12, 0) = cube_F.array() + (8 * i);
     V.block<8, 3>(i * 8, 0).transpose() =

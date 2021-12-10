@@ -12,8 +12,8 @@ static const char* kAssetNames[] = {"base.stl",
                                     "shoulder.stl",
                                     "upperarm.stl",
                                     "forearm.stl",
-                                    "wrist2.stl",
                                     "wrist1.stl",
+                                    "wrist2.stl",
                                     "wrist3.stl"};
 
 static const size_t kAssetSize = 7;
