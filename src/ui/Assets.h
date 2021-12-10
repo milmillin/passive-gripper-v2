@@ -8,6 +8,7 @@
 namespace psg {
 namespace ui {
 
+// https://github.com/ros-industrial/universal_robot/tree/kinetic-devel/ur_description/meshes/ur5/visual
 static const char* kAssetNames[] = {"base.stl",
                                     "shoulder.stl",
                                     "upperarm.stl",
