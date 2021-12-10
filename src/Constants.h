@@ -41,6 +41,26 @@ const Eigen::Affine3d kLocalTrans[6] = {
     Eigen::Translation3d(-kArmRadius, -kArmRadius, -0.01) *
         Eigen::Scaling(2 * kArmRadius, 2 * kArmRadius, 0.01)};
 
+// https://roboticscasual.com/files/ur5_rviz.txt
+const Eigen::Affine3d kUrdfTrans[6] = {
+    (Eigen::Affine3d)Eigen::Translation3d(0, 0, 0.089159),
+    Eigen::Translation3d(0, 0.13585, 0) *
+        Eigen::AngleAxisd(kHalfPi, Eigen::Vector3d::UnitY()),
+    (Eigen::Affine3d)Eigen::Translation3d(0, -0.1197, 0.425),
+    Eigen::Translation3d(0, 0, 0.39225) *
+        Eigen::AngleAxisd(kHalfPi, Eigen::Vector3d::UnitY()),
+    (Eigen::Affine3d)Eigen::Translation3d(0, 0.093, 0),
+    (Eigen::Affine3d)Eigen::Translation3d(0, 0, 0.09465)};
+
+const Eigen::Vector3d kUrdfAxis[6] = {
+    Eigen::Vector3d::UnitZ(),
+    Eigen::Vector3d::UnitY(),
+    Eigen::Vector3d::UnitY(),
+    Eigen::Vector3d::UnitY(),
+    Eigen::Vector3d::UnitZ(),
+    Eigen::Vector3d::UnitY(),
+};
+
 typedef Eigen::Array<double, kNumDOFs, 1> Pose;
 typedef std::vector<Pose> Trajectory;
 

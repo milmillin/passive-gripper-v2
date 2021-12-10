@@ -84,6 +84,9 @@ class MainUI : public igl::opengl::glfw::imgui::ImGuiMenu {
   void OnNegVolInvalidated();
   void OnGripperInvalidated();
 
+  // Robot Viz
+  bool robot_viz_ = false;
+
   // Contact Point Candidates
   size_t cp_num_seeds = 1000;
   size_t cp_num_candidates = 10000;
