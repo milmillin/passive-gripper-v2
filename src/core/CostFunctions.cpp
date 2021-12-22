@@ -203,8 +203,8 @@ double ComputeCost(const GripperParams& params,
 
                 // dEval/dTheta * factor
                 double t = last ? lastTrajectoryT : trajectoryT;
-                t_dCost_dTheta_0 = dEval_dTheta * (1. - t);
-                t_dCost_dTheta_1 = dEval_dTheta * t;
+                t_dCost_dTheta_0 = dEval_dTheta * (1. - t) * factor;
+                t_dCost_dTheta_1 = dEval_dTheta * t * factor;
               };
 #pragma omp for
           for (long long jj = 1; jj < nEvalsPerFingerPerFrame; jj++) {
