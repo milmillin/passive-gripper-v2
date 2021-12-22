@@ -63,12 +63,34 @@ double EvalAt(const Eigen::Vector3d& p,
   return result;
 }
 
+double ComputeDuration(const Pose& p1,
+                       const Pose& p2,
+                       double ang_velocity,
+                       size_t& out_idx,
+                       bool& out_flip) {
+  Pose dp = (p2 - p1) / ang_velocity;
+  double duration = -1;
+  out_idx = -1;
+  for (size_t i = 0; i < kNumDOFs; i++) {
+    double d = dp(i);
+    bool flip = d < 0;
+    if (flip) d = -d;
+    if (d > duration) {
+      duration = d;
+      out_idx = i;
+      out_flip = flip;
+    }
+  }
+  return duration;
+}
+
 double ComputeCost(const GripperParams& params,
                    const GripperSettings& settings,
                    const MeshDependentResource& mdr,
                    GripperParams& out_dCost_dParam) {
   const size_t nTrajectorySteps = settings.cost.n_trajectory_steps;
   const long long nFingerSteps = settings.cost.n_finger_steps;
+  const double angVelocity = settings.cost.ang_velocity;
   const double trajectoryStep = 1. / nTrajectorySteps;
   const double fingerStep = 1. / nFingerSteps;
 
@@ -143,6 +165,18 @@ double ComputeCost(const GripperParams& params,
 
   double totalCost = 0.;
   for (size_t iKf = 1; iKf < nKeyframes; iKf++) {
+    size_t duration_idx;
+    bool duration_flip;
+    /*
+    double duration = ComputeDuration(params.trajectory[iKf - 1],
+                                      params.trajectory[iKf],
+                                      angVelocity,
+                                      duration_idx,
+                                      duration_flip);
+    */ 
+    double duration = 1;
+    //std::cout << std::setprecision(12) << duration << " " << duration_idx << " "
+              //<< duration_flip << std::endl;
     Pose t_lerpedKeyframe;
     for (long long j = 1; j <= nTrajectorySteps; j++) {
       double trajectoryT = j * trajectoryStep;
@@ -213,33 +247,42 @@ double ComputeCost(const GripperParams& params,
             double finger_len = Norm(curData[i][jj - 1].lerpedJoint,
                                      curData[i][jj].lerpedJoint,
                                      dFingerLen_dLerpedJoint1);
-            double totalEval =
+            double total_eval =
                 curData[i][jj - 1].eval + 2 * curData[i][jj].eval +
                 2 * lastData[i][jj - 1].eval + lastData[i][jj].eval;
-            t_curCost += totalEval * finger_len * trajectoryStep;
+            double non_eval_factor = finger_len * trajectoryStep * duration;
 
-            // Apply part of gradient
-            t_ApplyGradient(
-                curData[i][jj - 1], finger_len * trajectoryStep, false);
-            t_ApplyGradient(
-                curData[i][jj], 2 * finger_len * trajectoryStep, false);
-            t_ApplyGradient(
-                lastData[i][jj - 1], 2 * finger_len * trajectoryStep, true);
-            t_ApplyGradient(lastData[i][jj], finger_len * trajectoryStep, true);
+            // The cost
+            t_curCost += total_eval * non_eval_factor;
 
-            // totalEval * dFingerLen/dFinger * trajectoryStep
+            // Apply eval part of gradient
+            t_ApplyGradient(curData[i][jj - 1], non_eval_factor, false);
+            t_ApplyGradient(curData[i][jj], 2 * non_eval_factor, false);
+            t_ApplyGradient(lastData[i][jj - 1], 2 * non_eval_factor, true);
+            t_ApplyGradient(lastData[i][jj], non_eval_factor, true);
+
+            // total_eval * dFingerLen/dFinger * trajectoryStep * duration
+            double non_finger_len_factor =
+                total_eval * trajectoryStep * duration;
             t_dCost_dFinger.row(curData[i][jj - 1].iJoint) +=
-                totalEval * dFingerLen_dLerpedJoint1 *
-                curData[i][jj - 1].dLerpedJoint_dJoint1 * trajectoryStep;
+                dFingerLen_dLerpedJoint1 *
+                curData[i][jj - 1].dLerpedJoint_dJoint1 * non_finger_len_factor;
             t_dCost_dFinger.row(curData[i][jj - 1].iJoint + 1) +=
-                totalEval * dFingerLen_dLerpedJoint1 *
-                curData[i][jj - 1].dLerpedJoint_dJoint2 * trajectoryStep;
+                dFingerLen_dLerpedJoint1 *
+                curData[i][jj - 1].dLerpedJoint_dJoint2 * non_finger_len_factor;
             t_dCost_dFinger.row(curData[i][jj].iJoint) +=
-                totalEval * -dFingerLen_dLerpedJoint1 *
-                curData[i][jj].dLerpedJoint_dJoint1 * trajectoryStep;
+                -dFingerLen_dLerpedJoint1 *
+                curData[i][jj].dLerpedJoint_dJoint1 * non_finger_len_factor;
             t_dCost_dFinger.row(curData[i][jj].iJoint + 1) +=
-                totalEval * -dFingerLen_dLerpedJoint1 *
-                curData[i][jj].dLerpedJoint_dJoint2 * trajectoryStep;
+                -dFingerLen_dLerpedJoint1 *
+                curData[i][jj].dLerpedJoint_dJoint2 * non_finger_len_factor;
+
+            // total_eval * finger_len * trajectoryStep * dDuration/dTheta
+            // double ddTheta =
+                // total_eval * finger_len * trajectoryStep / angVelocity;
+            // if (duration_flip) ddTheta = -ddTheta;
+            // t_dCost_dTheta_0(duration_idx) -= ddTheta;
+            // t_dCost_dTheta_1(duration_idx) += ddTheta;
           }
 
 #pragma omp critical
