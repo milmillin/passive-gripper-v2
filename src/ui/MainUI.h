@@ -83,6 +83,7 @@ class MainUI : public igl::opengl::glfw::imgui::ImGuiMenu {
   void OnGripperBoundInvalidated();
   void OnNegVolInvalidated();
   void OnGripperInvalidated();
+  void OnGradientInvalidated();
 
   // Robot Viz
   bool robot_viz_ = false;

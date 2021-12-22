@@ -8,37 +8,67 @@ namespace psg {
 namespace core {
 
 // See CHOMP paper page 4
-static double PotentialSDF(double s) {
+static double PotentialSDF(double s, double& out_dP_ds) {
   static constexpr double epsilon = 0.001;
-  if (s > epsilon) return 0;
+  if (s > epsilon) {
+    out_dP_ds = 0;
+    return 0;
+  }
   if (s < 0) {
+    out_dP_ds = -1;
     return -s + (epsilon / 2.);
   }
   double tmp = s - epsilon;
+  out_dP_ds = s / epsilon - 1;
   return tmp * tmp / (2. * epsilon);
 }
 
 static double GetDist(const Eigen::Vector3d& p,
                       const CostSettings& settings,
-                      const MeshDependentResource& mdr) {
+                      const MeshDependentResource& mdr,
+                      Eigen::RowVector3d& out_ds_dp) {
   Eigen::RowVector3d c;
   double sign;
   double s = mdr.ComputeSignedDistance(p, c, sign);
   double sFloor = p.y() - settings.floor;
-  return std::min(s, sFloor);
+  if (s < sFloor) {
+    if (s < 0)
+      out_ds_dp = (c - p.transpose()).normalized();
+    else
+      out_ds_dp = (p.transpose() - c).normalized();
+    return s;
+  } else {
+    out_ds_dp = Eigen::RowVector3d::UnitY();
+    return sFloor;
+  }
+}
+
+static double Norm(const Eigen::Vector3d& x1,
+                   const Eigen::Vector3d& x2,
+                   Eigen::RowVector3d& out_dNorm_dx1) {
+  Eigen::RowVector3d x12 = (x1 - x2).transpose();
+  double norm = x12.norm();
+  out_dNorm_dx1 = x12 / norm;
+  return norm;
 }
 
 double EvalAt(const Eigen::Vector3d& p,
               const CostSettings& settings,
-              const MeshDependentResource& mdr) {
-  return PotentialSDF(GetDist(p, settings, mdr));
+              const MeshDependentResource& mdr,
+              Eigen::RowVector3d& out_dc_dp) {
+  Eigen::RowVector3d ds_dp;
+  double dP_ds;
+  double result = PotentialSDF(GetDist(p, settings, mdr, ds_dp), dP_ds);
+  out_dc_dp = dP_ds * ds_dp;
+  return result;
 }
 
 double ComputeCost(const GripperParams& params,
                    const GripperSettings& settings,
-                   const MeshDependentResource& mdr) {
+                   const MeshDependentResource& mdr,
+                   std::vector<Eigen::MatrixXd>& out_dCost_dFinger) {
   const size_t nTrajectorySteps = settings.cost.n_trajectory_steps;
-  const size_t nFingerSteps = settings.cost.n_finger_steps;
+  const long long nFingerSteps = settings.cost.n_finger_steps;
   const double trajectoryStep = 1. / nTrajectorySteps;
   const double fingerStep = 1. / nFingerSteps;
 
@@ -47,14 +77,22 @@ double ComputeCost(const GripperParams& params,
   const size_t nFingerJoints = settings.finger.n_finger_joints;
   const size_t nEvalsPerFingerPerFrame = (nFingerJoints - 1) * nFingerSteps + 1;
 
-  std::vector<std::vector<double>> lastEval(
-      nFingers, std::vector<double>(nEvalsPerFingerPerFrame, 0));
-  std::vector<std::vector<Eigen::Vector3d>> lastFinger(
-      nFingers, std::vector<Eigen::Vector3d>(nEvalsPerFingerPerFrame));
-  std::vector<std::vector<double>> curEval(
-      nFingers, std::vector<double>(nEvalsPerFingerPerFrame, 0));
-  std::vector<std::vector<Eigen::Vector3d>> curFinger(
-      nFingers, std::vector<Eigen::Vector3d>(nEvalsPerFingerPerFrame));
+  static struct _Data {
+    double eval;
+    Eigen::Vector3d lerpedJoint;
+    Eigen::RowVector3d dEval_dLerpedJoint;
+    Eigen::Matrix3d dLerpedJoint_dJoint1;
+    Eigen::Matrix3d dLerpedJoint_dJoint2;
+    size_t iJoint;  // iJoint -- (iJoint + 1)
+  };
+
+  std::vector<std::vector<_Data>> lastData(
+      nFingers, std::vector<_Data>(nEvalsPerFingerPerFrame));
+  std::vector<std::vector<_Data>> curData(
+      nFingers, std::vector<_Data>(nEvalsPerFingerPerFrame));
+
+  std::vector<Eigen::MatrixXd> dCost_dFinger(
+      nFingers, Eigen::MatrixXd::Zero(nFingerJoints, 3));
 
   Eigen::Affine3d fingerTransInv =
       robots::Forward(params.trajectory.front()).inverse();
@@ -66,20 +104,23 @@ double ComputeCost(const GripperParams& params,
       const Eigen::MatrixXd& finger = params.fingers[i];
       Eigen::MatrixXd transformedFinger =
           (curTrans * finger.transpose().colwise().homogeneous()).transpose();
-      lastFinger[i][0] = transformedFinger.row(0).transpose();
-      lastEval[i][0] =
-          EvalAt(transformedFinger.row(0).transpose(), settings.cost, mdr);
-      for (size_t joint = 1; joint < nFingerJoints; joint++) {
-        for (size_t kk = 1; kk <= nFingerSteps; kk++) {
-          double fingerT = kk * fingerStep;
-          Eigen::RowVector3d lerpedFinger =
-              transformedFinger.row(joint - 1) * (1. - fingerT) +
-              transformedFinger.row(joint) * fingerT;
-          lastFinger[i][(joint - 1) * nFingerSteps + kk] =
-              lerpedFinger.transpose();
-          lastEval[i][(joint - 1) * nFingerSteps + kk] =
-              EvalAt(lerpedFinger.transpose(), settings.cost, mdr);
-        }
+#pragma omp parallel for
+      for (long long jj = 0; jj < nEvalsPerFingerPerFrame; jj++) {
+        _Data& data = lastData[i][jj];
+        long long kk = (jj - 1) % nFingerSteps + 1;
+        long long joint = (jj - 1) / nFingerSteps + 1;
+        double fingerT = kk * fingerStep;
+        Eigen::RowVector3d lerpedJoint =
+            transformedFinger.row(joint - 1) * (1. - fingerT) +
+            transformedFinger.row(joint) * fingerT;
+        data.lerpedJoint = lerpedJoint.transpose();
+        data.dLerpedJoint_dJoint1 = (1. - fingerT) * curTrans.linear();
+        data.dLerpedJoint_dJoint2 = (fingerT)*curTrans.linear();
+        data.eval = EvalAt(lerpedJoint.transpose(),
+                           settings.cost,
+                           mdr,
+                           data.dEval_dLerpedJoint);
+        data.iJoint = joint - 1;
       }
     }
   }
@@ -89,57 +130,95 @@ double ComputeCost(const GripperParams& params,
     Pose t_lerpedKeyframe;
     for (long long j = 1; j <= nTrajectorySteps; j++) {
       double trajectoryT = j * trajectoryStep;
-      for (size_t k = 0; k < kNumDOFs; k++) {
-        t_lerpedKeyframe[k] =
-            params.trajectory[iKf - 1][k] * (1 - trajectoryT) +
-            params.trajectory[iKf][k] * trajectoryT;
-      }
+      t_lerpedKeyframe = params.trajectory[iKf - 1] * (1 - trajectoryT) +
+                         params.trajectory[iKf] * trajectoryT;
       Eigen::Affine3d curTrans =
           robots::Forward(t_lerpedKeyframe) * fingerTransInv;
       for (size_t i = 0; i < nFingers; i++) {
         const Eigen::MatrixXd& finger = params.fingers[i];
         Eigen::MatrixXd transformedFinger =
             (curTrans * finger.transpose().colwise().homogeneous()).transpose();
-        curFinger[i][0] = transformedFinger.row(0).transpose();
-        curEval[i][0] =
-            EvalAt(transformedFinger.row(0).transpose(), settings.cost, mdr);
 #pragma omp parallel for
-        for (long long jj = 1; jj < nEvalsPerFingerPerFrame; jj++) {
+        for (long long jj = 0; jj < nEvalsPerFingerPerFrame; jj++) {
+          _Data& data = curData[i][jj];
           long long kk = (jj - 1) % nFingerSteps + 1;
           long long joint = (jj - 1) / nFingerSteps + 1;
           double fingerT = kk * fingerStep;
-          Eigen::RowVector3d lerpedFinger =
+          Eigen::RowVector3d lerpedJoint =
               transformedFinger.row(joint - 1) * (1. - fingerT) +
               transformedFinger.row(joint) * fingerT;
-          curFinger[i][jj] = lerpedFinger.transpose();
-          curEval[i][jj] = EvalAt(lerpedFinger.transpose(), settings.cost, mdr);
+          data.lerpedJoint = lerpedJoint.transpose();
+          data.dLerpedJoint_dJoint1 = (1. - fingerT) * curTrans.linear();
+          data.dLerpedJoint_dJoint2 = (fingerT)*curTrans.linear();
+          data.eval = EvalAt(lerpedJoint.transpose(),
+                             settings.cost,
+                             mdr,
+                             data.dEval_dLerpedJoint);
+          data.iJoint = joint - 1;
         }
-        double curCost = 0.;
-#pragma omp parallel for reduction(+ : curCost)
-        for (long long jj = 1; jj < nEvalsPerFingerPerFrame; jj++) {
-          /*
-          curCost +=
-              (curEval[i][jj - 1] + curEval[i][jj] + lastEval[i][jj - 1]) *
-              DoubleTriangleArea(curFinger[i][jj - 1],
-                                 curFinger[i][jj],
-                                 lastFinger[i][jj - 1]);
-          curCost +=
-              (lastEval[i][jj] + curEval[i][jj] + lastEval[i][jj - 1]) *
-              DoubleTriangleArea(
-                  lastFinger[i][jj], curFinger[i][jj], lastFinger[i][jj - 1]);
-          */
-          double finger_len = (curFinger[i][jj] - curFinger[i][jj - 1]).norm();
-          curCost += (curEval[i][jj - 1] + 2 * curEval[i][jj] +
-                      2 * lastEval[i][jj - 1] + lastEval[i][jj]) *
-                     finger_len * trajectoryStep;
+
+#pragma omp parallel
+        {
+          double t_curCost = 0.;
+          Eigen::MatrixXd t_dCost_dFinger =
+              Eigen::MatrixXd::Zero(nFingerJoints, 3);
+
+          auto t_ApplyGradient = [&t_curCost, &t_dCost_dFinger](
+                                     const _Data& data, double factor) {
+            t_dCost_dFinger.row(data.iJoint) +=
+                data.dEval_dLerpedJoint * data.dLerpedJoint_dJoint1 * factor;
+            t_dCost_dFinger.row(data.iJoint + 1) +=
+                data.dEval_dLerpedJoint * data.dLerpedJoint_dJoint2 * factor;
+          };
+#pragma omp for
+          for (long long jj = 1; jj < nEvalsPerFingerPerFrame; jj++) {
+            Eigen::RowVector3d dFingerLen_dLerpedJoint1;
+            // dFingerLen_dLerpedJoint2 = -dFingerLen_dLerpedJoint1
+            double finger_len = Norm(curData[i][jj - 1].lerpedJoint,
+                                     curData[i][jj].lerpedJoint,
+                                     dFingerLen_dLerpedJoint1);
+            double totalEval =
+                curData[i][jj - 1].eval + 2 * curData[i][jj].eval +
+                2 * lastData[i][jj - 1].eval + lastData[i][jj].eval;
+            t_curCost += totalEval * finger_len * trajectoryStep;
+
+            // dEval/dFinger * fingerLen * trajectoryStep
+            t_ApplyGradient(curData[i][jj - 1], finger_len * trajectoryStep);
+            t_ApplyGradient(curData[i][jj], 2 * finger_len * trajectoryStep);
+            t_ApplyGradient(lastData[i][jj - 1],
+                            2 * finger_len * trajectoryStep);
+            t_ApplyGradient(lastData[i][jj], finger_len * trajectoryStep);
+
+            // totalEval * dFingerLen/dFinger * trajectoryStep
+            t_dCost_dFinger.row(curData[i][jj - 1].iJoint) +=
+                totalEval * dFingerLen_dLerpedJoint1 *
+                curData[i][jj - 1].dLerpedJoint_dJoint1 * trajectoryStep;
+            t_dCost_dFinger.row(curData[i][jj - 1].iJoint + 1) +=
+                totalEval * dFingerLen_dLerpedJoint1 *
+                curData[i][jj - 1].dLerpedJoint_dJoint2 * trajectoryStep;
+            t_dCost_dFinger.row(curData[i][jj].iJoint) +=
+                totalEval * -dFingerLen_dLerpedJoint1 *
+                curData[i][jj].dLerpedJoint_dJoint1 * trajectoryStep;
+            t_dCost_dFinger.row(curData[i][jj].iJoint + 1) +=
+                totalEval * -dFingerLen_dLerpedJoint1 *
+                curData[i][jj].dLerpedJoint_dJoint2 * trajectoryStep;
+          }
+
+#pragma omp critical
+          {
+            totalCost += t_curCost;
+            dCost_dFinger[i] += t_dCost_dFinger;
+          }
         }
-        totalCost += curCost;
       }
-      std::swap(curEval, lastEval);
-      std::swap(curFinger, lastFinger);
+      std::swap(curData, lastData);
     }
   }
   totalCost /= 6.;
+  for (size_t i = 0; i < nFingers; i++) {
+    dCost_dFinger[i] /= 6.;
+  }
+  out_dCost_dFinger = dCost_dFinger;
   return totalCost;
 }
 
@@ -167,6 +246,7 @@ double MinDistance(const GripperParams& params,
 #pragma omp parallel
   {
     double t_min_dist = 0;
+    Eigen::RowVector3d t_dP_ds;  // unused
 #pragma omp for
     for (long long ii = 0; ii < nFrames; ii++) {
       size_t a = ii / nTrajectorySteps;
@@ -192,9 +272,9 @@ double MinDistance(const GripperParams& params,
           Eigen::RowVector3d lerpedFinger =
               t_finger.row(joint - 1) * (1. - fingerT) +
               t_finger.row(joint) * fingerT;
-          t_min_dist =
-              std::min(t_min_dist,
-                       GetDist(lerpedFinger.transpose(), settings.cost, mdr));
+          t_min_dist = std::min(
+              t_min_dist,
+              GetDist(lerpedFinger.transpose(), settings.cost, mdr, t_dP_ds));
         }
       }
     }

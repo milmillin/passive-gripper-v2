@@ -23,7 +23,8 @@ class PassiveGripper : public psg::core::serialization::Serializable {
     kContactPoints,
     kFingers,
     kTrajectory,
-    kTopoOptSettings
+    kTopoOptSettings,
+    kCost
   };
   typedef std::function<void(InvalidatedReason)> InvalidatedDelegate;
 
@@ -96,6 +97,8 @@ class PassiveGripper : public psg::core::serialization::Serializable {
   double min_dist_;
   bool intersecting_;
 
+  std::vector<Eigen::MatrixXd> dCost_dFinger_;
+
   // state dependency
   bool mesh_changed_ = false;
   bool contact_settings_changed_ = false;
@@ -148,6 +151,7 @@ class PassiveGripper : public psg::core::serialization::Serializable {
   DECLARE_GETTER(GetMinWrench, min_wrench_)
   DECLARE_GETTER(GetPartialMinWrench, partial_min_wrench_)
   DECLARE_GETTER(GetCost, cost_)
+  DECLARE_GETTER(GetGradient, dCost_dFinger_)
   DECLARE_GETTER(GetMinDist, min_dist_)
   DECLARE_GETTER(GetIntersecting, intersecting_)
   DECLARE_GETTER(GetParams, params_)

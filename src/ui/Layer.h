@@ -17,6 +17,7 @@ enum class Layer : int {
   kGripper,
   kInitFingers,
   kInitTrajectory,
+  kGradient,
   kMax
 };
 

@@ -185,6 +185,9 @@ void ViewModel::OnPsgInvalidated(PassiveGripper::InvalidatedReason reason) {
       is_neg_valid_ = false;
       InvokeLayerInvalidated(Layer::kNegVol);
       break;
+    case PassiveGripper::InvalidatedReason::kCost:
+      InvokeLayerInvalidated(Layer::kGradient);
+      break;
   }
 }
 
@@ -216,6 +219,7 @@ void ViewModel::PoseChanged() {
   InvokeLayerInvalidated(Layer::kGripperBound);
   InvokeLayerInvalidated(Layer::kNegVol);
   InvokeLayerInvalidated(Layer::kGripper);
+  InvokeLayerInvalidated(Layer::kGradient);
 }
 
 }  // namespace ui

@@ -814,6 +814,9 @@ void MainUI::OnLayerInvalidated(Layer layer) {
     case Layer::kGripper:
       OnGripperInvalidated();
       break;
+    case Layer::kGradient:
+      OnGradientInvalidated();
+      break;
   }
 }
 
@@ -1145,9 +1148,12 @@ void MainUI::OnSweptSurfaceInvalidated() {
       }
     }
   }
+  Eigen::RowVector3d dEval_dp;  // unused
   for (size_t i = 0; i < nEvals; i++) {
-    Cost(i) = EvalAt(
-        P.row(i).transpose(), vm_.PSG().GetSettings().cost, vm_.PSG().GetMDR());
+    Cost(i) = EvalAt(P.row(i).transpose(),
+                     vm_.PSG().GetSettings().cost,
+                     vm_.PSG().GetMDR(),
+                     dEval_dp);
   }
   layer.set_mesh(P, PF);
   layer.set_data(Cost);
@@ -1188,6 +1194,51 @@ void MainUI::OnGripperInvalidated() {
                      .transpose(),
                  vm_.GetGripperF());
   layer.set_colors(colors::kBrown);
+}
+
+void MainUI::OnGradientInvalidated() {
+  auto& layer = GetLayer(Layer::kGradient);
+  layer.clear();
+
+  const auto& ddFinger = vm_.PSG().GetGradient();
+  const auto& fingers = vm_.PSG().GetFingers();
+  const auto& finger_settings = vm_.PSG().GetFingerSettings();
+  const Pose& current_pose = vm_.GetCurrentPose();
+  Eigen::Affine3d finger_trans_inv = vm_.PSG().GetFingerTransInv();
+
+  size_t nFingers = fingers.size();
+  Eigen::MatrixXd V(nFingers * finger_settings.n_finger_joints * 2, 3);
+  Eigen::MatrixXi E(nFingers * finger_settings.n_finger_joints, 2);
+
+  Eigen::Affine3d curTrans = robots::Forward(current_pose) * finger_trans_inv;
+
+  for (size_t i = 0; i < nFingers; i++) {
+    V.block(i * finger_settings.n_finger_joints * 2,
+            0,
+            finger_settings.n_finger_joints,
+            3)
+        .transpose() =
+        curTrans * fingers[i].transpose().colwise().homogeneous();
+    V.block(i * finger_settings.n_finger_joints * 2 +
+                finger_settings.n_finger_joints,
+            0,
+            finger_settings.n_finger_joints,
+            3) = V.block(i * finger_settings.n_finger_joints * 2,
+                         0,
+                         finger_settings.n_finger_joints,
+                         3) +
+                 ddFinger[i] * 1000;
+    for (size_t j = 0; j < finger_settings.n_finger_joints; j++) {
+      E(i * finger_settings.n_finger_joints + j, 0) =
+          i * finger_settings.n_finger_joints * 2 + j;
+      E(i * finger_settings.n_finger_joints + j, 1) =
+          i * finger_settings.n_finger_joints * 2 +
+          finger_settings.n_finger_joints + j;
+    }
+  }
+
+  layer.set_edges(V, E, Eigen::RowVector3d(0.8, 0.4, 0));
+  layer.line_width = 2;
 }
 
 inline bool MainUI::IsGuizmoVisible() {
