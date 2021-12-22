@@ -131,7 +131,7 @@ double ComputeCost(const GripperParams& params,
         data.lerpedJoint = lerpedJoint;
         data.dLerpedJoint_dJoint1 =
             (1. - fingerT) * Eigen::Matrix3d::Identity();
-        data.dLerpedJoint_dJoint2 = (fingerT)*Eigen::Matrix3d::Identity();
+        data.dLerpedJoint_dJoint2 = fingerT * Eigen::Matrix3d::Identity();
         data.eval =
             EvalAt(lerpedJoint, settings.cost, mdr, data.dEval_dLerpedJoint);
         data.iJoint = joint - 1;
@@ -203,8 +203,8 @@ double ComputeCost(const GripperParams& params,
 
                 // dEval/dTheta * factor
                 double t = last ? lastTrajectoryT : trajectoryT;
-                t_dCost_dTheta_0 = dEval_dTheta * (1. - t) * factor;
-                t_dCost_dTheta_1 = dEval_dTheta * t * factor;
+                t_dCost_dTheta_0 += dEval_dTheta.array() * ((1. - t) * factor);
+                t_dCost_dTheta_1 += dEval_dTheta.array() * (t * factor);
               };
 #pragma omp for
           for (long long jj = 1; jj < nEvalsPerFingerPerFrame; jj++) {
@@ -260,7 +260,7 @@ double ComputeCost(const GripperParams& params,
     dCost_dFinger[i] /= 6.;
   }
   for (size_t i = 0; i < nKeyframes; i++) {
-    dCost_dTheta[i] /= 6;  
+    dCost_dTheta[i] /= 6;
   }
   out_dCost_dParam.fingers = dCost_dFinger;
   out_dCost_dParam.trajectory = dCost_dTheta;
