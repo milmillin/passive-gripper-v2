@@ -167,14 +167,11 @@ double ComputeCost(const GripperParams& params,
   for (size_t iKf = 1; iKf < nKeyframes; iKf++) {
     size_t duration_idx;
     bool duration_flip;
-    /*
     double duration = ComputeDuration(params.trajectory[iKf - 1],
                                       params.trajectory[iKf],
                                       angVelocity,
                                       duration_idx,
                                       duration_flip);
-    */ 
-    double duration = 1;
     //std::cout << std::setprecision(12) << duration << " " << duration_idx << " "
               //<< duration_flip << std::endl;
     Pose t_lerpedKeyframe;
@@ -278,11 +275,11 @@ double ComputeCost(const GripperParams& params,
                 curData[i][jj].dLerpedJoint_dJoint2 * non_finger_len_factor;
 
             // total_eval * finger_len * trajectoryStep * dDuration/dTheta
-            // double ddTheta =
-                // total_eval * finger_len * trajectoryStep / angVelocity;
-            // if (duration_flip) ddTheta = -ddTheta;
-            // t_dCost_dTheta_0(duration_idx) -= ddTheta;
-            // t_dCost_dTheta_1(duration_idx) += ddTheta;
+            double ddTheta =
+                total_eval * finger_len * trajectoryStep / angVelocity;
+            if (duration_flip) ddTheta = -ddTheta;
+            t_dCost_dTheta_0(duration_idx) -= ddTheta;
+            t_dCost_dTheta_1(duration_idx) += ddTheta;
           }
 
 #pragma omp critical
