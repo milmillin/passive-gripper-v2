@@ -358,7 +358,7 @@ void PassiveGripper::InvalidateQuality() {
 
 void PassiveGripper::InvalidateCost() {
   cost_changed_ = false;
-  cost_ = ComputeCost(params_, settings_, mdr_, dCost_dFinger_);
+  cost_ = ComputeCost(params_, settings_, mdr_, dCost_dParam_);
   min_dist_ = MinDistance(params_, settings_, mdr_);
   intersecting_ = Intersects(params_, settings_, mdr_);
   InvokeInvalidated(InvalidatedReason::kCost);

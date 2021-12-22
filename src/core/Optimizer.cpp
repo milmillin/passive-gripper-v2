@@ -161,8 +161,8 @@ const GripperParams& Optimizer::GetCurrentParams() {
 }
 double Optimizer::ComputeCostInternal(unsigned n, const double* x) {
   MyUnflatten(params_, x);
-  std::vector<Eigen::MatrixXd> dCost_dFinger; // unused
-  double cost = ComputeCost(params_, settings_, mdr_, dCost_dFinger);
+  GripperParams dCost_dParam; // unused
+  double cost = ComputeCost(params_, settings_, mdr_, dCost_dParam);
   n_iters_++;
   if (cost < t_min_cost_) {
     is_result_available_ = true;

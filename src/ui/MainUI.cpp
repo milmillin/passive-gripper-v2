@@ -1227,7 +1227,7 @@ void MainUI::OnGradientInvalidated() {
                          0,
                          finger_settings.n_finger_joints,
                          3) +
-                 ddFinger[i] * 1000;
+                 ddFinger.fingers[i] * 1000;
     for (size_t j = 0; j < finger_settings.n_finger_joints; j++) {
       E(i * finger_settings.n_finger_joints + j, 0) =
           i * finger_settings.n_finger_joints * 2 + j;

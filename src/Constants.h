@@ -64,6 +64,12 @@ const Eigen::Vector3d kUrdfAxis[6] = {
 typedef Eigen::Array<double, kNumDOFs, 1> Pose;
 typedef std::vector<Pose> Trajectory;
 
+// Jacobian 3x6 matrix [dpos/dtheta_0 | ... | dpos/dtheta_5]
+typedef Eigen::Matrix<double, 3, kNumDOFs> Jacobian;
+
+// Returns Jacobian (3x6 matrix) given pos in effector space
+typedef std::function<Jacobian(const Eigen::Vector3d&)> JacobianFunc;
+
 const Pose kInitPose =
     (Pose() << -kHalfPi, -2., -2., 4., -kHalfPi, 0.).finished();
 

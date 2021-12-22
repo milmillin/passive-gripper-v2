@@ -97,7 +97,7 @@ class PassiveGripper : public psg::core::serialization::Serializable {
   double min_dist_;
   bool intersecting_;
 
-  std::vector<Eigen::MatrixXd> dCost_dFinger_;
+  GripperParams dCost_dParam_;
 
   // state dependency
   bool mesh_changed_ = false;
@@ -151,7 +151,7 @@ class PassiveGripper : public psg::core::serialization::Serializable {
   DECLARE_GETTER(GetMinWrench, min_wrench_)
   DECLARE_GETTER(GetPartialMinWrench, partial_min_wrench_)
   DECLARE_GETTER(GetCost, cost_)
-  DECLARE_GETTER(GetGradient, dCost_dFinger_)
+  DECLARE_GETTER(GetGradient, dCost_dParam_)
   DECLARE_GETTER(GetMinDist, min_dist_)
   DECLARE_GETTER(GetIntersecting, intersecting_)
   DECLARE_GETTER(GetParams, params_)

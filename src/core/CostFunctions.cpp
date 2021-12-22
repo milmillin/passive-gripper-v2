@@ -66,7 +66,7 @@ double EvalAt(const Eigen::Vector3d& p,
 double ComputeCost(const GripperParams& params,
                    const GripperSettings& settings,
                    const MeshDependentResource& mdr,
-                   std::vector<Eigen::MatrixXd>& out_dCost_dFinger) {
+                   GripperParams& out_dCost_dParam) {
   const size_t nTrajectorySteps = settings.cost.n_trajectory_steps;
   const long long nFingerSteps = settings.cost.n_finger_steps;
   const double trajectoryStep = 1. / nTrajectorySteps;
@@ -84,6 +84,7 @@ double ComputeCost(const GripperParams& params,
     Eigen::Matrix3d dLerpedJoint_dJoint1;
     Eigen::Matrix3d dLerpedJoint_dJoint2;
     size_t iJoint;  // iJoint -- (iJoint + 1)
+    Jacobian dpos_dtheta;
   };
 
   std::vector<std::vector<_Data>> lastData(
@@ -101,13 +102,14 @@ double ComputeCost(const GripperParams& params,
   std::vector<Eigen::MatrixXd> dCost_dFinger(
       nFingers, Eigen::MatrixXd::Zero(nFingerJoints, 3));
 
-  // std::vector<Pose> dCost_dTheta(nKeyframes, Pose::Zero());
+  std::vector<Pose> dCost_dTheta(nKeyframes, Pose::Zero());
 
-  Eigen::Affine3d fingerTransInv =
-      robots::Forward(params.trajectory.front()).inverse();
+  Eigen::Affine3d fingerTrans = robots::Forward(params.trajectory.front());
+  Eigen::Affine3d fingerTransInv = fingerTrans.inverse();
 
   {
     curH = robots::Forward(params.trajectory.front());
+    JacobianFunc J = robots::ComputeJacobian(params.trajectory.front());
     for (size_t i = 0; i < nFingers; i++) {
       const Eigen::MatrixXd& finger = params.fingers[i];
       Eigen::MatrixXd effFinger =
@@ -130,11 +132,10 @@ double ComputeCost(const GripperParams& params,
         data.dLerpedJoint_dJoint1 =
             (1. - fingerT) * Eigen::Matrix3d::Identity();
         data.dLerpedJoint_dJoint2 = (fingerT)*Eigen::Matrix3d::Identity();
-        data.eval = EvalAt(lerpedJoint,
-                           settings.cost,
-                           mdr,
-                           data.dEval_dLerpedJoint);
+        data.eval =
+            EvalAt(lerpedJoint, settings.cost, mdr, data.dEval_dLerpedJoint);
         data.iJoint = joint - 1;
+        data.dpos_dtheta = J(effFingers[i][jj]);
       }
     }
     lastH = curH;
@@ -145,14 +146,13 @@ double ComputeCost(const GripperParams& params,
     Pose t_lerpedKeyframe;
     for (long long j = 1; j <= nTrajectorySteps; j++) {
       double trajectoryT = j * trajectoryStep;
+      double lastTrajectoryT = (j - 1) * trajectoryStep;
       t_lerpedKeyframe = params.trajectory[iKf - 1] * (1 - trajectoryT) +
                          params.trajectory[iKf] * trajectoryT;
       curH = robots::Forward(t_lerpedKeyframe);
+      JacobianFunc J = robots::ComputeJacobian(t_lerpedKeyframe);
       Eigen::Affine3d curTrans = curH * fingerTransInv;
       for (size_t i = 0; i < nFingers; i++) {
-        const Eigen::MatrixXd& finger = params.fingers[i];
-        Eigen::MatrixXd transformedFinger =
-            (curTrans * finger.transpose().colwise().homogeneous()).transpose();
 #pragma omp parallel for
         for (long long jj = 0; jj < nEvalsPerFingerPerFrame; jj++) {
           _Data& data = curData[i][jj];
@@ -164,12 +164,11 @@ double ComputeCost(const GripperParams& params,
 
           data.lerpedJoint = lerpedJoint;
           data.dLerpedJoint_dJoint1 = (1. - fingerT) * curTrans.linear();
-          data.dLerpedJoint_dJoint2 = (fingerT)*curTrans.linear();
-          data.eval = EvalAt(lerpedJoint,
-                             settings.cost,
-                             mdr,
-                             data.dEval_dLerpedJoint);
+          data.dLerpedJoint_dJoint2 = fingerT * curTrans.linear();
+          data.eval =
+              EvalAt(lerpedJoint, settings.cost, mdr, data.dEval_dLerpedJoint);
           data.iJoint = joint - 1;
+          data.dpos_dtheta = J(effFingers[i][jj]);
         }
 
 #pragma omp parallel
@@ -177,14 +176,36 @@ double ComputeCost(const GripperParams& params,
           double t_curCost = 0.;
           Eigen::MatrixXd t_dCost_dFinger =
               Eigen::MatrixXd::Zero(nFingerJoints, 3);
+          Pose t_dCost_dTheta_0 = Pose::Zero();
+          Pose t_dCost_dTheta_1 = Pose::Zero();
 
-          auto t_ApplyGradient = [&t_curCost, &t_dCost_dFinger](
-                                     const _Data& data, double factor) {
-            t_dCost_dFinger.row(data.iJoint) +=
-                data.dEval_dLerpedJoint * data.dLerpedJoint_dJoint1 * factor;
-            t_dCost_dFinger.row(data.iJoint + 1) +=
-                data.dEval_dLerpedJoint * data.dLerpedJoint_dJoint2 * factor;
-          };
+          auto t_ApplyGradient =
+              [&t_dCost_dTheta_0,
+               &t_dCost_dTheta_1,
+               &t_dCost_dFinger,
+               &curH,
+               &lastH,
+               iKf,
+               lastTrajectoryT,
+               trajectoryT](const _Data& data, double factor, bool last) {
+                Eigen::RowVector3d dEval_dJoint1 =
+                    data.dEval_dLerpedJoint * data.dLerpedJoint_dJoint1;
+                Eigen::RowVector3d dEval_dJoint2 =
+                    data.dEval_dLerpedJoint * data.dLerpedJoint_dJoint2;
+
+                Eigen::Matrix<double, 1, 6> dEval_dTheta =
+                    data.dEval_dLerpedJoint * (last ? lastH : curH).linear() *
+                    data.dpos_dtheta;
+
+                // dEval/dFinger * factor
+                t_dCost_dFinger.row(data.iJoint) += dEval_dJoint1 * factor;
+                t_dCost_dFinger.row(data.iJoint + 1) += dEval_dJoint2 * factor;
+
+                // dEval/dTheta * factor
+                double t = last ? lastTrajectoryT : trajectoryT;
+                t_dCost_dTheta_0 = dEval_dTheta * (1. - t);
+                t_dCost_dTheta_1 = dEval_dTheta * t;
+              };
 #pragma omp for
           for (long long jj = 1; jj < nEvalsPerFingerPerFrame; jj++) {
             Eigen::RowVector3d dFingerLen_dLerpedJoint1;
@@ -197,12 +218,14 @@ double ComputeCost(const GripperParams& params,
                 2 * lastData[i][jj - 1].eval + lastData[i][jj].eval;
             t_curCost += totalEval * finger_len * trajectoryStep;
 
-            // dEval/dFinger * fingerLen * trajectoryStep
-            t_ApplyGradient(curData[i][jj - 1], finger_len * trajectoryStep);
-            t_ApplyGradient(curData[i][jj], 2 * finger_len * trajectoryStep);
-            t_ApplyGradient(lastData[i][jj - 1],
-                            2 * finger_len * trajectoryStep);
-            t_ApplyGradient(lastData[i][jj], finger_len * trajectoryStep);
+            // Apply part of gradient
+            t_ApplyGradient(
+                curData[i][jj - 1], finger_len * trajectoryStep, false);
+            t_ApplyGradient(
+                curData[i][jj], 2 * finger_len * trajectoryStep, false);
+            t_ApplyGradient(
+                lastData[i][jj - 1], 2 * finger_len * trajectoryStep, true);
+            t_ApplyGradient(lastData[i][jj], finger_len * trajectoryStep, true);
 
             // totalEval * dFingerLen/dFinger * trajectoryStep
             t_dCost_dFinger.row(curData[i][jj - 1].iJoint) +=
@@ -223,6 +246,8 @@ double ComputeCost(const GripperParams& params,
           {
             totalCost += t_curCost;
             dCost_dFinger[i] += t_dCost_dFinger;
+            dCost_dTheta[iKf - 1] += t_dCost_dTheta_0;
+            dCost_dTheta[iKf] += t_dCost_dTheta_1;
           }
         }
       }
@@ -234,7 +259,11 @@ double ComputeCost(const GripperParams& params,
   for (size_t i = 0; i < nFingers; i++) {
     dCost_dFinger[i] /= 6.;
   }
-  out_dCost_dFinger = dCost_dFinger;
+  for (size_t i = 0; i < nKeyframes; i++) {
+    dCost_dTheta[i] /= 6;  
+  }
+  out_dCost_dParam.fingers = dCost_dFinger;
+  out_dCost_dParam.trajectory = dCost_dTheta;
   return totalCost;
 }
 

@@ -81,8 +81,7 @@ static bool InverseImpl(const Eigen::Matrix3d& rot,
   return true;
 }
 
-bool Inverse(Eigen::Affine3d trans,
-                     std::vector<Pose>& out_jointConfigs) {
+bool Inverse(Eigen::Affine3d trans, std::vector<Pose>& out_jointConfigs) {
   trans = globalTransInv * trans;
   return InverseImpl(trans.linear(), trans.translation(), out_jointConfigs);
 }
@@ -99,7 +98,7 @@ static Eigen::Affine3d JointTransform(double theta,
 }
 
 void ForwardIntermediate(const Pose& jointConfig,
-                                 std::vector<Eigen::Affine3d>& out_trans) {
+                         std::vector<Eigen::Affine3d>& out_trans) {
   out_trans.resize(kNumDOFs);
   out_trans[0] =
       JointTransform(jointConfig[0], kRobotA[0], kRobotD[0], kRobotAlpha[0]);
@@ -111,6 +110,32 @@ void ForwardIntermediate(const Pose& jointConfig,
   for (size_t i = 0; i < kNumDOFs; i++) {
     out_trans[i] = globalTrans * out_trans[i];
   }
+}
+
+JacobianFunc ComputeJacobian(const Pose& jointConfig) {
+  std::vector<Eigen::Affine3d> H(kNumDOFs + 1);
+  std::vector<Eigen::Vector3d> Z(kNumDOFs);
+  std::vector<Eigen::Vector3d> d(kNumDOFs);
+
+  H[0].setIdentity();
+  for (size_t i = 0; i < kNumDOFs; i++) {
+    Z[i] = H[i].matrix().block<3, 1>(0, 2).transpose();
+    d[i] = H[i].translation();
+    H[i + 1] =
+        H[i] *
+        JointTransform(jointConfig(i), kRobotA[i], kRobotD[i], kRobotAlpha[i]);
+  }
+
+  Eigen::Affine3d Hlast = H.back();
+
+  return [Z, d, Hlast](const Eigen::Vector3d& pos) {
+    Jacobian J;
+    Eigen::Vector3d pos_glob = Hlast * pos;
+    for (size_t i = 0; i < kNumDOFs; i++) {
+      J.block<3, 1>(0, i) = globalTrans * Z[i].cross(pos_glob - d[i]);
+    }
+    return J;
+  };
 }
 
 }  // namespace robots
