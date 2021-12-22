@@ -593,6 +593,9 @@ void MainUI::DrawDebugPanel() {
     if (ImGui::Button("Subdivision Check", ImVec2(w, 0))) {
       DebugSubdivision(vm_.PSG());
     }
+    if (ImGui::Button("Debug Gradient", ImVec2(w, 0))) {
+      DebugGradient(vm_.PSG());
+    }
     if (ImGui::Button("Compute Init Params", ImVec2(w, 0))) {
       vm_.ComputeInitParams();
     }

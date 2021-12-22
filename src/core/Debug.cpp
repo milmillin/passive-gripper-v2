@@ -4,6 +4,7 @@
 #include <iostream>
 
 #include "CostFunctions.h"
+#include "Optimizer.h"
 
 namespace psg {
 namespace core {
@@ -20,6 +21,37 @@ void DebugSubdivision(const PassiveGripper& psg) {
     std::cout << std::setprecision(5) << std::scientific << step << " , " << cost
               << std::endl;
   }
+}
+
+void DebugGradient(const PassiveGripper& psg) {
+  size_t n = MyFlattenSize(psg.GetParams());
+
+  Eigen::MatrixXd org(n, 1);
+  Eigen::MatrixXd grad(n, 1);
+  MyFlattenGrad(psg.GetParams(), org.data());
+
+  GripperParams grad_;
+  double org_cost =
+      ComputeCost(psg.GetParams(), psg.GetSettings(), psg.GetMDR(), grad_);
+  MyFlattenGrad(grad_, grad.data());
+
+  double eps = 1e-9;
+  GripperParams unused_grad_;
+
+  Eigen::MatrixXd correct_grad(n, 1);
+  for (int i = 0; i < n; i++) {
+    Eigen::MatrixXd cur = org;
+    cur(i) += eps;
+    GripperParams cur_ = psg.GetParams();
+    MyUnflatten(cur_, cur.data());
+    double cur_cost =
+        ComputeCost(cur_, psg.GetSettings(), psg.GetMDR(), unused_grad_);
+    correct_grad(i) = (cur_cost - org_cost) / eps;
+  }
+
+  std::cout << "Computed Grad:\n" << grad.transpose() << std::endl;
+  std::cout << "Correct Grad:\n" << correct_grad.transpose() << std::endl;
+  std::cout << "Error:\n" << (grad - correct_grad).transpose() << std::endl;
 }
 
 }  // namespace core

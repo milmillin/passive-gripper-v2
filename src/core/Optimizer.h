@@ -13,6 +13,10 @@
 namespace psg {
 namespace core {
 
+size_t MyFlattenSize(const GripperParams& meta);
+void MyUnflatten(GripperParams& meta, const double* x);
+void MyFlattenGrad(const GripperParams& meta, double* x);
+
 class Optimizer {
  public:
   ~Optimizer();
