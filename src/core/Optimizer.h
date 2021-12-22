@@ -35,7 +35,7 @@ class Optimizer {
 
 
   // Internal use
-  double ComputeCostInternal(unsigned n, const double* x);
+  double ComputeCostInternal(unsigned n, const double* x, double* grad);
 
  private:
   nlopt_opt opt_ = nullptr;

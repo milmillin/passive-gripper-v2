@@ -40,6 +40,24 @@ void MyFlatten(const GripperParams& meta,
   }
 }
 
+void MyFlattenGrad(const GripperParams& meta, double* x) {
+  for (size_t i = 0; i < meta.fingers.size(); i++) {
+    const auto& finger = meta.fingers[i];
+    for (size_t r = 1; r < finger.rows() - 1; r++) {
+      for (size_t c = 0; c < 3; c++) {
+        *(x++) = finger(r, c);
+      }
+    }
+  }
+  for (size_t i = 1; i < meta.trajectory.size() - 1; i++) {
+    const auto& keyframe = meta.trajectory[i];
+    for (size_t j = 0; j < keyframe.size(); j++) {
+      *(x++) = keyframe[j];
+    }
+  }
+
+}
+
 // x -> meta
 void MyUnflatten(GripperParams& meta, const double* x) {
   for (size_t i = 0; i < meta.fingers.size(); i++) {
@@ -63,7 +81,7 @@ static double ComputeCostWrapper(unsigned n,
                                  double* grad,
                                  void* data) {
   // ignore grad
-  return reinterpret_cast<Optimizer*>(data)->ComputeCostInternal(n, x);
+  return reinterpret_cast<Optimizer*>(data)->ComputeCostInternal(n, x, grad);
 }
 
 Optimizer::~Optimizer() {
@@ -159,10 +177,17 @@ const GripperParams& Optimizer::GetCurrentParams() {
   MyUnflatten(params_proto_, g_min_x_.get());
   return params_proto_;
 }
-double Optimizer::ComputeCostInternal(unsigned n, const double* x) {
+double Optimizer::ComputeCostInternal(unsigned n, const double* x, double* grad) {
   MyUnflatten(params_, x);
-  GripperParams dCost_dParam; // unused
+  GripperParams dCost_dParam;
   double cost = ComputeCost(params_, settings_, mdr_, dCost_dParam);
+  if (grad != nullptr) {
+    MyFlattenGrad(dCost_dParam, grad);
+    // for (unsigned i = 0; i < n; i++) {
+      // std::cout << grad[i] << "\n";    
+    // }
+    // std::cout << "-----" << std::endl;
+  }
   n_iters_++;
   if (cost < t_min_cost_) {
     is_result_available_ = true;
