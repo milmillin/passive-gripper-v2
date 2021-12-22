@@ -91,38 +91,53 @@ double ComputeCost(const GripperParams& params,
   std::vector<std::vector<_Data>> curData(
       nFingers, std::vector<_Data>(nEvalsPerFingerPerFrame));
 
+  // Finger in effector space
+  std::vector<std::vector<Eigen::Vector3d>> effFingers(
+      nFingers, std::vector<Eigen::Vector3d>(nEvalsPerFingerPerFrame));
+
+  Eigen::Affine3d lastH;
+  Eigen::Affine3d curH;
+
   std::vector<Eigen::MatrixXd> dCost_dFinger(
       nFingers, Eigen::MatrixXd::Zero(nFingerJoints, 3));
+
+  // std::vector<Pose> dCost_dTheta(nKeyframes, Pose::Zero());
 
   Eigen::Affine3d fingerTransInv =
       robots::Forward(params.trajectory.front()).inverse();
 
   {
-    Eigen::Affine3d curTrans =
-        robots::Forward(params.trajectory.front()) * fingerTransInv;
+    curH = robots::Forward(params.trajectory.front());
     for (size_t i = 0; i < nFingers; i++) {
       const Eigen::MatrixXd& finger = params.fingers[i];
-      Eigen::MatrixXd transformedFinger =
-          (curTrans * finger.transpose().colwise().homogeneous()).transpose();
+      Eigen::MatrixXd effFinger =
+          (fingerTransInv * finger.transpose().colwise().homogeneous())
+              .transpose();
 #pragma omp parallel for
       for (long long jj = 0; jj < nEvalsPerFingerPerFrame; jj++) {
         _Data& data = lastData[i][jj];
         long long kk = (jj - 1) % nFingerSteps + 1;
         long long joint = (jj - 1) / nFingerSteps + 1;
         double fingerT = kk * fingerStep;
-        Eigen::RowVector3d lerpedJoint =
-            transformedFinger.row(joint - 1) * (1. - fingerT) +
-            transformedFinger.row(joint) * fingerT;
-        data.lerpedJoint = lerpedJoint.transpose();
-        data.dLerpedJoint_dJoint1 = (1. - fingerT) * curTrans.linear();
-        data.dLerpedJoint_dJoint2 = (fingerT)*curTrans.linear();
-        data.eval = EvalAt(lerpedJoint.transpose(),
+
+        // precompute finger
+        Eigen::Vector3d lerpedJoint =
+            curH *
+            (effFingers[i][jj] = effFinger.row(joint - 1) * (1. - fingerT) +
+                                 effFinger.row(joint) * fingerT);
+
+        data.lerpedJoint = lerpedJoint;
+        data.dLerpedJoint_dJoint1 =
+            (1. - fingerT) * Eigen::Matrix3d::Identity();
+        data.dLerpedJoint_dJoint2 = (fingerT)*Eigen::Matrix3d::Identity();
+        data.eval = EvalAt(lerpedJoint,
                            settings.cost,
                            mdr,
                            data.dEval_dLerpedJoint);
         data.iJoint = joint - 1;
       }
     }
+    lastH = curH;
   }
 
   double totalCost = 0.;
@@ -132,8 +147,8 @@ double ComputeCost(const GripperParams& params,
       double trajectoryT = j * trajectoryStep;
       t_lerpedKeyframe = params.trajectory[iKf - 1] * (1 - trajectoryT) +
                          params.trajectory[iKf] * trajectoryT;
-      Eigen::Affine3d curTrans =
-          robots::Forward(t_lerpedKeyframe) * fingerTransInv;
+      curH = robots::Forward(t_lerpedKeyframe);
+      Eigen::Affine3d curTrans = curH * fingerTransInv;
       for (size_t i = 0; i < nFingers; i++) {
         const Eigen::MatrixXd& finger = params.fingers[i];
         Eigen::MatrixXd transformedFinger =
@@ -144,13 +159,13 @@ double ComputeCost(const GripperParams& params,
           long long kk = (jj - 1) % nFingerSteps + 1;
           long long joint = (jj - 1) / nFingerSteps + 1;
           double fingerT = kk * fingerStep;
-          Eigen::RowVector3d lerpedJoint =
-              transformedFinger.row(joint - 1) * (1. - fingerT) +
-              transformedFinger.row(joint) * fingerT;
-          data.lerpedJoint = lerpedJoint.transpose();
+
+          Eigen::Vector3d lerpedJoint = curH * effFingers[i][jj];
+
+          data.lerpedJoint = lerpedJoint;
           data.dLerpedJoint_dJoint1 = (1. - fingerT) * curTrans.linear();
           data.dLerpedJoint_dJoint2 = (fingerT)*curTrans.linear();
-          data.eval = EvalAt(lerpedJoint.transpose(),
+          data.eval = EvalAt(lerpedJoint,
                              settings.cost,
                              mdr,
                              data.dEval_dLerpedJoint);
@@ -211,6 +226,7 @@ double ComputeCost(const GripperParams& params,
           }
         }
       }
+      lastH = curH;
       std::swap(curData, lastData);
     }
   }
