@@ -195,10 +195,16 @@ Trajectory InitializeTrajectory(const std::vector<Eigen::MatrixXd>& fingers,
   const size_t nSize = (n_keyframes - 1) * subdivide;
   Eigen::MatrixXd avgNorms(nSize, 3);
   avgNorms.setZero();
+  Eigen::Affine3d fingerTransInv = robots::Forward(initPose).inverse();
+  double minY = -0.05;
   for (size_t i = 0; i < fingers.size(); i++) {
     Eigen::MatrixXd finger;
     LengthParameterize(fingers[i], nSize, finger);
     avgNorms += (finger.block(1, 0, nSize, 3) - finger.block(0, 0, nSize, 3));
+    Eigen::MatrixXd transformedFinger =
+        (fingerTransInv * fingers[i].transpose().colwise().homogeneous())
+            .transpose();
+    minY = std::min(minY, transformedFinger.colwise().minCoeff()(1));
   }
   avgNorms /= fingers.size();
   Eigen::MatrixXd trans(n_keyframes, 3);
@@ -209,13 +215,15 @@ Trajectory InitializeTrajectory(const std::vector<Eigen::MatrixXd>& fingers,
         avgNorms.block(i * subdivide, 0, subdivide, 3).colwise().sum();
   }
 
+
   Trajectory result;
   result.reserve(n_keyframes);
   result.push_back(initPose);
-  Eigen::Affine3d curTrans = robots::Forward(initPose);
+  Eigen::Affine3d cumTrans = robots::Forward(initPose);
   for (size_t i = 1; i < n_keyframes; i++) {
-    curTrans = Eigen::Translation3d(trans.row(i)) * curTrans;
-    curTrans.translation().y() = std::max(curTrans.translation().y(), 0.05);
+    cumTrans = Eigen::Translation3d(trans.row(i)) * cumTrans;
+    Eigen::Affine3d curTrans = cumTrans;
+    curTrans.translation().y() = std::max(curTrans.translation().y(), -minY + 0.003);
     std::vector<Pose> candidates;
     if (robots::Inverse(curTrans, candidates)) {
       double best = std::numeric_limits<double>::max();
