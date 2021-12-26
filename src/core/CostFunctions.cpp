@@ -99,7 +99,7 @@ double ComputeCost(const GripperParams& params,
   const size_t nFingerJoints = settings.finger.n_finger_joints;
   const size_t nEvalsPerFingerPerFrame = (nFingerJoints - 1) * nFingerSteps + 1;
 
-  static struct _Data {
+  struct _Data {
     double eval;
     Eigen::Vector3d lerpedJoint;
     Eigen::RowVector3d dEval_dLerpedJoint;
