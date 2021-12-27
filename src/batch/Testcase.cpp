@@ -39,7 +39,7 @@ void ProcessFrom(std::string raw_fn,
     throw std::invalid_argument("> Cannot open psg file " + psg_fn);
   }
 
-  std::string cp_fn = raw_fn + ".cp";
+  std::string cp_fn = raw_fn + ".cpx";
   std::ifstream cp_file(cp_fn, std::ios::in | std::ios::binary);
   if (!cp_file.is_open()) {
     throw std::invalid_argument("> Cannot open cp file " + cp_fn);
@@ -55,7 +55,7 @@ void ProcessFrom(std::string raw_fn,
   Log() << psg.GetOptSettings() << std::endl;
   Log() << psg.GetTopoOptSettings() << std::endl;
 
-  std::vector<std::vector<ContactPoint>> cps;
+  std::vector<ContactPointMetric> cps;
   psg::core::serialization::Deserialize(cps, cp_file);
   Log() << "> Loaded " << cp_fn << std::endl;
 
@@ -64,8 +64,9 @@ void ProcessFrom(std::string raw_fn,
 
   size_t n_cps = std::min(cps.size(), maxiters);
   for (size_t i = i_cp; i < n_cps && need > 0; i++) {
+    Log() << "> Optimizating for " << i << "-th candidate" << std::endl;
     psg.reinit_trajectory = true;
-    psg.SetContactPoints(cps[i]);
+    psg.SetContactPoints(cps[i].contact_points);
     auto start_time = std::chrono::high_resolution_clock::now();
     optimizer.Optimize(psg);
     optimizer.Wait();

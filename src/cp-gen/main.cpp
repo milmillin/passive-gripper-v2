@@ -13,7 +13,7 @@
 int main(int argc, char** argv) {
   Log() << "Num threads: " << omp_get_max_threads() << std::endl;
   if (argc < 3) {
-    Error() << "input .psg file and output .cp file required" << std::endl;
+    Error() << "input .psg file and output .cpx file required" << std::endl;
     return 1;
   }
   std::string psg_fn = argv[1];
@@ -34,12 +34,7 @@ int main(int argc, char** argv) {
   psg.Deserialize(psg_f);
   auto cps = psg::core::InitializeContactPoints(
       psg.GetMDR(), psg.GetSettings(), 10000, 1000);
-  std::vector<std::vector<psg::core::models::ContactPoint>> cp_list;
-  cp_list.reserve(cps.size());
-  for (const auto& cp : cps) {
-    cp_list.push_back(cp.contact_points);
-  }
-  psg::core::serialization::Serialize(cp_list, cp_f);
+  psg::core::serialization::Serialize(cps, cp_f);
   Log() << "Contact point candidate written to: " << cp_fn << std::endl;
   return 0;
 }
