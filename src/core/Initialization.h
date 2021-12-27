@@ -12,6 +12,10 @@ namespace core {
 
 using namespace models;
 
+void InitializeMeshPosition(const Eigen::MatrixXd& V,
+                            Eigen::MatrixXd& out_V,
+                            Eigen::Affine3d& out_trans);
+
 Eigen::MatrixXd InitializeFinger(const ContactPoint& contact_point,
                                  const MeshDependentResource& mdr,
                                  const Eigen::Vector3d& effector_pos,

@@ -2,6 +2,7 @@
 
 #include <igl/remove_duplicate_vertices.h>
 #include <igl/unproject_onto_mesh.h>
+#include <igl/writeSTL.h>
 #include <iostream>
 
 #include "../core/CostFunctions.h"
@@ -120,8 +121,12 @@ void MainUI::draw_viewer_window() {
 void MainUI::draw_viewer_menu() {
   float w = ImGui::GetContentRegionAvailWidth();
   float p = ImGui::GetStyle().FramePadding.x;
-  if (ImGui::Button("Load Mesh", ImVec2(w, 0))) {
+  if (ImGui::Button("Load Mesh", ImVec2((w - p) / 2, 0))) {
     OnLoadMeshClicked();
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Save Mesh", ImVec2((w - p) / 2, 0))) {
+    OnSaveMeshClicked();
   }
   ImGui::Checkbox("Millimeter", &is_millimeter_);
   ImGui::Checkbox("Swap YZ", &is_swap_yz_);
@@ -677,9 +682,31 @@ void MainUI::OnLoadMeshClicked() {
     SF.col(1).swap(SF.col(2));
   }
 
+  SV_ = SV;
+  SF_ = SF;
+
   vm_.SetMesh(SV, SF);
   OnAlignCameraCenter();
   optimizer_.Reset();
+}
+
+void MainUI::OnSaveMeshClicked() {
+  std::string filename = igl::file_dialog_save();
+  if (filename.empty()) return;
+  size_t last_dot = filename.rfind('.');
+  if (last_dot == std::string::npos) {
+    std::cerr << "Error: No file extension found in " << filename << std::endl;
+    return;
+  }
+  std::string extension = filename.substr(last_dot + 1);
+  if (extension != "stl") {
+    std::cerr << "Error: Not an .stl file" << filename << std::endl;
+    return;
+  }
+
+
+  igl::writeSTL(filename, SV_, SF_, igl::FileEncoding::Binary);
+  std::cout << "Mesh saved to " << filename << std::endl;
 }
 
 void MainUI::OnLoadPSGClicked() {

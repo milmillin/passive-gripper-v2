@@ -11,7 +11,7 @@
 #include "../Constants.h"
 #include "../utils.h"
 #include "Result.h"
-#include "SettingsOverrider.h"
+#include "../core/models/SettingsOverrider.h"
 #include "Testcase.h"
 
 namespace fs = std::filesystem;
@@ -134,7 +134,7 @@ int main(int argc, char** argv) {
   };
 
   try {
-    SettingsOverrider stgo;
+    psg::core::models::SettingsOverrider stgo;
     if (stgo_set) stgo.Load(stgo_fn);
     ProcessFrom(raw_fn, out_dir, ckpt_i, ckpt_need, maxiters, stgo, cb);
   } catch (const std::exception& e) {

@@ -125,3 +125,6 @@ target_link_libraries(psg-batch ${BATCH_LINK_LIBS})
 
 add_executable(psg-cp-gen "src/cp-gen/main.cpp")
 target_link_libraries(psg-cp-gen core)
+
+add_executable(psg-psg-gen "src/psg-gen/main.cpp")
+target_link_libraries(psg-psg-gen core igl::core)

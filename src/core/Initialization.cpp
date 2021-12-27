@@ -36,6 +36,28 @@ static bool ShouldPopB(Eigen::Vector3d a,
       a.transpose().cast<float>(), (c - a).transpose().cast<float>(), hit);
 }
 
+void InitializeMeshPosition(const Eigen::MatrixXd& V,
+                            Eigen::MatrixXd& out_V,
+                            Eigen::Affine3d& out_trans) {
+  Eigen::Vector3d minimum = V.colwise().minCoeff();
+  Eigen::Vector3d maximum = V.colwise().maxCoeff();
+
+  Eigen::Vector3d translate(
+      -minimum.x() / 2. - maximum.x() / 2., -minimum.y(), 0.07 - minimum.z());
+
+  Eigen::MatrixXd SV = V.rowwise() + translate.transpose();
+  Eigen::Translation3d mesh_trans(
+      (SV.colwise().minCoeff() + SV.colwise().maxCoeff()) / 2.);
+
+  Eigen::Affine3d trans = robots::Forward(kInitPose);
+  SV = (trans * (SV.transpose().colwise().homogeneous())).transpose();
+
+  double min_y = SV.colwise().minCoeff().y();
+  SV.col(1).array() -= min_y;
+  out_V = SV;
+  out_trans = Eigen::Translation3d(0, -min_y, 0) * trans * mesh_trans;
+}
+
 Eigen::MatrixXd InitializeFinger(const ContactPoint& contactPoint,
                                  const MeshDependentResource& mdr,
                                  const Eigen::Vector3d& effectorPos,
@@ -215,7 +237,6 @@ Trajectory InitializeTrajectory(const std::vector<Eigen::MatrixXd>& fingers,
         avgNorms.block(i * subdivide, 0, subdivide, 3).colwise().sum();
   }
 
-
   Trajectory result;
   result.reserve(n_keyframes);
   result.push_back(initPose);
@@ -223,7 +244,8 @@ Trajectory InitializeTrajectory(const std::vector<Eigen::MatrixXd>& fingers,
   for (size_t i = 1; i < n_keyframes; i++) {
     cumTrans = Eigen::Translation3d(trans.row(i)) * cumTrans;
     Eigen::Affine3d curTrans = cumTrans;
-    curTrans.translation().y() = std::max(curTrans.translation().y(), -minY + 0.003);
+    curTrans.translation().y() =
+        std::max(curTrans.translation().y(), -minY + 0.003);
     std::vector<Pose> candidates;
     if (robots::Inverse(curTrans, candidates)) {
       double best = std::numeric_limits<double>::max();

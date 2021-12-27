@@ -4,7 +4,11 @@
 #include <string>
 #include <vector>
 
-#include "../core/PassiveGripper.h"
+#include "../PassiveGripper.h"
+
+namespace psg {
+namespace core {
+namespace models {
 
 class SettingsOverrider {
  private:
@@ -14,3 +18,7 @@ class SettingsOverrider {
   void Load(std::string fn);
   void Apply(psg::core::PassiveGripper& psg) const;
 };
+
+}  // namespace models
+}  // namespace core
+}  // namespace psg

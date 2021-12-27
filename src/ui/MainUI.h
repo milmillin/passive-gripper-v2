@@ -44,6 +44,8 @@ class MainUI : public igl::opengl::glfw::imgui::ImGuiMenu {
   // Load Mesh Options
   bool is_millimeter_ = false;
   bool is_swap_yz_ = false;
+  Eigen::MatrixXd SV_;
+  Eigen::MatrixXi SF_;
 
   // Draw Panel
   void DrawViewPanel();
@@ -65,6 +67,7 @@ class MainUI : public igl::opengl::glfw::imgui::ImGuiMenu {
 
   // Button Callback
   void OnLoadMeshClicked();
+  void OnSaveMeshClicked();
   void OnLoadPSGClicked();
   void OnSavePSGClicked();
   void OnAlignCameraCenter();

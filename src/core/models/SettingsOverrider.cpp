@@ -6,10 +6,12 @@
 #include <string>
 #include <vector>
 
-#include "../utils.h"
-#include "../core/PassiveGripper.h"
+#include "../PassiveGripper.h"
+#include "../../utils.h"
 
-using namespace psg::core::models;
+namespace psg {
+namespace core {
+namespace models {
 
 void SettingsOverrider::Load(std::string fn) {
   std::ifstream f(fn);
@@ -21,11 +23,12 @@ void SettingsOverrider::Load(std::string fn) {
   std::string key;
   std::string value;
   while (f >> key) {
-    f >> value;      
+    f >> value;
     mp.insert({key, value});
     Log() << key << ": " << value << std::endl;
     if (key == "algorithm") {
-      Log() << "  > " << psg::labels::kAlgorithms[std::stoi(value)] << std::endl;
+      Log() << "  > " << psg::labels::kAlgorithms[std::stoi(value)]
+            << std::endl;
     }
   }
 }
@@ -75,3 +78,7 @@ void SettingsOverrider::Apply(psg::core::PassiveGripper& psg) const {
   psg.reinit_fingers = tmp_reinit_fingers;
   psg.reinit_trajectory = tmp_reinit_trajectory;
 }
+
+}  // namespace models
+}  // namespace core
+}  // namespace psg
