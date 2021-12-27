@@ -9,6 +9,7 @@
 #include "../core/Initialization.h"
 #include "../utils.h"
 #include "../core/models/SettingsOverrider.h"
+#include <igl/remove_duplicate_vertices.h>
 
 int main(int argc, char** argv) {
   if (argc < 3) {
@@ -23,6 +24,17 @@ int main(int argc, char** argv) {
   Eigen::MatrixXd N;
   igl::readSTL(stl_f, V, F, N);
 
+  Eigen::MatrixXd SV;
+  Eigen::VectorXd SVI;
+  Eigen::VectorXd SVJ;
+  igl::remove_duplicate_vertices(V, 0, SV, SVI, SVJ);
+  Eigen::MatrixXi SF = F;
+  for (size_t i = 0; i < SF.size(); i++) {
+    SF(i) = SVJ(SF(i));
+  }
+
+  Log() << "Num vertices: " << V.rows() << std::endl;
+
   std::string psg_fn = argv[2];
   std::ofstream psg_f(psg_fn, std::ios::out | std::ios::binary);
   if (!psg_f.is_open()) {
@@ -31,10 +43,10 @@ int main(int argc, char** argv) {
   }
 
   psg::core::PassiveGripper psg;
-  Eigen::MatrixXd SV;
+  Eigen::MatrixXd SV2;
   Eigen::Affine3d trans;
-  psg::core::InitializeMeshPosition(V, SV, trans);
-  psg.SetMesh(SV, F);
+  psg::core::InitializeMeshPosition(SV, SV2, trans);
+  psg.SetMesh(SV2, SF);
 
   if (argc >= 4) {
     std::string stgo_fn = argv[3];  
