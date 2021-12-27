@@ -12,6 +12,11 @@ namespace core {
 
 using namespace models;
 
+bool Remesh(const Eigen::MatrixXd& V,
+            const Eigen::MatrixXi& F,
+            Eigen::MatrixXd& out_V,
+            Eigen::MatrixXi& out_F);
+
 // points: N by dim matrix
 bool ComputeConvexHull(const Eigen::MatrixXd& points,
                        std::vector<size_t>& out_hull_indices,

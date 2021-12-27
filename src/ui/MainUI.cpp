@@ -304,6 +304,14 @@ void MainUI::DrawTransformPanel() {
       vm_.PSG().TransformMesh(trans);
     }
   }
+  if (ImGui::CollapsingHeader("Remesh", ImGuiTreeNodeFlags_DefaultOpen)) {
+    if (ImGui::Button("Remesh##a", ImVec2(w, 0))) {
+      Eigen::MatrixXd V;
+      Eigen::MatrixXi F;
+      Remesh(vm_.PSG().GetMeshV(), vm_.PSG().GetMeshF(), V, F);
+      vm_.SetMesh(V, F);
+    }
+  }
 }
 
 void MainUI::DrawRobotPanel() {
