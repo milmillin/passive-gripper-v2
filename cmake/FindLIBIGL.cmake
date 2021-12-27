@@ -7,27 +7,15 @@ if(LIBIGL_FOUND)
     return()
 endif()
 
-find_path(LIBIGL_INCLUDE_DIR igl/readOBJ.h
-    HINTS
-        ${LIBIGL_DIR}
-        ENV LIBIGL_DIR
-    PATHS
-        ${CMAKE_SOURCE_DIR}/external/libigl
-        ${CMAKE_SOURCE_DIR}/../..
-        ${CMAKE_SOURCE_DIR}/..
-        ${CMAKE_SOURCE_DIR}
-        ${CMAKE_SOURCE_DIR}/libigl
-        ${CMAKE_SOURCE_DIR}/../libigl
-        ${CMAKE_SOURCE_DIR}/../../libigl
-        /usr
-        /usr/local
-        /usr/local/igl/libigl
-    PATH_SUFFIXES include
-)
+set(EXPECTED_LIBIGL_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/external/libigl/include)
+if(EXISTS ${EXPECTED_LIBIGL_INCLUDE_DIR})
+    set(LIBIGL_INCLUDE_DIR ${EXPECTED_LIBIGL_INCLUDE_DIR})
+    message("-- Found libigl:" ${LIBIGL_INCLUDE_DIR})
+endif()
 
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(LIBIGL
-    "\nlibigl not found --- You can download it using:\n\tgit clone https://github.com/libigl/libigl.git ${CMAKE_SOURCE_DIR}/third_party/libigl"
+    "\nlibigl not found --- You can download it using:\n\tgit clone https://github.com/libigl/libigl.git ${CMAKE_SOURCE_DIR}/external/libigl"
     LIBIGL_INCLUDE_DIR)
 mark_as_advanced(LIBIGL_INCLUDE_DIR)
 

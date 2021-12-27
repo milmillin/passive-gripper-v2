@@ -1160,10 +1160,11 @@ void MainUI::OnNegVolInvalidated() {
 void MainUI::OnGripperInvalidated() {
   auto& layer = GetLayer(Layer::kGripper);
   layer.clear();
-  layer.set_mesh((robots::Forward(vm_.GetCurrentPose()) *
-                  vm_.GetGripperV().transpose().colwise().homogeneous())
-                     .transpose(),
-                 vm_.GetGripperF());
+  if (vm_.GetGripperV().size() != 0)
+    layer.set_mesh((robots::Forward(vm_.GetCurrentPose()) *
+                    vm_.GetGripperV().transpose().colwise().homogeneous())
+                      .transpose(),
+                  vm_.GetGripperF());
   layer.set_colors(colors::kBrown);
 }
 
