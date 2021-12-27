@@ -7,7 +7,7 @@ namespace core {
 namespace models {
 
 struct CostSettings : psg::core::serialization::Serializable {
-  double floor = 0.01;
+  double floor = 0.0005;
   size_t n_trajectory_steps = 32;
   size_t n_finger_steps = 32;
   double ang_velocity = kDegToRad * 60.;
