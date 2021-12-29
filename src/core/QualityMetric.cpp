@@ -197,7 +197,7 @@ double ComputePartialMinWrenchQP(const Eigen::MatrixXd& G,
   return 0.0;
 }
 
-static void ComputeQualityMetricSingle(
+void ComputeQualityMetricSingle(
     const std::vector<ContactPoint>& contact_points,
     const Eigen::Vector3d& center_of_mass,
     size_t cone_res,
@@ -236,12 +236,12 @@ bool ComputeRobustQualityMetric(const std::vector<ContactPoint>& contact_points,
     return false;
   }
 
-  constexpr size_t kSubR = 2;
-  constexpr size_t kSubTheta = 4;
+  constexpr size_t kSubR = 1;
+  constexpr size_t kSubTheta = 8;
   constexpr size_t kSamplePerContact = kSubR * kSubTheta;
-  constexpr size_t kC95 =
-      kSamplePerContact * kSamplePerContact * kSamplePerContact * 95 / 100;
-  constexpr double kRadius = 0.005;
+  constexpr size_t kC50 =
+      kSamplePerContact * kSamplePerContact * kSamplePerContact * 50 / 100;
+  constexpr double kRadius = 0.0005;
   constexpr double kRadiusStep = kRadius / kSubR;
   constexpr double kThetaStep = kTwoPi / kSubTheta;
 
@@ -259,7 +259,7 @@ bool ComputeRobustQualityMetric(const std::vector<ContactPoint>& contact_points,
         double theta = k * kThetaStep;
         ContactPoint& cp = sub_contact_points[i][j * kSubTheta + k];
         Eigen::Vector3d position =
-            base_cp.position + r * cos(theta) * B + r * sin(theta) * B;
+            base_cp.position + r * cos(theta) * B + r * sin(theta) * T;
         Eigen::Vector3d c;
         size_t fid = mdr.ComputeClosestFacet(position, c);
         cp.position = c;
@@ -290,20 +290,16 @@ bool ComputeRobustQualityMetric(const std::vector<ContactPoint>& contact_points,
         metrics.emplace_back();
         metrics.back().min_wrench = min_wrench;
         metrics.back().partial_min_wrench = partial_min_wrench;
+        // std::cout << i << "," << j << "," << k << " " << std::setprecision(12)
+                  // << "mw: " << min_wrench << ", pmw: " << partial_min_wrench
+                  // << std::endl;
       }
     }
   }
   std::sort(metrics.begin(), metrics.end());
-  size_t ii = 0;
-  for (const auto& metric : metrics) {
-    std::cout << ii << " " << std::setprecision(12)
-              << "mw: " << metric.min_wrench
-              << ", pmw: " << metric.partial_min_wrench << std::endl;
-    ii++;
-  }
-  out_metric = metrics[kC95];
+  out_metric = metrics[kC50];
   out_metric.contact_points = contact_points;
-  return out_metric.partial_min_wrench == 0;
+  return out_metric.partial_min_wrench > 0;
 }
 
 }  // namespace core

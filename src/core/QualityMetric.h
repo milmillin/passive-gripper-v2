@@ -40,6 +40,15 @@ double ComputePartialMinWrenchQP(const Eigen::MatrixXd& grasp_matrix,
                                  const Eigen::Vector3d& extForce,
                                  const Eigen::Vector3d& extTorque);
 
+void ComputeQualityMetricSingle(const std::vector<ContactPoint>& contact_points,
+                                const Eigen::Vector3d& center_of_mass,
+                                size_t cone_res,
+                                double friction,
+                                const Eigen::Vector3d& ext_force,
+                                const Eigen::Vector3d& ext_torque,
+                                double& out_min_wrench,
+                                double& out_partial_min_wrench);
+
 bool ComputeRobustQualityMetric(const std::vector<ContactPoint>& contact_points,
                                 const MeshDependentResource& mdr,
                                 const GripperSettings& settings,

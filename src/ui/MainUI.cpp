@@ -889,9 +889,38 @@ void MainUI::OnContactPointsInvalidated() {
           Eigen::RowVector2i(tmp + 1, tmp2 + 1);
     }
   }
+
+  constexpr size_t kSubR = 1;
+  constexpr size_t kSubTheta = 8;
+  constexpr size_t kSamplePerContact = kSubR * kSubTheta;
+  constexpr double kRadius = 0.0025;
+  constexpr double kRadiusStep = kRadius / kSubR;
+  constexpr double kThetaStep = kTwoPi / kSubTheta;
+  Eigen::MatrixXd P(nContacts * kSamplePerContact, 3);
+  for (size_t i = 0; i < contact_points.size(); i++) {
+    const ContactPoint& base_cp = contact_points[i];
+    Eigen::Vector3d B;
+    Eigen::Vector3d T;
+    GetPerp(base_cp.normal, B, T);
+
+    for (size_t j = 0; j < kSubR; j++) {
+      double r = (j + 1) * kRadiusStep;
+      for (size_t k = 0; k < kSubTheta; k++) {
+        double theta = k * kThetaStep;
+        Eigen::Vector3d position =
+            base_cp.position + r * cos(theta) * B + r * sin(theta) * T;
+        Eigen::Vector3d c;
+        size_t fid = vm_.PSG().GetMDR().ComputeClosestFacet(position, c);
+        P.row(i * kSamplePerContact + j * kSubTheta + k) = c.transpose();
+      }
+    }
+  }
+
   cpLayer.set_edges(V, VE, Eigen::RowVector3d(0.2, 0.5, 0.1));
   cpLayer.set_labels(PL, labels);
+  cpLayer.set_points(P, colors::kOrange);
   cpLayer.line_width = 2;
+  cpLayer.point_size = 5;
   cpLayer.show_custom_labels = true;
   cpLayer.show_overlay = true;
 }

@@ -313,31 +313,44 @@ std::vector<ContactPointMetric> InitializeContactPoints(
       }
 
       // Check Feasibility
-      std::vector<ContactPoint> contact_cones;
-      contact_cones.reserve(3 * settings.contact.cone_res);
-      for (size_t i = 0; i < 3; i++) {
-        const auto&& cone = GenerateContactCone(contactPoints[i],
-                                                settings.contact.cone_res,
-                                                settings.contact.friction);
-        contact_cones.insert(contact_cones.end(), cone.begin(), cone.end());
-      }
+      // std::vector<ContactPoint> contact_cones;
+      // contact_cones.reserve(3 * settings.contact.cone_res);
+      // for (size_t i = 0; i < 3; i++) {
+      // const auto&& cone = GenerateContactCone(contactPoints[i],
+      // settings.contact.cone_res,
+      // settings.contact.friction);
+      // contact_cones.insert(contact_cones.end(), cone.begin(), cone.end());
+      // }
 
-      Eigen::MatrixXd G = CreateGraspMatrix(contact_cones, mdr.center_of_mass);
+      // Eigen::MatrixXd G = CreateGraspMatrix(contact_cones,
+      // mdr.center_of_mass);
 
-      double partialMinWrench = ComputePartialMinWrenchQP(
-          G, -Eigen::Vector3d::UnitY(), Eigen::Vector3d::Zero());
+      // double partialMinWrench = ComputePartialMinWrenchQP(
+      // G, -Eigen::Vector3d::UnitY(), Eigen::Vector3d::Zero());
       // Get at least a partial closure
-      if (partialMinWrench == 0) continue;
+      // if (partialMinWrench == 0) continue;
 
-      double minWrench = ComputeMinWrenchQP(G);
+      // double minWrench = ComputeMinWrenchQP(G);
 
-      ContactPointMetric candidate;
-      candidate.contact_points = contactPoints;
-      candidate.partial_min_wrench = partialMinWrench;
-      candidate.min_wrench = minWrench;
+      ContactPointMetric metric;
+      ComputeQualityMetricSingle(contactPoints,
+                                 mdr.center_of_mass,
+                                 settings.contact.cone_res,
+                                 settings.contact.friction,
+                                 -Eigen::Vector3d::UnitY(),
+                                 Eigen::Vector3d::Zero(),
+                                 metric.min_wrench,
+                                 metric.partial_min_wrench);
+      if (metric.partial_min_wrench == 0) continue;
+      metric.contact_points = contactPoints;
+
+      // ContactPointMetric candidate;
+      // candidate.contact_points = contactPoints;
+      // candidate.partial_min_wrench = partialMinWrench;
+      // candidate.min_wrench = minWrench;
 #pragma omp critical
       {
-        prelim.push_back(candidate);
+        prelim.push_back(metric);
         if (prelim.size() % 100 == 0)
           std::cout << "prelim prog: " << prelim.size() << "/" << num_candidates
                     << std::endl;
@@ -352,7 +365,30 @@ std::vector<ContactPointMetric> InitializeContactPoints(
                 return a.partial_min_wrench > b.partial_min_wrench;
               return a.min_wrench > b.min_wrench;
             });
-  return prelim;
+
+  size_t num_candidates_2 = 100;
+  std::vector<ContactPointMetric> round2;
+
+#pragma omp parallel for
+  for (ssize_t i = 0; i < prelim.size(); i++) {
+    ContactPointMetric metric;
+    if (ComputeRobustQualityMetric(prelim[i].contact_points,
+                                   mdr,
+                                   settings,
+                                   -Eigen::Vector3d::UnitY(),
+                                   Eigen::Vector3d::Zero(),
+                                   metric)) {
+#pragma omp critical
+      round2.push_back(metric);
+    }
+    bool to_continue = true;
+#pragma omp critical
+    to_continue = (round2.size() < num_candidates_2);
+    if (!to_continue) break;
+  }
+
+  std::sort(round2.begin(), round2.end());
+  return round2;
 }
 
 void InitializeGripperBound(const PassiveGripper& psg,
