@@ -611,6 +611,17 @@ void MainUI::DrawDebugPanel() {
     if (ImGui::Button("Compute Init Params", ImVec2(w, 0))) {
       vm_.ComputeInitParams();
     }
+    if (ImGui::Button("Compute Robust Stability Metric", ImVec2(w, 0))) {
+      ContactPointMetric metric;
+      ComputeRobustQualityMetric(vm_.PSG().GetContactPoints(),
+                                 vm_.PSG().GetMDR(),
+                                 vm_.PSG().GetSettings(),
+                                 -Eigen::Vector3d::UnitY(),
+                                 Eigen::Vector3d::Zero(),
+                                 metric);
+      std::cout << "mw: " << metric.min_wrench
+                << ", pmw: " << metric.partial_min_wrench << std::endl;
+    }
   }
   ImGui::PopID();
 }

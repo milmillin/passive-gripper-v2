@@ -151,6 +151,7 @@ std::vector<ContactPoint> GenerateContactCones(
     size_t cone_res,
     double friction) {
   std::vector<ContactPoint> cones;
+  cones.reserve(cps.size() * cone_res);
   for (const auto& cp : cps) {
     std::vector<ContactPoint>&& cone =
         GenerateContactCone(cp, cone_res, friction);

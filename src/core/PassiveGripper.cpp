@@ -344,16 +344,13 @@ void PassiveGripper::InvalidateTopoOptSettings() {
 
 void PassiveGripper::InvalidateQuality() {
   quality_changed_ = false;
-  is_force_closure_ = CheckForceClosureQP(contact_cones_, mdr_.center_of_mass);
-  is_partial_closure_ = CheckPartialClosureQP(contact_cones_,
-                                              mdr_.center_of_mass,
-                                              -Eigen::Vector3d::UnitY(),
-                                              Eigen::Vector3d::Zero());
-  min_wrench_ = ComputeMinWrenchQP(contact_cones_, mdr_.center_of_mass);
-  partial_min_wrench_ = ComputePartialMinWrenchQP(contact_cones_,
-                                                  mdr_.center_of_mass,
-                                                  -Eigen::Vector3d::UnitY(),
-                                                  Eigen::Vector3d::Zero());
+  Eigen::MatrixXd G = CreateGraspMatrix(contact_cones_, mdr_.center_of_mass);
+  is_force_closure_ = CheckForceClosureQP(G);
+  is_partial_closure_ = CheckPartialClosureQP(
+      G, -Eigen::Vector3d::UnitY(), Eigen::Vector3d::Zero());
+  min_wrench_ = ComputeMinWrenchQP(G);
+  partial_min_wrench_ = ComputePartialMinWrenchQP(
+      G, -Eigen::Vector3d::UnitY(), Eigen::Vector3d::Zero());
 }
 
 void PassiveGripper::InvalidateCost() {

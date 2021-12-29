@@ -32,7 +32,8 @@ struct MeshDependentResource : psg::core::serialization::Serializable {
                                Eigen::RowVector3d& out_c,
                                double& out_s) const;
 
-  size_t ComputeClosestFacet(const Eigen::Vector3d& position) const;
+  size_t ComputeClosestFacet(const Eigen::Vector3d& position,
+                             Eigen::Vector3d& out_c) const;
 
   DECL_SERIALIZE() {
     constexpr int version = 1;

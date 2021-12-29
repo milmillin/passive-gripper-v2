@@ -15,9 +15,8 @@ typedef CGAL::MP_Float ET;
 
 namespace psg {
 namespace core {
-static Eigen::MatrixXd CreateGraspMatrix(
-    const std::vector<ContactPoint>& contactCones,
-    const Eigen::Vector3d& centerOfMass) {
+Eigen::MatrixXd CreateGraspMatrix(const std::vector<ContactPoint>& contactCones,
+                                  const Eigen::Vector3d& centerOfMass) {
   size_t nContacts = contactCones.size();
   Eigen::MatrixXd G(6, nContacts);
   for (size_t i = 0; i < nContacts; i++) {
@@ -104,26 +103,20 @@ static CGAL::Quotient<ET> WrenchInPositiveSpan(
   return s.objective_value() * 2 + targetWrench.squaredNorm();
 }
 
-bool CheckForceClosureQP(const std::vector<ContactPoint>& contactCones,
-                         const Eigen::Vector3d& centerOfMass) {
-  Eigen::MatrixXd G = CreateGraspMatrix(contactCones, centerOfMass);
+bool CheckForceClosureQP(const Eigen::MatrixXd& G) {
   return MinNormVectorInFacet(G) < kWrenchNormThresh;
 }
 
-bool CheckPartialClosureQP(const std::vector<ContactPoint>& contactCones,
-                           const Eigen::Vector3d& centerOfMass,
+bool CheckPartialClosureQP(const Eigen::MatrixXd& G,
                            const Eigen::Vector3d& extForce,
                            const Eigen::Vector3d& extTorque) {
-  Eigen::MatrixXd G = CreateGraspMatrix(contactCones, centerOfMass);
   Eigen::VectorXd targetWrench(6);
   targetWrench.block<3, 1>(0, 0) = -extForce;
   targetWrench.block<3, 1>(3, 0) = -extTorque;
   return WrenchInPositiveSpan(G, targetWrench) < kWrenchNormThresh;
 }
 
-double ComputeMinWrenchQP(const std::vector<ContactPoint>& contactCones,
-                          const Eigen::Vector3d& centerOfMass) {
-  Eigen::MatrixXd G = CreateGraspMatrix(contactCones, centerOfMass);
+double ComputeMinWrenchQP(const Eigen::MatrixXd& G) {
   if (MinNormVectorInFacet(G) >= kWrenchNormThresh) {
     // Zero not in convex hull
     return 0;
@@ -153,11 +146,9 @@ double ComputeMinWrenchQP(const std::vector<ContactPoint>& contactCones,
   return 0;
 }
 
-double ComputePartialMinWrenchQP(const std::vector<ContactPoint>& contactCones,
-                                 const Eigen::Vector3d& centerOfMass,
+double ComputePartialMinWrenchQP(const Eigen::MatrixXd& G,
                                  const Eigen::Vector3d& extForce,
                                  const Eigen::Vector3d& extTorque) {
-  Eigen::MatrixXd G = CreateGraspMatrix(contactCones, centerOfMass);
   Eigen::VectorXd targetWrench(6);
   targetWrench.block<3, 1>(0, 0) = -extForce;
   targetWrench.block<3, 1>(3, 0) = -extTorque;
@@ -204,6 +195,115 @@ double ComputePartialMinWrenchQP(const std::vector<ContactPoint>& contactCones,
       return std::numeric_limits<double>::max();
   }
   return 0.0;
+}
+
+static void ComputeQualityMetricSingle(
+    const std::vector<ContactPoint>& contact_points,
+    const Eigen::Vector3d& center_of_mass,
+    size_t cone_res,
+    double friction,
+    const Eigen::Vector3d& ext_force,
+    const Eigen::Vector3d& ext_torque,
+    double& out_min_wrench,
+    double& out_partial_min_wrench) {
+  std::vector<ContactPoint> contact_cones =
+      GenerateContactCones(contact_points, cone_res, friction);
+  Eigen::MatrixXd G = CreateGraspMatrix(contact_cones, center_of_mass);
+  out_min_wrench = ComputeMinWrenchQP(G);
+  out_partial_min_wrench = ComputePartialMinWrenchQP(G, ext_force, ext_torque);
+}
+
+bool ComputeRobustQualityMetric(const std::vector<ContactPoint>& contact_points,
+                                const MeshDependentResource& mdr,
+                                const GripperSettings& settings,
+                                const Eigen::Vector3d& ext_force,
+                                const Eigen::Vector3d& ext_torque,
+                                ContactPointMetric& out_metric) {
+  double min_wrench;
+  double partial_min_wrench;
+  out_metric.contact_points = contact_points;
+  ComputeQualityMetricSingle(contact_points,
+                             mdr.center_of_mass,
+                             settings.contact.cone_res,
+                             settings.contact.friction,
+                             ext_force,
+                             ext_torque,
+                             min_wrench,
+                             partial_min_wrench);
+  if (partial_min_wrench == 0) {
+    out_metric.min_wrench = min_wrench;
+    out_metric.partial_min_wrench = partial_min_wrench;
+    return false;
+  }
+
+  constexpr size_t kSubR = 2;
+  constexpr size_t kSubTheta = 4;
+  constexpr size_t kSamplePerContact = kSubR * kSubTheta;
+  constexpr size_t kC95 =
+      kSamplePerContact * kSamplePerContact * kSamplePerContact * 95 / 100;
+  constexpr double kRadius = 0.005;
+  constexpr double kRadiusStep = kRadius / kSubR;
+  constexpr double kThetaStep = kTwoPi / kSubTheta;
+
+  std::vector<std::vector<ContactPoint>> sub_contact_points(
+      contact_points.size(), std::vector<ContactPoint>(kSamplePerContact));
+  for (size_t i = 0; i < contact_points.size(); i++) {
+    const ContactPoint& base_cp = contact_points[i];
+    Eigen::Vector3d B;
+    Eigen::Vector3d T;
+    GetPerp(base_cp.normal, B, T);
+
+    for (size_t j = 0; j < kSubR; j++) {
+      double r = (j + 1) * kRadiusStep;
+      for (size_t k = 0; k < kSubTheta; k++) {
+        double theta = k * kThetaStep;
+        ContactPoint& cp = sub_contact_points[i][j * kSubTheta + k];
+        Eigen::Vector3d position =
+            base_cp.position + r * cos(theta) * B + r * sin(theta) * B;
+        Eigen::Vector3d c;
+        size_t fid = mdr.ComputeClosestFacet(position, c);
+        cp.position = c;
+        cp.fid = fid;
+        cp.normal = mdr.FN.row(fid);
+      }
+    }
+  }
+
+  assert(contact_points.size() == 3);
+  std::vector<ContactPointMetric> metrics;
+  metrics.reserve(kSamplePerContact * kSamplePerContact * kSamplePerContact);
+  std::vector<ContactPoint> try_contact_points(3);
+  for (size_t i = 0; i < kSamplePerContact; i++) {
+    try_contact_points[0] = sub_contact_points[0][i];
+    for (size_t j = 0; j < kSamplePerContact; j++) {
+      try_contact_points[1] = sub_contact_points[1][j];
+      for (size_t k = 0; k < kSamplePerContact; k++) {
+        try_contact_points[2] = sub_contact_points[2][k];
+        ComputeQualityMetricSingle(try_contact_points,
+                                   mdr.center_of_mass,
+                                   settings.contact.cone_res,
+                                   settings.contact.friction,
+                                   ext_force,
+                                   ext_torque,
+                                   min_wrench,
+                                   partial_min_wrench);
+        metrics.emplace_back();
+        metrics.back().min_wrench = min_wrench;
+        metrics.back().partial_min_wrench = partial_min_wrench;
+      }
+    }
+  }
+  std::sort(metrics.begin(), metrics.end());
+  size_t ii = 0;
+  for (const auto& metric : metrics) {
+    std::cout << ii << " " << std::setprecision(12)
+              << "mw: " << metric.min_wrench
+              << ", pmw: " << metric.partial_min_wrench << std::endl;
+    ii++;
+  }
+  out_metric = metrics[kC95];
+  out_metric.contact_points = contact_points;
+  return out_metric.partial_min_wrench == 0;
 }
 
 }  // namespace core

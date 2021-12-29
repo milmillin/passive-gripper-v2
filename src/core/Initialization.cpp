@@ -110,7 +110,8 @@ Eigen::MatrixXd InitializeFinger(const ContactPoint& contactPoint,
   }
   Eigen::MatrixXd res(n_finger_joints, 3);
 
-  size_t fid = mdr.ComputeClosestFacet(contactPoint.position);
+  Eigen::Vector3d __c;  // unused
+  size_t fid = mdr.ComputeClosestFacet(contactPoint.position, __c);
   size_t vid = -1;
   double bestDist = std::numeric_limits<double>::max();
   double curDist;
@@ -141,9 +142,9 @@ Eigen::MatrixXd InitializeFinger(const ContactPoint& contactPoint,
   fingerVid.push_back(-1);
 
   // Expand segment by 0.01
-  for (size_t j = 1; j < finger.size() - 1; j++) {
-    finger[j] += mdr.VN.row(fingerVid[j]) * 0.01;
-  }
+  // for (size_t j = 1; j < finger.size() - 1; j++) {
+  // finger[j] += mdr.VN.row(fingerVid[j]) * 0.01;
+  // }
 
   // Fix number of segment
   while (finger.size() > n_finger_joints) {
@@ -321,15 +322,14 @@ std::vector<ContactPointMetric> InitializeContactPoints(
         contact_cones.insert(contact_cones.end(), cone.begin(), cone.end());
       }
 
-      double partialMinWrench =
-          ComputePartialMinWrenchQP(contact_cones,
-                                    mdr.center_of_mass,
-                                    -Eigen::Vector3d::UnitY(),
-                                    Eigen::Vector3d::Zero());
+      Eigen::MatrixXd G = CreateGraspMatrix(contact_cones, mdr.center_of_mass);
+
+      double partialMinWrench = ComputePartialMinWrenchQP(
+          G, -Eigen::Vector3d::UnitY(), Eigen::Vector3d::Zero());
       // Get at least a partial closure
       if (partialMinWrench == 0) continue;
 
-      double minWrench = ComputeMinWrenchQP(contact_cones, mdr.center_of_mass);
+      double minWrench = ComputeMinWrenchQP(G);
 
       ContactPointMetric candidate;
       candidate.contact_points = contactPoints;

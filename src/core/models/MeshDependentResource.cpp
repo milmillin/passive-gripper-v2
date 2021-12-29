@@ -40,10 +40,12 @@ double MeshDependentResource::ComputeSignedDistance(
   return s * sqrt(sqrd);
 }
 size_t MeshDependentResource::ComputeClosestFacet(
-    const Eigen::Vector3d& position) const {
+    const Eigen::Vector3d& position,
+    Eigen::Vector3d& out_c) const {
   Eigen::RowVector3d c;
   int fid;
   tree.squared_distance(V, F, position.transpose(), fid, c);
+  out_c = c.transpose();
   return fid;
 }
 }  // namespace models
