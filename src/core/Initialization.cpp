@@ -371,6 +371,10 @@ std::vector<ContactPointMetric> InitializeContactPoints(
 
 #pragma omp parallel for
   for (ssize_t i = 0; i < prelim.size(); i++) {
+    bool to_continue = true;
+#pragma omp critical
+    to_continue = (round2.size() < num_candidates_2);
+    if (!to_continue) continue;
     ContactPointMetric metric;
     if (ComputeRobustQualityMetric(prelim[i].contact_points,
                                    mdr,
@@ -381,10 +385,6 @@ std::vector<ContactPointMetric> InitializeContactPoints(
 #pragma omp critical
       round2.push_back(metric);
     }
-    bool to_continue = true;
-#pragma omp critical
-    to_continue = (round2.size() < num_candidates_2);
-    if (!to_continue) break;
   }
 
   std::sort(round2.begin(), round2.end());
