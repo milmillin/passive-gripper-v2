@@ -1,6 +1,10 @@
 #include "GeometryUtils.h"
 
+#include <CGAL/Polygon_mesh_processing/remesh.h>
+#include <CGAL/Polyhedron_3.h>
 #include <igl/volume.h>
+#include <igl/copyleft/cgal/mesh_to_polyhedron.h>
+#include <igl/copyleft/cgal/polyhedron_to_mesh.h>
 #include <libqhullcpp/Qhull.h>
 #include <libqhullcpp/QhullFacetList.h>
 #include <libqhullcpp/QhullPoint.h>
@@ -9,6 +13,22 @@
 
 namespace psg {
 namespace core {
+
+bool Remesh(const Eigen::MatrixXd& V,
+            const Eigen::MatrixXi& F,
+            Eigen::MatrixXd& out_V,
+            Eigen::MatrixXi& out_F) {
+  typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
+  typedef CGAL::Polyhedron_3<K> Mesh;
+  // typedef Mesh::Vertex_index vertex_descriptor;
+  namespace PMP = CGAL::Polygon_mesh_processing;
+
+  Mesh mesh;
+  igl::copyleft::cgal::mesh_to_polyhedron(V, F, mesh);
+  PMP::isotropic_remeshing(
+      faces(mesh), 0.003, mesh, PMP::parameters::number_of_iterations(1));
+  igl::copyleft::cgal::polyhedron_to_mesh(mesh, out_V, out_F);
+}
 
 bool ComputeConvexHull(const Eigen::MatrixXd& points,
                        std::vector<size_t>& out_hullIndices,
