@@ -89,8 +89,8 @@ find_package(CGAL CONFIG REQUIRED)
 # Boost
 find_package(Boost COMPONENTS system filesystem REQUIRED)
 
-# Autodiff
-include_directories("external/include")
+# Autodiff (not the best way)
+include_directories("external/autodiff")
 
 # Link libigl
 option(LIBIGL_WITH_OPENGL            "Use OpenGL"         ON)

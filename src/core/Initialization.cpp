@@ -335,7 +335,7 @@ std::vector<ContactPointMetric> InitializeContactPoints(
       // Check Feasiblity: Approach Direction
       if (!CheckApproachDirection(
               contactPoints,
-              M_PI / 2 * 8 / 9,
+              kPi / 2 * 8 / 9,
               1,
               0.1,
               1e-12,
