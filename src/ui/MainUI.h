@@ -93,7 +93,7 @@ class MainUI : public igl::opengl::glfw::imgui::ImGuiMenu {
 
   // Contact Point Candidates
   size_t cp_num_seeds = 1000;
-  size_t cp_num_candidates = 10000;
+  size_t cp_num_candidates = 1000;
   std::vector<ContactPointMetric> contact_point_candidates_;
 
   // Keyframe

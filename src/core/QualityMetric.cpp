@@ -212,21 +212,24 @@ double ComputePartialMinWrenchQP(const std::vector<ContactPoint>& contactCones,
 using autodiff::real;
 using autodiff::Vector3real;
 
-static real lossFn(const std::vector<Vector3real> &positions,
-                 const std::vector<Vector3real> &normals,
-                 Vector3real &trans,
-                 Vector3real &rot,
-                 Vector3real &center,
-                 double maxCos,
-                 double maxV) {
+static real lossFn(const std::vector<Vector3real>& positions,
+                   const std::vector<Vector3real>& normals,
+                   Vector3real& trans,
+                   Vector3real& rot,
+                   Vector3real& center,
+                   double maxCos,
+                   double maxV) {
   assert(positions.size() == normals.size());
   auto n = positions.size();
 
   real loss = 0;
   for (size_t i = 0; i < n; i++) {
     Vector3real v = trans + rot.cross(positions[i] - center);
-    loss += std::max<real>(maxCos - v.dot(normals[i]), 0)
-        + std::max<real>(v.norm() - maxV, 0);
+    real x = std::max<real>(maxCos - v.normalized().dot(normals[i]), 0);
+    real y = std::max<real>(0.001 - v.norm(), 0);
+    loss += x * x + y * y;
+    // loss += std::max<real>(maxCos - v.dot(normals[i]), 0) +
+    // std::max<real>(v.norm() - maxV, 0);
   }
   return loss;
 }
@@ -237,10 +240,10 @@ bool CheckApproachDirection(const std::vector<ContactPoint>& contactPoints,
                             double learningRate,
                             double threshold,
                             int max_iterations) {
-  using autodiff::Matrix3real;
-  using autodiff::gradient;
-  using autodiff::wrt;
   using autodiff::at;
+  using autodiff::gradient;
+  using autodiff::Matrix3real;
+  using autodiff::wrt;
 
   Vector3real trans = Vector3real::Zero();
   Vector3real rot = Vector3real::Zero();
@@ -257,16 +260,15 @@ bool CheckApproachDirection(const std::vector<ContactPoint>& contactPoints,
 
   real loss;
   for (int i = 0; i < max_iterations; ++i) {
-    Eigen::VectorXd grad = gradient(lossFn,
-                                    wrt(trans, rot, center),
-                                    at(positions, normals,
-                                       trans, rot, center,
-                                       maxCos, maxV),
-                                    loss);
+    Eigen::VectorXd grad =
+        gradient(lossFn,
+                 wrt(trans, rot, center),
+                 at(positions, normals, trans, rot, center, maxCos, maxV),
+                 loss);
     grad *= learningRate;
 
-    // std::cout << i << " loss: " << loss << std::endl;
     if (loss < threshold) {
+      std::cout << i << " loss: " << loss << std::endl;
       return true;
     }
 
@@ -274,9 +276,101 @@ bool CheckApproachDirection(const std::vector<ContactPoint>& contactPoints,
     rot -= grad.block(3, 0, 3, 1);
     center -= grad.block(6, 0, 3, 1);
   }
+  std::cout << "failed: " << loss << std::endl;
   return false;
 }
 
+static real LossFn2(const std::vector<Vector3real>& positions,
+                    const std::vector<Vector3real>& normals,
+                    Vector3real& trans,
+                    Vector3real& rot,
+                    Vector3real& center,
+                    real away_dist) {
+  assert(positions.size() == normals.size());
+  size_t n = positions.size();
+
+  real loss = 0;
+  for (size_t i = 0; i < n; i++) {
+    Vector3real v = trans + rot.cross(positions[i] - center);
+    // real x = std::max<real>(away_dist - v.norm(), 0);
+    // real y = std::max<real>(max_cos - v.normalized().dot(normals[i]), 0);
+    // real y = std::max<real>(v.norm() - limit, 0);
+    real x = std::max<real>(away_dist - v.dot(normals[i]), 0);
+    loss += x * x;
+  }
+  return loss;
+}
+
+bool CheckApproachDirection2(const std::vector<ContactPoint>& contactPoints,
+                             double away_dist,
+                             double max_angle,
+                             const Eigen::Vector3d& center_of_mass,
+                             Eigen::Affine3d& out_trans) {
+  using autodiff::at;
+  using autodiff::gradient;
+  using autodiff::Matrix3real;
+  using autodiff::wrt;
+
+  constexpr double learningRate = 0.1;
+
+  Vector3real trans = Vector3real::Zero();
+  Vector3real rot = Vector3real::Zero();
+  Vector3real center = center_of_mass.cast<real>();
+
+  std::vector<Vector3real> positions;
+  std::vector<Vector3real> normals;
+  for (const auto& cp : contactPoints) {
+    positions.push_back(cp.position);
+    normals.push_back(cp.normal.normalized());
+  }
+
+  double max_cos = cos(max_angle);
+
+  real loss;
+  for (int i = 0; i < 10000; ++i) {
+    Eigen::VectorXd grad =
+        gradient(LossFn2,
+                 wrt(trans, rot, center),
+                 at(positions, normals, trans, rot, center, away_dist),
+                 loss);
+    grad *= learningRate;
+
+    if (loss < 1e-12) {
+      std::cout << i << " loss: " << loss << std::endl;
+
+      Eigen::Vector3d rotd = rot.cast<double>();
+      Eigen::Vector3d transd = trans.cast<double>();
+      Eigen::Vector3d centerd = center.cast<double>();
+
+      double maxv = 0;
+      for (size_t j = 0; j < positions.size(); j++) {
+        Eigen::Vector3d v =
+            transd + rotd.cross(contactPoints[j].position - centerd);
+        maxv = std::max(v.norm(), maxv);
+      }
+
+      std::cout << maxv << std::endl;
+
+      double factor = away_dist / maxv;
+
+      transd *= factor;
+      rotd *= factor;
+
+      double theta = rotd.norm();
+
+      out_trans = Eigen::Translation3d(transd + centerd) *
+                  Eigen::AngleAxisd(theta, rotd / theta) *
+                  Eigen::Translation3d(-centerd);
+      return true;
+    }
+
+    trans -= grad.block(0, 0, 3, 1);
+    rot -= grad.block(3, 0, 3, 1);
+    center -= grad.block(6, 0, 3, 1);
+  }
+  std::cout << "failed: " << loss << std::endl;
+  return false;
+}
 
 }  // namespace core
 }  // namespace psg

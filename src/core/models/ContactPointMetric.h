@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <Eigen/Geometry>
 
 #include "../serialization/Serialization.h"
 #include "ContactPoint.h"
@@ -13,6 +14,7 @@ struct ContactPointMetric : psg::core::serialization::Serializable {
   std::vector<ContactPoint> contact_points;
   double min_wrench;
   double partial_min_wrench;
+  Eigen::Affine3d trans;
 
   DECL_SERIALIZE() {
     constexpr int version = 1;

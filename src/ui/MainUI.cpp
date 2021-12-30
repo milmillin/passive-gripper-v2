@@ -271,7 +271,19 @@ void MainUI::DrawContactPointPanel() {
     for (size_t i = 0; i < k; i++) {
       ImGui::PushID(std::to_string(i).c_str());
       if (ImGui::Button("Select")) {
-        vm_.PSG().SetContactPoints(contact_point_candidates_[i].contact_points);
+        const ContactPointMetric& cp = contact_point_candidates_[i];
+        vm_.PSG().reinit_trajectory = false;
+        vm_.PSG().SetContactPoints(cp.contact_points);
+        vm_.PSG().ClearKeyframe();
+
+        std::vector<Pose> candidates;
+        size_t best_i;
+        if (robots::BestInverse(cp.trans * robots::Forward(kInitPose),
+                                kInitPose,
+                                candidates,
+                                best_i)) {
+          vm_.PSG().AddKeyframe(FixAngles(kInitPose, candidates[best_i]));
+        }
       }
       ImGui::SameLine();
       ImGui::Text("mw: %.4e, pmw: %.4e",
@@ -711,7 +723,6 @@ void MainUI::OnSaveMeshClicked() {
     std::cerr << "Error: Not an .stl file" << filename << std::endl;
     return;
   }
-
 
   igl::writeSTL(filename, SV_, SF_, igl::FileEncoding::Binary);
   std::cout << "Mesh saved to " << filename << std::endl;
@@ -1198,8 +1209,8 @@ void MainUI::OnGripperInvalidated() {
   if (vm_.GetGripperV().size() != 0)
     layer.set_mesh((robots::Forward(vm_.GetCurrentPose()) *
                     vm_.GetGripperV().transpose().colwise().homogeneous())
-                      .transpose(),
-                  vm_.GetGripperF());
+                       .transpose(),
+                   vm_.GetGripperF());
   layer.set_colors(colors::kBrown);
 }
 

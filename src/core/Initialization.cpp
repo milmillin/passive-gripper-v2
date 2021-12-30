@@ -333,6 +333,7 @@ std::vector<ContactPointMetric> InitializeContactPoints(
       if (partialMinWrench == 0) continue;
 
       // Check Feasiblity: Approach Direction
+      /*
       if (!CheckApproachDirection(
               contactPoints,
               kPi / 2 * 8 / 9,
@@ -342,6 +343,15 @@ std::vector<ContactPointMetric> InitializeContactPoints(
               100)) {
         continue;
       }
+      */
+      Eigen::Affine3d trans;
+      if (!CheckApproachDirection2(contactPoints,
+                                   0.01,
+                                   kDegToRad * 80,
+                                   mdr.center_of_mass,
+                                   trans)) {
+        continue;
+      }
 
       double minWrench = ComputeMinWrenchQP(contact_cones, mdr.center_of_mass);
 
@@ -349,6 +359,7 @@ std::vector<ContactPointMetric> InitializeContactPoints(
       candidate.contact_points = contactPoints;
       candidate.partial_min_wrench = partialMinWrench;
       candidate.min_wrench = minWrench;
+      candidate.trans = trans;
 #pragma omp critical
       {
         prelim.push_back(candidate);

@@ -1,6 +1,7 @@
 #include "Robots.h"
 
 #define IKFAST_HAS_LIBRARY
+#include "../GeometryUtils.h"
 #include "ikfast.h"
 
 namespace psg {
@@ -84,6 +85,28 @@ static bool InverseImpl(const Eigen::Matrix3d& rot,
 bool Inverse(Eigen::Affine3d trans, std::vector<Pose>& out_jointConfigs) {
   trans = globalTransInv * trans;
   return InverseImpl(trans.linear(), trans.translation(), out_jointConfigs);
+}
+
+bool BestInverse(Eigen::Affine3d trans,
+                 Pose base,
+                 std::vector<Pose>& out_joint_configs,
+                 size_t& best_i) {
+  if (Inverse(trans, out_joint_configs)) {
+    double best = std::numeric_limits<double>::max();
+    double cur;
+    size_t bestI = -1;
+    for (size_t j = 0; j < out_joint_configs.size(); j++) {
+      if ((cur = SumSquaredAngularDistance(base, out_joint_configs[j])) <
+          best) {
+        best = cur;
+        bestI = j;
+      }
+    }
+    best_i = bestI;
+    return true;
+  }
+  best_i = -1;
+  return false;
 }
 
 static Eigen::Affine3d JointTransform(double theta,
