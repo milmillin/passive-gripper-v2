@@ -197,15 +197,14 @@ double ComputePartialMinWrenchQP(const Eigen::MatrixXd& G,
   return 0.0;
 }
 
-void ComputeQualityMetricSingle(
-    const std::vector<ContactPoint>& contact_points,
-    const Eigen::Vector3d& center_of_mass,
-    size_t cone_res,
-    double friction,
-    const Eigen::Vector3d& ext_force,
-    const Eigen::Vector3d& ext_torque,
-    double& out_min_wrench,
-    double& out_partial_min_wrench) {
+void ComputeQualityMetricSingle(const std::vector<ContactPoint>& contact_points,
+                                const Eigen::Vector3d& center_of_mass,
+                                size_t cone_res,
+                                double friction,
+                                const Eigen::Vector3d& ext_force,
+                                const Eigen::Vector3d& ext_torque,
+                                double& out_min_wrench,
+                                double& out_partial_min_wrench) {
   std::vector<ContactPoint> contact_cones =
       GenerateContactCones(contact_points, cone_res, friction);
   Eigen::MatrixXd G = CreateGraspMatrix(contact_cones, center_of_mass);
@@ -236,12 +235,9 @@ bool ComputeRobustQualityMetric(const std::vector<ContactPoint>& contact_points,
     return false;
   }
 
-  constexpr size_t kSubR = 1;
-  constexpr size_t kSubTheta = 8;
   constexpr size_t kSamplePerContact = kSubR * kSubTheta;
   constexpr size_t kC50 =
       kSamplePerContact * kSamplePerContact * kSamplePerContact * 50 / 100;
-  constexpr double kRadius = 0.0005;
   constexpr double kRadiusStep = kRadius / kSubR;
   constexpr double kThetaStep = kTwoPi / kSubTheta;
 
@@ -253,6 +249,7 @@ bool ComputeRobustQualityMetric(const std::vector<ContactPoint>& contact_points,
     Eigen::Vector3d T;
     GetPerp(base_cp.normal, B, T);
 
+    std::cout << "base\n" << base_cp.normal.transpose() << std::endl;
     for (size_t j = 0; j < kSubR; j++) {
       double r = (j + 1) * kRadiusStep;
       for (size_t k = 0; k < kSubTheta; k++) {
@@ -265,39 +262,39 @@ bool ComputeRobustQualityMetric(const std::vector<ContactPoint>& contact_points,
         cp.position = c;
         cp.fid = fid;
         cp.normal = mdr.FN.row(fid);
+        std::cout << cp.normal.transpose() << std::endl;
       }
     }
   }
 
-  assert(contact_points.size() == 3);
   std::vector<ContactPointMetric> metrics;
-  metrics.reserve(kSamplePerContact * kSamplePerContact * kSamplePerContact);
-  std::vector<ContactPoint> try_contact_points(3);
-  for (size_t i = 0; i < kSamplePerContact; i++) {
-    try_contact_points[0] = sub_contact_points[0][i];
+  metrics.reserve(contact_points.size() * kSamplePerContact);
+  std::vector<ContactPoint> try_contact_points;
+  size_t success = 0;
+  for (size_t i = 0; i < contact_points.size(); i++) {
+    try_contact_points = contact_points;
     for (size_t j = 0; j < kSamplePerContact; j++) {
-      try_contact_points[1] = sub_contact_points[1][j];
-      for (size_t k = 0; k < kSamplePerContact; k++) {
-        try_contact_points[2] = sub_contact_points[2][k];
-        ComputeQualityMetricSingle(try_contact_points,
-                                   mdr.center_of_mass,
-                                   settings.contact.cone_res,
-                                   settings.contact.friction,
-                                   ext_force,
-                                   ext_torque,
-                                   min_wrench,
-                                   partial_min_wrench);
-        metrics.emplace_back();
-        metrics.back().min_wrench = min_wrench;
-        metrics.back().partial_min_wrench = partial_min_wrench;
-        // std::cout << i << "," << j << "," << k << " " << std::setprecision(12)
-                  // << "mw: " << min_wrench << ", pmw: " << partial_min_wrench
-                  // << std::endl;
-      }
+      try_contact_points[i] = sub_contact_points[i][j];
+      ComputeQualityMetricSingle(try_contact_points,
+                                 mdr.center_of_mass,
+                                 settings.contact.cone_res,
+                                 settings.contact.friction,
+                                 ext_force,
+                                 ext_torque,
+                                 min_wrench,
+                                 partial_min_wrench);
+      if (partial_min_wrench > 0) success++;
+      metrics.emplace_back();
+      metrics.back().min_wrench = min_wrench;
+      metrics.back().partial_min_wrench = partial_min_wrench;
+      std::cout << i << "," << j << " " << std::setprecision(12)
+                << "mw: " << min_wrench << ", pmw: " << partial_min_wrench
+                << std::endl;
     }
   }
+  std::cout << "success: " << success << "/" << metrics.size() << std::endl;
   std::sort(metrics.begin(), metrics.end());
-  out_metric = metrics[kC50];
+  out_metric = metrics[metrics.size() / 2];
   out_metric.contact_points = contact_points;
   return out_metric.partial_min_wrench > 0;
 }

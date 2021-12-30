@@ -890,10 +890,7 @@ void MainUI::OnContactPointsInvalidated() {
     }
   }
 
-  constexpr size_t kSubR = 1;
-  constexpr size_t kSubTheta = 8;
   constexpr size_t kSamplePerContact = kSubR * kSubTheta;
-  constexpr double kRadius = 0.0025;
   constexpr double kRadiusStep = kRadius / kSubR;
   constexpr double kThetaStep = kTwoPi / kSubTheta;
   Eigen::MatrixXd P(nContacts * kSamplePerContact, 3);

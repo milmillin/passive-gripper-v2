@@ -17,6 +17,11 @@ constexpr double kHalfPi = kPi / 2.;
 const double kDegToRad = kPi / 180.;
 const double kRadToDeg = 180. / kPi;
 
+// Robust quality metric
+constexpr size_t kSubR = 2;
+constexpr size_t kSubTheta = 8;
+constexpr double kRadius = 0.0025;
+
 constexpr size_t kNumDOFs = 6;
 const double kRobotA[] = {0, -0.425, -0.39225, 0, 0, 0};
 const double kRobotD[] = {0.089159, 0, 0, 0.10915, 0.09465, 0.0823};

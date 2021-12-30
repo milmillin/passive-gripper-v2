@@ -383,7 +383,10 @@ std::vector<ContactPointMetric> InitializeContactPoints(
                                    Eigen::Vector3d::Zero(),
                                    metric)) {
 #pragma omp critical
-      round2.push_back(metric);
+      {
+        round2.push_back(metric);
+        std::cout << "round2 prog: " << round2.size() << std::endl;
+      }
     }
   }
 
