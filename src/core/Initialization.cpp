@@ -6,6 +6,9 @@
 #include "QualityMetric.h"
 #include "robots/Robots.h"
 
+#include <autodiff/forward/real.hpp>
+#include <autodiff/forward/real/eigen.hpp>
+
 namespace psg {
 namespace core {
 
@@ -311,7 +314,7 @@ std::vector<ContactPointMetric> InitializeContactPoints(
         contactPoints[i].fid = FI[pids[i]];
       }
 
-      // Check Feasibility
+      // Check Feasibility: Minimum Wrench
       std::vector<ContactPoint> contact_cones;
       contact_cones.reserve(3 * settings.contact.cone_res);
       for (size_t i = 0; i < 3; i++) {
@@ -328,6 +331,17 @@ std::vector<ContactPointMetric> InitializeContactPoints(
                                     Eigen::Vector3d::Zero());
       // Get at least a partial closure
       if (partialMinWrench == 0) continue;
+
+      // Check Feasiblity: Approach Direction
+      if (!CheckApproachDirection(
+              contactPoints,
+              M_PI / 2 * 8 / 9,
+              1,
+              0.1,
+              1e-12,
+              100)) {
+        continue;
+      }
 
       double minWrench = ComputeMinWrenchQP(contact_cones, mdr.center_of_mass);
 

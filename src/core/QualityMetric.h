@@ -37,5 +37,15 @@ double ComputePartialMinWrenchQP(const std::vector<ContactPoint>& contactCones,
                                  const Eigen::Vector3d& extForce,
                                  const Eigen::Vector3d& extTorque);
 
+// Solve for a translational and rotational velocity of the gripper, so that
+// the velocity of all finger tips align with the direction of the contact
+// point normal. Return true iff a solution is possible.
+bool CheckApproachDirection(const std::vector<ContactPoint>& contactPoints,
+                            double maxAngle,
+                            double maxV,
+                            double learningRate,
+                            double threshold,
+                            int max_iterations);
+
 }  // namespace core
 }  // namespace psg

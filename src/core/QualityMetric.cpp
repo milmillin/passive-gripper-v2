@@ -5,6 +5,9 @@
 
 #include "GeometryUtils.h"
 
+#include <autodiff/forward/real.hpp>
+#include <autodiff/forward/real/eigen.hpp>
+
 // #ifdef CGAL_USE_GMP
 // #include <CGAL/Gmpzf.h>
 // typedef CGAL::Gmpzf ET;
@@ -205,6 +208,75 @@ double ComputePartialMinWrenchQP(const std::vector<ContactPoint>& contactCones,
   }
   return 0.0;
 }
+
+using autodiff::real;
+using autodiff::Vector3real;
+
+static real lossFn(const std::vector<Vector3real> &positions,
+                 const std::vector<Vector3real> &normals,
+                 Vector3real &trans,
+                 Vector3real &rot,
+                 Vector3real &center,
+                 double maxCos,
+                 double maxV) {
+  assert(positions.size() == normals.size());
+  auto n = positions.size();
+
+  real loss = 0;
+  for (size_t i = 0; i < n; i++) {
+    Vector3real v = trans + rot.cross(positions[i] - center);
+    loss += std::max<real>(maxCos - v.dot(normals[i]), 0)
+        + std::max<real>(v.norm() - maxV, 0);
+  }
+  return loss;
+}
+
+bool CheckApproachDirection(const std::vector<ContactPoint>& contactPoints,
+                            double maxAngle,
+                            double maxV,
+                            double learningRate,
+                            double threshold,
+                            int max_iterations) {
+  using autodiff::Matrix3real;
+  using autodiff::gradient;
+  using autodiff::wrt;
+  using autodiff::at;
+
+  Vector3real trans = Vector3real::Zero();
+  Vector3real rot = Vector3real::Zero();
+  Vector3real center = Vector3real::Zero();
+
+  std::vector<Vector3real> positions;
+  std::vector<Vector3real> normals;
+  for (const auto& cp : contactPoints) {
+    positions.push_back(cp.position);
+    normals.push_back(cp.normal.normalized());
+  }
+
+  double maxCos = std::cos(maxAngle);
+
+  real loss;
+  for (int i = 0; i < max_iterations; ++i) {
+    Eigen::VectorXd grad = gradient(lossFn,
+                                    wrt(trans, rot, center),
+                                    at(positions, normals,
+                                       trans, rot, center,
+                                       maxCos, maxV),
+                                    loss);
+    grad *= learningRate;
+
+    // std::cout << i << " loss: " << loss << std::endl;
+    if (loss < threshold) {
+      return true;
+    }
+
+    trans -= grad.block(0, 0, 3, 1);
+    rot -= grad.block(3, 0, 3, 1);
+    center -= grad.block(6, 0, 3, 1);
+  }
+  return false;
+}
+
 
 }  // namespace core
 }  // namespace psg
