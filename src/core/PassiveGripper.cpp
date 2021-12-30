@@ -302,21 +302,22 @@ void PassiveGripper::InvalidateFinger() {
                                         effector_pos.translation(),
                                         settings_.finger.n_finger_joints);
     InvokeInvalidated(InvalidatedReason::kFingers);
-    trajectory_changed_ = true;
+    if (reinit_trajectory) {
+      // Re-initialize trajectory
+      params_.trajectory =
+          InitializeTrajectory(params_.fingers,
+                               params_.trajectory.front(),
+                               settings_.trajectory.n_keyframes);
+      trajectory_changed_ = true;
+    }
     cost_changed_ = true;
   }
 }
 
 void PassiveGripper::InvalidateTrajectory() {
   trajectory_changed_ = false;
-  if (reinit_trajectory) {
-    // Re-initialize trajectory
-    params_.trajectory = InitializeTrajectory(params_.fingers,
-                                              params_.trajectory.front(),
-                                              settings_.trajectory.n_keyframes);
-    InvokeInvalidated(InvalidatedReason::kTrajectory);
-    cost_changed_ = true;
-  }
+  InvokeInvalidated(InvalidatedReason::kTrajectory);
+  cost_changed_ = true;
 }
 
 void PassiveGripper::InvalidateTopoOptSettings() {
