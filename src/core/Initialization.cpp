@@ -61,65 +61,21 @@ void InitializeMeshPosition(const Eigen::MatrixXd& V,
   out_trans = Eigen::Translation3d(0, -min_y, 0) * trans * mesh_trans;
 }
 
-Eigen::MatrixXd InitializeFinger(const ContactPoint& contactPoint,
+Eigen::MatrixXd InitializeFinger(const ContactPoint contact_point,
                                  const MeshDependentResource& mdr,
-                                 const Eigen::Vector3d& effectorPos,
+                                 const Eigen::Vector3d& effector_pos,
+                                 const std::vector<double>& dist,
+                                 const std::vector<int>& par,
                                  size_t n_finger_joints) {
-  // Preprocess Mesh
-  struct VertexInfo {
-    int id;
-    double dist;
-    bool operator<(const VertexInfo& r) const { return dist > r.dist; }
-  };
-  struct EdgeInfo {
-    int id;
-    double dist;
-  };
-  std::vector<double> dist(mdr.V.rows(), std::numeric_limits<double>::max());
-  std::vector<int> par(mdr.V.rows(), -2);
-  std::vector<std::vector<EdgeInfo>> edges(mdr.V.rows());
-  std::priority_queue<VertexInfo> q;
-
-  for (size_t i = 0; i < mdr.V.rows(); i++) {
-    Eigen::RowVector3d direction = mdr.V.row(i) - effectorPos.transpose();
-    igl::Hit hit;
-    direction -= direction.normalized() * 1e-7;
-    if (!mdr.intersector.intersectSegment(effectorPos.transpose().cast<float>(),
-                                          direction.cast<float>(),
-                                          hit)) {
-      dist[i] = (mdr.V.row(i) - effectorPos.transpose()).norm();
-      par[i] = -1;
-      q.push(VertexInfo{(int)i, dist[i]});
-    }
-  }
-  for (size_t i = 0; i < mdr.F.rows(); i++) {
-    for (int iu = 0; iu < 3; iu++) {
-      int u = mdr.F(i, iu);
-      int v = mdr.F(i, (iu + 1) % 3);
-      edges[u].push_back(EdgeInfo{v, (mdr.V.row(v) - mdr.V.row(u)).norm()});
-    }
-  }
-  while (!q.empty()) {
-    VertexInfo now = q.top();
-    q.pop();
-    double nextDist;
-    for (const auto& next : edges[now.id]) {
-      if ((nextDist = dist[now.id] + next.dist) < dist[next.id]) {
-        dist[next.id] = nextDist;
-        par[next.id] = now.id;
-        q.push(VertexInfo{next.id, nextDist});
-      }
-    }
-  }
   Eigen::MatrixXd res(n_finger_joints, 3);
 
-  size_t fid = mdr.ComputeClosestFacet(contactPoint.position);
+  size_t fid = mdr.ComputeClosestFacet(contact_point.position);
   size_t vid = -1;
   double bestDist = std::numeric_limits<double>::max();
   double curDist;
   for (int j = 0; j < 3; j++) {
     int v = mdr.F(fid, j);
-    if ((curDist = (contactPoint.position - mdr.V.row(v).transpose()).norm() +
+    if ((curDist = (contact_point.position - mdr.V.row(v).transpose()).norm() +
                    dist[v]) < bestDist) {
       bestDist = curDist;
       vid = v;
@@ -127,7 +83,7 @@ Eigen::MatrixXd InitializeFinger(const ContactPoint& contactPoint,
   }
   std::vector<Eigen::Vector3d> finger;
   std::vector<int> fingerVid;
-  finger.push_back(contactPoint.position);
+  finger.push_back(contact_point.position);
   fingerVid.push_back(-1);
   while (vid != -1) {
     Eigen::Vector3d toPush = mdr.V.row(vid);
@@ -140,7 +96,7 @@ Eigen::MatrixXd InitializeFinger(const ContactPoint& contactPoint,
     fingerVid.push_back(vid);
     vid = par[vid];
   }
-  finger.push_back(effectorPos);
+  finger.push_back(effector_pos);
   fingerVid.push_back(-1);
 
   // Expand segment by 0.01
@@ -186,6 +142,66 @@ Eigen::MatrixXd InitializeFinger(const ContactPoint& contactPoint,
 
   for (size_t j = 0; j < n_finger_joints; j++) {
     res.row(j) = finger[j];
+  }
+  return res;
+}
+
+std::vector<Eigen::MatrixXd> InitializeFingers(
+    const std::vector<ContactPoint>& contact_points,
+    const MeshDependentResource& mdr,
+    const Eigen::Vector3d& effector_pos,
+    size_t n_finger_joints) {
+  // Preprocess Mesh
+  struct VertexInfo {
+    int id;
+    double dist;
+    bool operator<(const VertexInfo& r) const { return dist > r.dist; }
+  };
+  struct EdgeInfo {
+    int id;
+    double dist;
+  };
+  std::vector<double> dist(mdr.V.rows(), std::numeric_limits<double>::max());
+  std::vector<int> par(mdr.V.rows(), -2);
+  std::vector<std::vector<EdgeInfo>> edges(mdr.V.rows());
+  std::priority_queue<VertexInfo> q;
+
+  Eigen::RowVector3f effector_pos_f = effector_pos.transpose().cast<float>();
+  for (size_t i = 0; i < mdr.V.rows(); i++) {
+    Eigen::RowVector3d direction = mdr.V.row(i) - effector_pos.transpose();
+    igl::Hit hit;
+    direction -= direction.normalized() * 1e-7;
+    if (!mdr.intersector.intersectSegment(
+            effector_pos_f, direction.cast<float>(), hit)) {
+      dist[i] = (mdr.V.row(i) - effector_pos.transpose()).norm();
+      par[i] = -1;
+      q.push(VertexInfo{(int)i, dist[i]});
+    }
+  }
+  for (size_t i = 0; i < mdr.F.rows(); i++) {
+    for (int iu = 0; iu < 3; iu++) {
+      int u = mdr.F(i, iu);
+      int v = mdr.F(i, (iu + 1) % 3);
+      edges[u].push_back(EdgeInfo{v, (mdr.V.row(v) - mdr.V.row(u)).norm()});
+    }
+  }
+  while (!q.empty()) {
+    VertexInfo now = q.top();
+    q.pop();
+    double nextDist;
+    for (const auto& next : edges[now.id]) {
+      if ((nextDist = dist[now.id] + next.dist) < dist[next.id]) {
+        dist[next.id] = nextDist;
+        par[next.id] = now.id;
+        q.push(VertexInfo{next.id, nextDist});
+      }
+    }
+  }
+
+  std::vector<Eigen::MatrixXd> res(contact_points.size());
+  for (size_t i = 0; i < contact_points.size(); i++) {
+    res[i] = InitializeFinger(
+        contact_points[i], mdr, effector_pos, dist, par, n_finger_joints);      
   }
   return res;
 }
@@ -345,11 +361,8 @@ std::vector<ContactPointMetric> InitializeContactPoints(
       }
       */
       Eigen::Affine3d trans;
-      if (!CheckApproachDirection2(contactPoints,
-                                   0.01,
-                                   kDegToRad * 80,
-                                   mdr.center_of_mass,
-                                   trans)) {
+      if (!CheckApproachDirection2(
+              contactPoints, 0.01, kDegToRad * 80, mdr.center_of_mass, trans)) {
         continue;
       }
 

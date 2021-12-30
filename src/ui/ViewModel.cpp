@@ -183,14 +183,11 @@ void ViewModel::OnPsgInvalidated(PassiveGripper::InvalidatedReason reason) {
 bool ViewModel::ComputeInitParams() {
   Eigen::Vector3d effector_pos =
       robots::Forward(psg_.GetTrajectory().front()).translation();
-  init_params_.fingers.resize(psg_.GetContactPoints().size());
-  for (size_t i = 0; i < psg_.GetContactPoints().size(); i++) {
-    init_params_.fingers[i] =
-        InitializeFinger(psg_.GetContactPoints()[i],
-                         psg_.GetMDR(),
+  init_params_.fingers = 
+        InitializeFingers(psg_.GetContactPoints(),
+                         psg_.GetFloorMDR(),
                          effector_pos,
                          psg_.GetFingerSettings().n_finger_joints);
-  }
   init_params_.trajectory =
       InitializeTrajectory(init_params_.fingers,
                            psg_.GetTrajectory().front(),
