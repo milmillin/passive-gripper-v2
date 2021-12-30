@@ -338,7 +338,7 @@ bool CheckApproachDirection2(const std::vector<ContactPoint>& contact_points,
     grad *= learningRate;
 
     if (loss < 1e-12) {
-      std::cout << i << " loss: " << loss << std::endl;
+      // std::cout << i << " loss: " << loss << std::endl;
 
       Eigen::Vector3d rotd = rot.cast<double>();
       Eigen::Vector3d transd = trans.cast<double>();
@@ -351,7 +351,7 @@ bool CheckApproachDirection2(const std::vector<ContactPoint>& contact_points,
         maxv = std::max(v.norm(), maxv);
       }
 
-      std::cout << maxv << std::endl;
+      // std::cout << maxv << std::endl;
 
       double factor = away_dist / maxv;
 
@@ -370,7 +370,7 @@ bool CheckApproachDirection2(const std::vector<ContactPoint>& contact_points,
     rot -= grad.block(3, 0, 3, 1);
     center -= grad.block(6, 0, 3, 1);
   }
-  std::cout << "failed: " << loss << std::endl;
+  // std::cout << "failed: " << loss << std::endl;
   return false;
 }
 
