@@ -45,6 +45,15 @@ void MainUI::init(igl::opengl::glfw::Viewer* viewer_) {
   axisLayer.line_width = 2;
 
   GetLayer(Layer::kSweptSurface).show_lines = false;
+
+  auto& floorLayer = GetLayer(Layer::kFloor);
+  floorLayer.set_mesh(plane_V * 10, plane_F);
+  floorLayer.uniform_colors((Eigen::Vector3d)Eigen::Vector3d::Constant(0.5),
+                            Eigen::Vector3d::Constant(0.75),
+                            Eigen::Vector3d::Ones());
+  floorLayer.show_lines = false;
+  floorLayer.set_visible(false, -1);
+  GetLayer(Layer::kContactFloor).set_visible(false, -1);
 }
 
 inline bool MainUI::pre_draw() {
@@ -232,6 +241,8 @@ void MainUI::DrawContactPointPanel() {
         "Friction Coeff", &contact_settings.friction, 0.1, 0.5);
     contact_update |=
         ImGui::InputInt("Cone Resolution", (int*)&contact_settings.cone_res);
+    contact_update |=
+        ImGui::InputDouble("Contact Floor", &contact_settings.floor, 0.001, 0.001);
     finger_update |= ImGui::InputInt("Finger Joints",
                                      (int*)&finger_settings.n_finger_joints);
     if (finger_update) vm_.PSG().SetFingerSettings(finger_settings);
@@ -546,6 +557,8 @@ void MainUI::DrawViewPanel() {
     DrawLayerOptions(Layer::kGripper, "Gripper");
     DrawLayerOptions(Layer::kInitFingers, "Init Finger");
     DrawLayerOptions(Layer::kInitTrajectory, "Init Trajectory");
+    DrawLayerOptions(Layer::kFloor, "Floor");
+    DrawLayerOptions(Layer::kContactFloor, "Contact Floor");
     ImGui::PopID();
   }
 }
@@ -833,6 +846,9 @@ void MainUI::OnLayerInvalidated(Layer layer) {
       break;
     case Layer::kGradient:
       OnGradientInvalidated();
+      break;
+    case Layer::kContactFloor:
+      OnContactFloorInvalidated();
       break;
   }
 }
@@ -1257,6 +1273,17 @@ void MainUI::OnGradientInvalidated() {
 
   layer.set_edges(V, E, Eigen::RowVector3d(0.8, 0.4, 0));
   layer.line_width = 2;
+}
+
+void MainUI::OnContactFloorInvalidated() {
+  auto& layer = GetLayer(Layer::kContactFloor);
+  Eigen::MatrixXd V = plane_V * 3;
+  V.col(1).array() += vm_.PSG().GetContactSettings().floor;
+  layer.set_mesh(V, plane_F);
+  layer.show_lines = false;
+  layer.uniform_colors((Eigen::Vector3d)Eigen::Vector3d::Constant(0.5),
+                       colors::kBlue.transpose(),
+                       colors::kWhite.transpose());
 }
 
 inline bool MainUI::IsGuizmoVisible() {

@@ -156,6 +156,7 @@ void ViewModel::OnPsgInvalidated(PassiveGripper::InvalidatedReason reason) {
       break;
     case PassiveGripper::InvalidatedReason::kContactPoints:
       InvokeLayerInvalidated(Layer::kContactPoints);
+      InvokeLayerInvalidated(Layer::kContactFloor);
       is_init_params_valid_ = false;
       InvokeLayerInvalidated(Layer::kInitFingers);
       InvokeLayerInvalidated(Layer::kInitTrajectory);

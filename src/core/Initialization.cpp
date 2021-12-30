@@ -284,7 +284,7 @@ std::vector<ContactPointMetric> InitializeContactPoints(
     Eigen::MatrixXd X_;
     igl::random_points_on_mesh(num_seeds, mdr.V, mdr.F, B_, FI_, X_);
     for (long long i = 0; i < X_.rows(); i++) {
-      if (X_.row(i).y() > settings.cost.floor) {
+      if (X_.row(i).y() > settings.contact.floor) {
         FI.push_back(FI_(i));
         X.push_back(X_.row(i));
       }

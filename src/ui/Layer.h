@@ -18,6 +18,8 @@ enum class Layer : int {
   kInitFingers,
   kInitTrajectory,
   kGradient,
+  kFloor,
+  kContactFloor,
   kMax
 };
 

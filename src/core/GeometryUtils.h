@@ -134,6 +134,16 @@ const Eigen::Matrix<int, 3, 2> axis_E = (Eigen::Matrix<int, 3, 2>() <<
   0, 1,
   0, 2,
   0, 3).finished();
+
+const Eigen::Matrix<double, 4, 3> plane_V = (Eigen::Matrix<double, 4, 3>() <<
+  -1, 0, -1,
+  -1, 0, 1,
+  1, 0, 1,
+  1, 0, -1).finished();
+
+const Eigen::Matrix<int, 2, 3> plane_F = (Eigen::Matrix<int, 2, 3>() <<
+  0, 1, 2,
+  0, 2, 3).finished();
 // clang-format on
 
 }  // namespace core
