@@ -283,18 +283,18 @@ void MainUI::DrawContactPointPanel() {
       ImGui::PushID(std::to_string(i).c_str());
       if (ImGui::Button("Select")) {
         const ContactPointMetric& cp = contact_point_candidates_[i];
-        vm_.PSG().reinit_trajectory = false;
+        // vm_.PSG().reinit_trajectory = false;
         vm_.PSG().SetContactPoints(cp.contact_points);
-        vm_.PSG().ClearKeyframe();
+        // vm_.PSG().ClearKeyframe();
 
-        std::vector<Pose> candidates;
-        size_t best_i;
-        if (robots::BestInverse(cp.trans * robots::Forward(kInitPose),
-                                kInitPose,
-                                candidates,
-                                best_i)) {
-          vm_.PSG().AddKeyframe(FixAngles(kInitPose, candidates[best_i]));
-        }
+        // std::vector<Pose> candidates;
+        // size_t best_i;
+        // if (robots::BestInverse(cp.trans * robots::Forward(kInitPose),
+                                // kInitPose,
+                                // candidates,
+                                // best_i)) {
+          // vm_.PSG().AddKeyframe(FixAngles(kInitPose, candidates[best_i]));
+        // }
       }
       ImGui::SameLine();
       ImGui::Text("mw: %.4e, pmw: %.4e",
