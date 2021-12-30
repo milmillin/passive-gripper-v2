@@ -301,7 +301,7 @@ static real LossFn2(const std::vector<Vector3real>& positions,
   return loss;
 }
 
-bool CheckApproachDirection2(const std::vector<ContactPoint>& contactPoints,
+bool CheckApproachDirection2(const std::vector<ContactPoint>& contact_points,
                              double away_dist,
                              double max_angle,
                              const Eigen::Vector3d& center_of_mass,
@@ -319,10 +319,12 @@ bool CheckApproachDirection2(const std::vector<ContactPoint>& contactPoints,
 
   std::vector<Vector3real> positions;
   std::vector<Vector3real> normals;
-  for (const auto& cp : contactPoints) {
+  for (const auto& cp : contact_points) {
     positions.push_back(cp.position);
     normals.push_back(cp.normal.normalized());
+    trans += cp.normal;
   }
+  trans /= contact_points.size();
 
   double max_cos = cos(max_angle);
 
@@ -345,7 +347,7 @@ bool CheckApproachDirection2(const std::vector<ContactPoint>& contactPoints,
       double maxv = 0;
       for (size_t j = 0; j < positions.size(); j++) {
         Eigen::Vector3d v =
-            transd + rotd.cross(contactPoints[j].position - centerd);
+            transd + rotd.cross(contact_points[j].position - centerd);
         maxv = std::max(v.norm(), maxv);
       }
 

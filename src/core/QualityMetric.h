@@ -47,7 +47,7 @@ bool CheckApproachDirection(const std::vector<ContactPoint>& contactPoints,
                             double threshold,
                             int max_iterations);
 
-bool CheckApproachDirection2(const std::vector<ContactPoint>& contactPoints,
+bool CheckApproachDirection2(const std::vector<ContactPoint>& contact_points,
                              double away_dist,
                              double max_angle,
                              const Eigen::Vector3d& center_of_mass,
