@@ -99,9 +99,18 @@ Eigen::MatrixXd InitializeFinger(const ContactPoint contact_point,
   finger.push_back(effector_pos);
   fingerVid.push_back(-1);
 
-  // Expand segment by 0.01
+  // Expand segment by 0.01 or half the clearance
   for (size_t j = 1; j < finger.size() - 1; j++) {
-    finger[j] += mdr.VN.row(fingerVid[j]) * 0.01;
+    Eigen::RowVector3d normal = mdr.VN.row(fingerVid[j]);
+    igl::Hit hit;
+    double avail_dis = 0.01;
+    if (mdr.intersector.intersectRay(
+        (mdr.V.row(fingerVid[j]) + normal * 1e-6).cast<float>(),
+        normal.cast<float>(),
+            hit)) {
+      avail_dis = std::min(avail_dis, hit.t / 2.);
+    }
+    finger[j] += mdr.VN.row(fingerVid[j]) * avail_dis;
   }
 
   // Fix number of segment
