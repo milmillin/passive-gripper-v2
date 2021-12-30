@@ -301,7 +301,6 @@ void PassiveGripper::InvalidateFinger() {
                                         mdr_floor_,
                                         effector_pos.translation(),
                                         settings_.finger.n_finger_joints);
-    InvokeInvalidated(InvalidatedReason::kFingers);
     if (reinit_trajectory) {
       // Re-initialize trajectory
       params_.trajectory =
@@ -310,8 +309,9 @@ void PassiveGripper::InvalidateFinger() {
                                settings_.trajectory.n_keyframes);
       trajectory_changed_ = true;
     }
-    cost_changed_ = true;
   }
+  InvokeInvalidated(InvalidatedReason::kFingers);
+  cost_changed_ = true;
 }
 
 void PassiveGripper::InvalidateTrajectory() {
