@@ -55,6 +55,9 @@ std::vector<ContactPoint> GenerateContactCones(
 
 double Volume(const Eigen::MatrixXd& V, const Eigen::MatrixXi& F);
 
+Eigen::Vector3d CenterOfMass(const Eigen::MatrixXd& V,
+                             const Eigen::MatrixXi& F);
+
 Eigen::MatrixXd CreateCubeV(const Eigen::Vector3d& lb,
                             const Eigen::Vector3d& ub);
 

@@ -172,6 +172,23 @@ double Volume(const Eigen::MatrixXd& V, const Eigen::MatrixXi& F) {
   return std::abs(vol.sum());
 }
 
+Eigen::Vector3d CenterOfMass(const Eigen::MatrixXd& V,
+                             const Eigen::MatrixXi& F) {
+  // volume-weighted average of COM of tets
+  double volume = 0;
+  Eigen::RowVector3d center(0, 0, 0);
+  for (size_t i = 0; i < F.rows(); i++) {
+    Eigen::RowVector3d a = V.row(F(i, 0));
+    Eigen::RowVector3d b = V.row(F(i, 1));
+    Eigen::RowVector3d c = V.row(F(i, 2));
+    double tet_volume = -a.dot(b.cross(c)) / 6.;
+    Eigen::RowVector3d tet_center = (a + b + c) / 4.;
+    center += tet_volume * tet_center;
+    volume += tet_volume;
+  }
+  return center.transpose() / volume;
+}
+
 Eigen::MatrixXd CreateCubeV(const Eigen::Vector3d& lb,
                             const Eigen::Vector3d& ub) {
   auto R = cube_V.array().rowwise() * (ub - lb).transpose().array();
