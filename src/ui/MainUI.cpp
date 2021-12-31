@@ -128,6 +128,9 @@ void MainUI::draw_viewer_menu() {
   if (ImGui::Button("Save Mesh", ImVec2((w - p) / 2, 0))) {
     OnSaveMeshClicked();
   }
+  if (ImGui::Button("Merge mesh", ImVec2(w, 0))) {
+    OnMergeMeshClicked();
+  }
   ImGui::Checkbox("Millimeter", &is_millimeter_);
   ImGui::Checkbox("Swap YZ", &is_swap_yz_);
   ImGui::Separator();
@@ -715,6 +718,22 @@ void MainUI::OnSaveMeshClicked() {
 
   igl::writeSTL(filename, SV_, SF_, igl::FileEncoding::Binary);
   std::cout << "Mesh saved to " << filename << std::endl;
+}
+
+void MainUI::OnMergeMeshClicked() {
+  if (SV_.rows() == 0) {
+    std::cout << "Warning: mesh is empty" << std::endl;
+    return;
+  }
+
+  Eigen::MatrixXd SV;
+  Eigen::MatrixXi SF;
+  MergeMesh(SV_, SF_, SV, SF);
+
+  SV_.swap(SV);
+  SF_.swap(SF);
+  vm_.SetMesh(SV_, SF_);
+  optimizer_.Reset();
 }
 
 void MainUI::OnLoadPSGClicked() {
