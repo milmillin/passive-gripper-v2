@@ -24,13 +24,6 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  std::string cp_fn = argv[2];
-  std::ofstream cp_f(cp_fn, std::ios::out | std::ios::binary);
-  if (!cp_f.is_open()) {
-    Error() << "Cannot open " << cp_fn << std::endl;
-    return 1;
-  }
-
   psg::core::PassiveGripper psg;
   psg.Deserialize(psg_f);
   auto cps = psg::core::InitializeContactPoints(
@@ -40,6 +33,13 @@ int main(int argc, char** argv) {
       psg::core::robots::Forward(psg.GetTrajectory().front()).translation(),
       10000,
       1000);
+
+  std::string cp_fn = argv[2];
+  std::ofstream cp_f(cp_fn, std::ios::out | std::ios::binary);
+  if (!cp_f.is_open()) {
+    Error() << "Cannot open " << cp_fn << std::endl;
+    return 1;
+  }
   psg::core::serialization::Serialize(cps, cp_f);
   Log() << "Contact point candidate written to: " << cp_fn << std::endl;
   return 0;
