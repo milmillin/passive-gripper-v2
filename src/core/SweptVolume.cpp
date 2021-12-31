@@ -446,7 +446,7 @@ void NegativeSweptVolumePSG(const PassiveGripper& psg,
                             Eigen::MatrixXd& out_V,
                             Eigen::MatrixXi& out_F,
                             const int num_seeds) {
-  Eigen::Vector3d floor(0, psg.GetCostSettings().floor, 0);
+  Eigen::Vector3d floor(0, 0, 0);
   Eigen::Vector3d floor_N(0, 1, 0);
   Eigen::Affine3d finger_trans_inv = psg.GetFingerTransInv();
   floor = finger_trans_inv * floor;
@@ -471,7 +471,7 @@ void PiNegativeSweptVolumePSG(const PassiveGripper& psg,
                               Eigen::MatrixXd& out_V,
                               Eigen::MatrixXi& out_F,
                               const int num_seeds) {
-  Eigen::Vector3d floor(0, psg.GetCostSettings().floor, 0);
+  Eigen::Vector3d floor(0, 0, 0);
   Eigen::Vector3d floor_N(0, 1, 0);
   Eigen::Affine3d finger_trans_inv = psg.GetFingerTransInv();
   floor = finger_trans_inv * floor;
