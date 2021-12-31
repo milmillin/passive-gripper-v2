@@ -6,6 +6,7 @@
 
 #include "../Constants.h"
 #include "models/ContactPoint.h"
+#include "models/MeshDependentResource.h"
 
 namespace psg {
 namespace core {
@@ -60,6 +61,12 @@ Eigen::Vector3d CenterOfMass(const Eigen::MatrixXd& V,
 
 Eigen::MatrixXd CreateCubeV(const Eigen::Vector3d& lb,
                             const Eigen::Vector3d& ub);
+
+// par (>=0) vertex id, (-1) from, (-2) unreachable
+void ComputeConnectivityFrom(const MeshDependentResource& mdr,
+                             const Eigen::Vector3d& from,
+                             std::vector<double>& out_dist,
+                             std::vector<int>& out_par);
 
 // Creates sphere meshes
 // Input:

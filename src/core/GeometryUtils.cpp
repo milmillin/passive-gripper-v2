@@ -2,9 +2,9 @@
 
 #include <CGAL/Polygon_mesh_processing/remesh.h>
 #include <CGAL/Polyhedron_3.h>
-#include <igl/volume.h>
 #include <igl/copyleft/cgal/mesh_to_polyhedron.h>
 #include <igl/copyleft/cgal/polyhedron_to_mesh.h>
+#include <igl/volume.h>
 #include <libqhullcpp/Qhull.h>
 #include <libqhullcpp/QhullFacetList.h>
 #include <libqhullcpp/QhullPoint.h>
@@ -193,6 +193,59 @@ Eigen::MatrixXd CreateCubeV(const Eigen::Vector3d& lb,
                             const Eigen::Vector3d& ub) {
   auto R = cube_V.array().rowwise() * (ub - lb).transpose().array();
   return R.array().rowwise() + lb.transpose().array();
+}
+
+void ComputeConnectivityFrom(const MeshDependentResource& mdr,
+                             const Eigen::Vector3d& from,
+                             std::vector<double>& out_dist,
+                             std::vector<int>& out_par) {
+  struct VertexInfo {
+    int id;
+    double dist;
+    bool operator<(const VertexInfo& r) const { return dist > r.dist; }
+  };
+  struct EdgeInfo {
+    int id;
+    double dist;
+  };
+  std::vector<double> dist(mdr.V.rows(), std::numeric_limits<double>::max());
+  std::vector<int> par(mdr.V.rows(), -2);
+  std::vector<std::vector<EdgeInfo>> edges(mdr.V.rows());
+  std::priority_queue<VertexInfo> q;
+
+  Eigen::RowVector3f effector_pos_f = from.transpose().cast<float>();
+  for (size_t i = 0; i < mdr.V.rows(); i++) {
+    Eigen::RowVector3d direction = mdr.V.row(i) - from.transpose();
+    igl::Hit hit;
+    direction -= direction.normalized() * 1e-7;
+    if (!mdr.intersector.intersectSegment(
+            effector_pos_f, direction.cast<float>(), hit)) {
+      dist[i] = (mdr.V.row(i) - from.transpose()).norm();
+      par[i] = -1;
+      q.push(VertexInfo{(int)i, dist[i]});
+    }
+  }
+  for (size_t i = 0; i < mdr.F.rows(); i++) {
+    for (int iu = 0; iu < 3; iu++) {
+      int u = mdr.F(i, iu);
+      int v = mdr.F(i, (iu + 1) % 3);
+      edges[u].push_back(EdgeInfo{v, (mdr.V.row(v) - mdr.V.row(u)).norm()});
+    }
+  }
+  while (!q.empty()) {
+    VertexInfo now = q.top();
+    q.pop();
+    double nextDist;
+    for (const auto& next : edges[now.id]) {
+      if ((nextDist = dist[now.id] + next.dist) < dist[next.id]) {
+        dist[next.id] = nextDist;
+        par[next.id] = now.id;
+        q.push(VertexInfo{next.id, nextDist});
+      }
+    }
+  }
+  out_dist = dist;
+  out_par = par;
 }
 
 void CreateSpheres(const Eigen::MatrixXd& P,

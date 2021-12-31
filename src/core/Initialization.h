@@ -28,7 +28,9 @@ Trajectory InitializeTrajectory(const std::vector<Eigen::MatrixXd>& fingers,
 
 std::vector<ContactPointMetric> InitializeContactPoints(
     const MeshDependentResource& mdr,
-    const GripperSettings& settings,
+    const MeshDependentResource& mdr_floor,
+    const ContactSettings& settings,
+    const Eigen::Vector3d& effector_pos,
     size_t num_candidates,
     size_t num_seeds);
 

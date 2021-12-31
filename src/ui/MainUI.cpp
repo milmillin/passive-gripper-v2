@@ -241,8 +241,8 @@ void MainUI::DrawContactPointPanel() {
         "Friction Coeff", &contact_settings.friction, 0.1, 0.5);
     contact_update |=
         ImGui::InputInt("Cone Resolution", (int*)&contact_settings.cone_res);
-    contact_update |=
-        ImGui::InputDouble("Contact Floor", &contact_settings.floor, 0.001, 0.001);
+    contact_update |= ImGui::InputDouble(
+        "Contact Floor", &contact_settings.floor, 0.001, 0.001);
     finger_update |= ImGui::InputInt("Finger Joints",
                                      (int*)&finger_settings.n_finger_joints);
     if (finger_update) vm_.PSG().SetFingerSettings(finger_settings);
@@ -270,11 +270,13 @@ void MainUI::DrawContactPointPanel() {
     ImGui::InputInt("# Candidates", (int*)&cp_num_candidates, 1000);
     ImGui::InputInt("# Seeds", (int*)&cp_num_seeds, 1000);
     if (ImGui::Button("Generate Candidates", ImVec2(w, 0))) {
-      contact_point_candidates_ =
-          InitializeContactPoints(vm_.PSG().GetMDR(),
-                                  vm_.PSG().GetSettings(),
-                                  cp_num_candidates,
-                                  cp_num_seeds);
+      contact_point_candidates_ = InitializeContactPoints(
+          vm_.PSG().GetMDR(),
+          vm_.PSG().GetFloorMDR(),
+          vm_.PSG().GetContactSettings(),
+          robots::Forward(vm_.PSG().GetTrajectory().front()).translation(),
+          cp_num_candidates,
+          cp_num_seeds);
     }
     ImGui::Separator();
     size_t k = std::min((size_t)10, contact_point_candidates_.size());
@@ -290,10 +292,10 @@ void MainUI::DrawContactPointPanel() {
         // std::vector<Pose> candidates;
         // size_t best_i;
         // if (robots::BestInverse(cp.trans * robots::Forward(kInitPose),
-                                // kInitPose,
-                                // candidates,
-                                // best_i)) {
-          // vm_.PSG().AddKeyframe(FixAngles(kInitPose, candidates[best_i]));
+        // kInitPose,
+        // candidates,
+        // best_i)) {
+        // vm_.PSG().AddKeyframe(FixAngles(kInitPose, candidates[best_i]));
         // }
       }
       ImGui::SameLine();

@@ -1,12 +1,13 @@
+#include <omp.h>
 #include <cstring>
 #include <fstream>
 #include <iostream>
 #include <string>
 #include <vector>
-#include <omp.h>
 
-#include "../core/PassiveGripper.h"
 #include "../core/Initialization.h"
+#include "../core/PassiveGripper.h"
+#include "../core/robots/Robots.h"
 #include "../core/serialization/Serialization.h"
 #include "../utils.h"
 
@@ -33,7 +34,12 @@ int main(int argc, char** argv) {
   psg::core::PassiveGripper psg;
   psg.Deserialize(psg_f);
   auto cps = psg::core::InitializeContactPoints(
-      psg.GetMDR(), psg.GetSettings(), 10000, 1000);
+      psg.GetMDR(),
+      psg.GetFloorMDR(),
+      psg.GetContactSettings(),
+      psg::core::robots::Forward(psg.GetTrajectory().front()).translation(),
+      10000,
+      1000);
   psg::core::serialization::Serialize(cps, cp_f);
   Log() << "Contact point candidate written to: " << cp_fn << std::endl;
   return 0;

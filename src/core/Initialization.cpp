@@ -105,8 +105,8 @@ Eigen::MatrixXd InitializeFinger(const ContactPoint contact_point,
     igl::Hit hit;
     double avail_dis = 0.01;
     if (mdr.intersector.intersectRay(
-        (mdr.V.row(fingerVid[j]) + normal * 1e-6).cast<float>(),
-        normal.cast<float>(),
+            (mdr.V.row(fingerVid[j]) + normal * 1e-6).cast<float>(),
+            normal.cast<float>(),
             hit)) {
       avail_dis = std::min(avail_dis, hit.t / 2.);
     }
@@ -160,57 +160,14 @@ std::vector<Eigen::MatrixXd> InitializeFingers(
     const MeshDependentResource& mdr,
     const Eigen::Vector3d& effector_pos,
     size_t n_finger_joints) {
-  // Preprocess Mesh
-  struct VertexInfo {
-    int id;
-    double dist;
-    bool operator<(const VertexInfo& r) const { return dist > r.dist; }
-  };
-  struct EdgeInfo {
-    int id;
-    double dist;
-  };
-  std::vector<double> dist(mdr.V.rows(), std::numeric_limits<double>::max());
-  std::vector<int> par(mdr.V.rows(), -2);
-  std::vector<std::vector<EdgeInfo>> edges(mdr.V.rows());
-  std::priority_queue<VertexInfo> q;
-
-  Eigen::RowVector3f effector_pos_f = effector_pos.transpose().cast<float>();
-  for (size_t i = 0; i < mdr.V.rows(); i++) {
-    Eigen::RowVector3d direction = mdr.V.row(i) - effector_pos.transpose();
-    igl::Hit hit;
-    direction -= direction.normalized() * 1e-7;
-    if (!mdr.intersector.intersectSegment(
-            effector_pos_f, direction.cast<float>(), hit)) {
-      dist[i] = (mdr.V.row(i) - effector_pos.transpose()).norm();
-      par[i] = -1;
-      q.push(VertexInfo{(int)i, dist[i]});
-    }
-  }
-  for (size_t i = 0; i < mdr.F.rows(); i++) {
-    for (int iu = 0; iu < 3; iu++) {
-      int u = mdr.F(i, iu);
-      int v = mdr.F(i, (iu + 1) % 3);
-      edges[u].push_back(EdgeInfo{v, (mdr.V.row(v) - mdr.V.row(u)).norm()});
-    }
-  }
-  while (!q.empty()) {
-    VertexInfo now = q.top();
-    q.pop();
-    double nextDist;
-    for (const auto& next : edges[now.id]) {
-      if ((nextDist = dist[now.id] + next.dist) < dist[next.id]) {
-        dist[next.id] = nextDist;
-        par[next.id] = now.id;
-        q.push(VertexInfo{next.id, nextDist});
-      }
-    }
-  }
+  std::vector<double> dist;
+  std::vector<int> par;
+  ComputeConnectivityFrom(mdr, effector_pos, dist, par);
 
   std::vector<Eigen::MatrixXd> res(contact_points.size());
   for (size_t i = 0; i < contact_points.size(); i++) {
     res[i] = InitializeFinger(
-        contact_points[i], mdr, effector_pos, dist, par, n_finger_joints);      
+        contact_points[i], mdr, effector_pos, dist, par, n_finger_joints);
   }
   return res;
 }
@@ -294,11 +251,15 @@ Trajectory InitializeTrajectory(const std::vector<Eigen::MatrixXd>& fingers,
 
 std::vector<ContactPointMetric> InitializeContactPoints(
     const MeshDependentResource& mdr,
-    const GripperSettings& settings,
+    const MeshDependentResource& mdr_floor,
+    const ContactSettings& settings,
+    const Eigen::Vector3d& effector_pos,
     size_t num_candidates,
     size_t num_seeds) {
-  std::vector<ContactPointMetric> prelim;
-  prelim.reserve(num_candidates);
+
+  std::vector<double> v_dist;
+  std::vector<int> v_par;
+  ComputeConnectivityFrom(mdr_floor, effector_pos, v_dist, v_par);
 
   std::vector<int> FI;
   std::vector<Eigen::Vector3d> X;
@@ -309,10 +270,13 @@ std::vector<ContactPointMetric> InitializeContactPoints(
     Eigen::MatrixXd X_;
     igl::random_points_on_mesh(num_seeds, mdr.V, mdr.F, B_, FI_, X_);
     for (long long i = 0; i < X_.rows(); i++) {
-      if (X_.row(i).y() > settings.contact.floor) {
-        FI.push_back(FI_(i));
-        X.push_back(X_.row(i));
-      }
+      Eigen::RowVector3d x = X_.row(i);
+      // filter floor
+      if (x.y() <= settings.floor) continue;
+      // filter unreachable point
+      if (v_par[mdr_floor.ComputeClosestVertex(x)] == -2) continue;
+      FI.push_back(FI_(i));
+      X.push_back(X_.row(i));
     }
   }
   std::cout << "Num seeds: " << X.size() << std::endl;
@@ -320,6 +284,8 @@ std::vector<ContactPointMetric> InitializeContactPoints(
   std::mt19937 gen;
   std::uniform_int_distribution<int> dist(0, num_seeds - 1);
 
+  std::vector<ContactPointMetric> prelim;
+  prelim.reserve(num_candidates);
 #pragma omp parallel
   {
     while (true) {
@@ -341,11 +307,11 @@ std::vector<ContactPointMetric> InitializeContactPoints(
 
       // Check Feasibility: Minimum Wrench
       std::vector<ContactPoint> contact_cones;
-      contact_cones.reserve(3 * settings.contact.cone_res);
+      contact_cones.reserve(3 * settings.cone_res);
       for (size_t i = 0; i < 3; i++) {
         const auto&& cone = GenerateContactCone(contactPoints[i],
-                                                settings.contact.cone_res,
-                                                settings.contact.friction);
+                                                settings.cone_res,
+                                                settings.friction);
         contact_cones.insert(contact_cones.end(), cone.begin(), cone.end());
       }
 

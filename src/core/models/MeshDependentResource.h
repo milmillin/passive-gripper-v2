@@ -20,6 +20,9 @@ struct MeshDependentResource : psg::core::serialization::Serializable {
   Eigen::MatrixXi E;
   Eigen::MatrixXi EMAP;
   Eigen::Vector3d center_of_mass;
+  Eigen::Vector3d minimum;
+  Eigen::Vector3d maximum;
+  Eigen::Vector3d size;
   igl::AABB<Eigen::MatrixXd, 3> tree;
   igl::embree::EmbreeIntersector intersector;
 
@@ -33,6 +36,8 @@ struct MeshDependentResource : psg::core::serialization::Serializable {
                                double& out_s) const;
 
   size_t ComputeClosestFacet(const Eigen::Vector3d& position) const;
+
+  size_t ComputeClosestVertex(const Eigen::Vector3d& position) const;
 
   DECL_SERIALIZE() {
     constexpr int version = 1;
