@@ -16,6 +16,7 @@ namespace core {
 
 bool Remesh(const Eigen::MatrixXd& V,
             const Eigen::MatrixXi& F,
+            size_t n_iters,
             Eigen::MatrixXd& out_V,
             Eigen::MatrixXi& out_F) {
   typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
@@ -24,10 +25,14 @@ bool Remesh(const Eigen::MatrixXd& V,
   namespace PMP = CGAL::Polygon_mesh_processing;
 
   Mesh mesh;
-  igl::copyleft::cgal::mesh_to_polyhedron(V, F, mesh);
+  if (!igl::copyleft::cgal::mesh_to_polyhedron(V, F, mesh)) {
+    std::cerr << "Malformed mesh" << std::endl;
+    return false;
+  }
   PMP::isotropic_remeshing(
-      faces(mesh), 0.003, mesh, PMP::parameters::number_of_iterations(1));
+      faces(mesh), 0.003, mesh, PMP::parameters::number_of_iterations(n_iters));
   igl::copyleft::cgal::polyhedron_to_mesh(mesh, out_V, out_F);
+  return true;
 }
 
 bool ComputeConvexHull(const Eigen::MatrixXd& points,

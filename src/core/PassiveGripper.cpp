@@ -244,8 +244,16 @@ void PassiveGripper::InvalidateContactSettings() {
     mdr_floor_value_ = settings_.contact.floor;
     Eigen::MatrixXd cur_cube_V = cube_V;
 
-    Eigen::RowVector3d p_min = mdr_.V.colwise().minCoeff();
-    Eigen::RowVector3d p_max = mdr_.V.colwise().maxCoeff();
+    Eigen::MatrixXd NV;
+    Eigen::MatrixXi NF;
+    if (!Remesh(mdr_.V, mdr_.F, 5, NV, NF)) {
+      std::cerr << "Remesh failed! Defaulted to using original mesh" << std::endl;
+      NV = mdr_.V;
+      NF = mdr_.F;
+    }
+
+    Eigen::RowVector3d p_min = NV.colwise().minCoeff();
+    Eigen::RowVector3d p_max = NV.colwise().maxCoeff();
     Eigen::RowVector3d range = p_max - p_min;
     range.y() = settings_.contact.floor;
 
@@ -254,8 +262,8 @@ void PassiveGripper::InvalidateContactSettings() {
 
     Eigen::MatrixXd RV;
     Eigen::MatrixXi RF;
-    igl::copyleft::cgal::mesh_boolean(mdr_.V,
-                                      mdr_.F,
+    igl::copyleft::cgal::mesh_boolean(NV,
+                                      NF,
                                       cur_cube_V,
                                       cube_F,
                                       igl::MESH_BOOLEAN_TYPE_UNION,

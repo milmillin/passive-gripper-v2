@@ -15,6 +15,7 @@ using namespace models;
 
 bool Remesh(const Eigen::MatrixXd& V,
             const Eigen::MatrixXi& F,
+            size_t n_iters,
             Eigen::MatrixXd& out_V,
             Eigen::MatrixXi& out_F);
 

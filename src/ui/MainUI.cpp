@@ -338,7 +338,7 @@ void MainUI::DrawTransformPanel() {
     if (ImGui::Button("Remesh##a", ImVec2(w, 0))) {
       Eigen::MatrixXd V;
       Eigen::MatrixXi F;
-      Remesh(vm_.PSG().GetMeshV(), vm_.PSG().GetMeshF(), V, F);
+      Remesh(vm_.PSG().GetMeshV(), vm_.PSG().GetMeshF(), 1, V, F);
       vm_.SetMesh(V, F);
     }
   }
