@@ -714,7 +714,7 @@ void MainUI::OnLoadMeshClicked() {
   }
   if (is_swap_yz_) {
     SV.col(1).swap(SV.col(2));
-    SF.col(1).swap(SF.col(2));
+    SV.col(0) *= -1;
   }
 
   SV_ = SV;
