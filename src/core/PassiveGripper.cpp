@@ -21,6 +21,14 @@ void PassiveGripper::SetMesh(const Eigen::MatrixXd& V,
                              const Eigen::MatrixXi& F,
                              bool invalidate) {
   mdr_.init(V, F);
+  Eigen::MatrixXd RV;
+  Eigen::MatrixXi RF;
+  if (!Remesh(mdr_.V, mdr_.F, 5, RV, RF)) {
+    std::cerr << "Remesh failed! Defaulted to using original mesh" << std::endl;
+  }
+  std::cerr << "Remesh: V: " << RV.rows() << std::endl;
+  mdr_remeshed_.init(RV, RF);
+
   mesh_changed_ = true;
   mesh_loaded_ = true;
   if (invalidate) Invalidate();
@@ -220,57 +228,50 @@ void PassiveGripper::InvalidateMesh() {
   mesh_changed_ = false;
   params_.contact_points.clear();
   params_.fingers.clear();
-  mdr_floor_value_ = -1;
+  mdr_contact_floor_ = -1;
   InvokeInvalidated(InvalidatedReason::kMesh);
   contact_changed_ = true;
 }
 
+static void InitMdrFloor(const Eigen::MatrixXd& V,
+                         const Eigen::MatrixXi& F,
+                         double floor,
+                         MeshDependentResource& out_mdr) {
+  Eigen::MatrixXd cur_cube_V = cube_V;
+
+  Eigen::RowVector3d p_min = V.colwise().minCoeff();
+  Eigen::RowVector3d p_max = V.colwise().maxCoeff();
+  Eigen::RowVector3d range = p_max - p_min;
+  p_min = p_min.cwiseMin(Eigen::RowVector3d::Zero());
+  p_max = p_max.cwiseMax(Eigen::RowVector3d::Zero());
+  range.y() = 0;
+  p_min -= range;
+  p_max += range;
+  range = p_max - p_min;
+  range.y() = floor;
+
+  cur_cube_V.array().rowwise() *= range.array();
+  cur_cube_V.rowwise() += p_min;
+
+  Eigen::MatrixXd RV;
+  Eigen::MatrixXi RF;
+  igl::copyleft::cgal::mesh_boolean(
+      V, F, cur_cube_V, cube_F, igl::MESH_BOOLEAN_TYPE_UNION, RV, RF);
+
+  out_mdr.init(RV, RF);
+}
+
 void PassiveGripper::InvalidateContactSettings() {
   contact_settings_changed_ = false;
-  contact_cones_.clear();
-  contact_cones_.reserve(settings_.contact.cone_res *
-                         params_.contact_points.size());
-  for (size_t i = 0; i < params_.contact_points.size(); i++) {
-    std::vector<ContactPoint>&& cones =
-        GenerateContactCone(params_.contact_points[i],
-                            settings_.contact.cone_res,
-                            settings_.contact.friction);
-    contact_cones_.insert(contact_cones_.end(), cones.begin(), cones.end());
-  }
   contact_changed_ = true;
 
-  // Update mdr_floor_;
-  if (mdr_floor_value_ != settings_.contact.floor) {
-    mdr_floor_value_ = settings_.contact.floor;
-    Eigen::MatrixXd cur_cube_V = cube_V;
-
-    Eigen::MatrixXd NV;
-    Eigen::MatrixXi NF;
-    if (!Remesh(mdr_.V, mdr_.F, 5, NV, NF)) {
-      std::cerr << "Remesh failed! Defaulted to using original mesh" << std::endl;
-      NV = mdr_.V;
-      NF = mdr_.F;
-    }
-
-    Eigen::RowVector3d p_min = NV.colwise().minCoeff();
-    Eigen::RowVector3d p_max = NV.colwise().maxCoeff();
-    Eigen::RowVector3d range = p_max - p_min;
-    range.y() = settings_.contact.floor;
-
-    cur_cube_V.array().rowwise() *= range.array();
-    cur_cube_V.rowwise() += p_min;
-
-    Eigen::MatrixXd RV;
-    Eigen::MatrixXi RF;
-    igl::copyleft::cgal::mesh_boolean(NV,
-                                      NF,
-                                      cur_cube_V,
-                                      cube_F,
-                                      igl::MESH_BOOLEAN_TYPE_UNION,
-                                      RV,
-                                      RF);
-
-    mdr_floor_.init(RV, RF);
+  // Update mdr_contact_;
+  if (mdr_contact_floor_ != settings_.contact.floor) {
+    mdr_contact_floor_ = settings_.contact.floor;
+    InitMdrFloor(mdr_remeshed_.V,
+                 mdr_remeshed_.F,
+                 settings_.contact.floor,
+                 mdr_contact_);
   }
 }
 
@@ -306,7 +307,7 @@ void PassiveGripper::InvalidateFinger() {
   if (reinit_fingers) {
     Eigen::Affine3d effector_pos = robots::Forward(params_.trajectory.front());
     params_.fingers = InitializeFingers(params_.contact_points,
-                                        mdr_floor_,
+                                        mdr_contact_,
                                         effector_pos.translation(),
                                         settings_.finger.n_finger_joints);
     if (reinit_trajectory) {

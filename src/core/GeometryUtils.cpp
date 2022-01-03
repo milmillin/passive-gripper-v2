@@ -26,7 +26,8 @@ bool Remesh(const Eigen::MatrixXd& V,
 
   Mesh mesh;
   if (!igl::copyleft::cgal::mesh_to_polyhedron(V, F, mesh)) {
-    std::cerr << "Malformed mesh" << std::endl;
+    out_V = V;
+    out_F = F;
     return false;
   }
   PMP::isotropic_remeshing(

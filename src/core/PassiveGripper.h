@@ -87,9 +87,12 @@ class PassiveGripper : public psg::core::serialization::Serializable {
   std::vector<ContactPoint> contact_cones_;
   Eigen::Affine3d mesh_trans_;
 
-  // mdr with floor cube
-  MeshDependentResource mdr_floor_;
-  double mdr_floor_value_ = -1;
+  // remesh'd
+  MeshDependentResource mdr_remeshed_;
+
+  // mdr with contact floor
+  MeshDependentResource mdr_contact_;
+  double mdr_contact_floor_ = -1;
 
   bool mesh_loaded_ = false;
 
@@ -161,7 +164,7 @@ class PassiveGripper : public psg::core::serialization::Serializable {
   DECLARE_GETTER(GetParams, params_)
   DECLARE_GETTER(GetSettings, settings_)
   DECLARE_GETTER(GetMDR, mdr_)
-  DECLARE_GETTER(GetFloorMDR, mdr_floor_)
+  DECLARE_GETTER(GetFloorMDR, mdr_contact_)
 
   DECL_SERIALIZE() {
     constexpr int version = 1;
