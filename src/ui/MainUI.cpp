@@ -16,6 +16,7 @@
 #include "../core/serialization/Serialization.h"
 #include "Assets.h"
 #include "Components.h"
+#include "../core/RRTStarPlanner.h"
 
 using namespace psg::core;
 
@@ -465,6 +466,13 @@ void MainUI::DrawOptimizationPanel() {
     if (cost_update) vm_.PSG().SetCostSettings(cost_settings);
     if (ImGui::Button("Optimize", ImVec2(w, 0))) {
       optimizer_.Optimize(vm_.PSG());
+    }
+    if (ImGui::Button("RRT Optimize", ImVec2(w, 0))) {
+      RRTStarPlanner planner;
+      Trajectory trajectory;
+      if (planner.Optimize(vm_.PSG(), trajectory)) {
+        vm_.PSG().SetTrajectory(trajectory);      
+      }
     }
   }
   ImGui::PopID();

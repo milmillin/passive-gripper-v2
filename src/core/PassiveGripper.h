@@ -57,6 +57,7 @@ class PassiveGripper : public psg::core::serialization::Serializable {
   void EditKeyframe(size_t index, const Pose& pose);
   void RemoveKeyframe(size_t index);
   void ClearKeyframe();
+  void SetTrajectory(const Trajectory& trajectory);
   inline const Trajectory& GetTrajectory() const { return params_.trajectory; }
   inline Eigen::Affine3d GetFingerTransInv() const {
     return robots::Forward(params_.trajectory.front()).inverse();

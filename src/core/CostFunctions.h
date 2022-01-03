@@ -1,5 +1,8 @@
 #pragma once
 
+#include <Eigen/Core>
+#include <Eigen/Geometry>
+#include <vector>
 #include "../Constants.h"
 #include "models/GripperParams.h"
 #include "models/GripperSettings.h"
@@ -20,6 +23,12 @@ double ComputeCost(const GripperParams& params,
                    const MeshDependentResource& mdr,
                    GripperParams& out_dCost_dParam);
 
+double MinDistanceAtPose(const std::vector<Eigen::MatrixXd>& fingers,
+                         const Eigen::Affine3d& finger_trans_inv,
+                         const MeshDependentResource& mdr,
+                         const GripperSettings& settings,
+                         const Pose& current_pose);
+
 double MinDistance(const GripperParams& params,
                    const GripperSettings& settings,
                    const MeshDependentResource& mdr);
@@ -29,4 +38,4 @@ bool Intersects(const GripperParams& params,
                 const MeshDependentResource& mdr);
 
 }  // namespace core
-}  // namespace psg 
+}  // namespace psg

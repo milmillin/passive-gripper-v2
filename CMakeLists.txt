@@ -92,6 +92,9 @@ find_package(Boost COMPONENTS system filesystem REQUIRED)
 # Autodiff (not the best way)
 include_directories("external/autodiff")
 
+# OMPL
+find_package(ompl CONFIG REQUIRED)
+
 # Link libigl
 option(LIBIGL_WITH_OPENGL            "Use OpenGL"         ON)
 option(LIBIGL_WITH_PNG               "Use PNG"            ON)
@@ -103,7 +106,7 @@ option(LIBIGL_WITH_CGAL              "Use CGAL"           ON)
 find_package(LIBIGL REQUIRED QUIET)
 
 # Linking
-set(CORE_LINK_LIBS igl::core igl::embree igl::png igl::cgal lapack Qhull::qhullcpp NLopt::nlopt CGAL::CGAL)
+set(CORE_LINK_LIBS igl::core igl::embree igl::png igl::cgal lapack Qhull::qhullcpp NLopt::nlopt CGAL::CGAL ompl)
 if (NOT MSVC)
     list(APPEND CORE_LINK_LIBS stdc++fs Qhull::qhullstatic_r)
 else()
