@@ -15,6 +15,11 @@ Eigen::Affine3d Forward(const Pose& jointConfig);
 
 bool Inverse(Eigen::Affine3d trans, std::vector<Pose>& out_jointConfigs);
 
+bool BestInverse(Eigen::Affine3d trans,
+                 Pose base,
+                 std::vector<Pose>& out_joint_configs,
+                 size_t& best_i);
+
 void ForwardIntermediate(const Pose& jointConfig,
                          std::vector<Eigen::Affine3d>& out_trans);
 

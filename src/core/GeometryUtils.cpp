@@ -5,10 +5,10 @@
 
 #include <CGAL/Polygon_mesh_processing/remesh.h>
 #include <CGAL/Polyhedron_3.h>
-#include <igl/volume.h>
 #include <igl/copyleft/cgal/mesh_to_polyhedron.h>
 #include <igl/copyleft/cgal/mesh_boolean.h>
 #include <igl/copyleft/cgal/polyhedron_to_mesh.h>
+#include <igl/volume.h>
 #include <libqhullcpp/Qhull.h>
 #include <libqhullcpp/QhullFacetList.h>
 #include <libqhullcpp/QhullPoint.h>
@@ -22,6 +22,7 @@ namespace core {
 
 bool Remesh(const Eigen::MatrixXd& V,
             const Eigen::MatrixXi& F,
+            size_t n_iters,
             Eigen::MatrixXd& out_V,
             Eigen::MatrixXi& out_F) {
   typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
@@ -30,10 +31,14 @@ bool Remesh(const Eigen::MatrixXd& V,
   namespace PMP = CGAL::Polygon_mesh_processing;
 
   Mesh mesh;
-  igl::copyleft::cgal::mesh_to_polyhedron(V, F, mesh);
+  if (!igl::copyleft::cgal::mesh_to_polyhedron(V, F, mesh)) {
+    std::cerr << "Malformed mesh" << std::endl;
+    return false;
+  }
   PMP::isotropic_remeshing(
-      faces(mesh), 0.003, mesh, PMP::parameters::number_of_iterations(1));
+      faces(mesh), 0.003, mesh, PMP::parameters::number_of_iterations(n_iters));
   igl::copyleft::cgal::polyhedron_to_mesh(mesh, out_V, out_F);
+  return true;
 }
 
 bool ComputeConvexHull(const Eigen::MatrixXd& points,
@@ -178,10 +183,80 @@ double Volume(const Eigen::MatrixXd& V, const Eigen::MatrixXi& F) {
   return std::abs(vol.sum());
 }
 
+Eigen::Vector3d CenterOfMass(const Eigen::MatrixXd& V,
+                             const Eigen::MatrixXi& F) {
+  // volume-weighted average of COM of tets
+  double volume = 0;
+  Eigen::RowVector3d center(0, 0, 0);
+  for (size_t i = 0; i < F.rows(); i++) {
+    Eigen::RowVector3d a = V.row(F(i, 0));
+    Eigen::RowVector3d b = V.row(F(i, 1));
+    Eigen::RowVector3d c = V.row(F(i, 2));
+    double tet_volume = -a.dot(b.cross(c)) / 6.;
+    Eigen::RowVector3d tet_center = (a + b + c) / 4.;
+    center += tet_volume * tet_center;
+    volume += tet_volume;
+  }
+  return center.transpose() / volume;
+}
+
 Eigen::MatrixXd CreateCubeV(const Eigen::Vector3d& lb,
                             const Eigen::Vector3d& ub) {
   auto R = cube_V.array().rowwise() * (ub - lb).transpose().array();
   return R.array().rowwise() + lb.transpose().array();
+}
+
+void ComputeConnectivityFrom(const MeshDependentResource& mdr,
+                             const Eigen::Vector3d& from,
+                             std::vector<double>& out_dist,
+                             std::vector<int>& out_par) {
+  struct VertexInfo {
+    int id;
+    double dist;
+    bool operator<(const VertexInfo& r) const { return dist > r.dist; }
+  };
+  struct EdgeInfo {
+    int id;
+    double dist;
+  };
+  std::vector<double> dist(mdr.V.rows(), std::numeric_limits<double>::max());
+  std::vector<int> par(mdr.V.rows(), -2);
+  std::vector<std::vector<EdgeInfo>> edges(mdr.V.rows());
+  std::priority_queue<VertexInfo> q;
+
+  Eigen::RowVector3f effector_pos_f = from.transpose().cast<float>();
+  for (size_t i = 0; i < mdr.V.rows(); i++) {
+    Eigen::RowVector3d direction = mdr.V.row(i) - from.transpose();
+    igl::Hit hit;
+    direction -= direction.normalized() * 1e-7;
+    if (!mdr.intersector.intersectSegment(
+            effector_pos_f, direction.cast<float>(), hit)) {
+      dist[i] = (mdr.V.row(i) - from.transpose()).norm();
+      par[i] = -1;
+      q.push(VertexInfo{(int)i, dist[i]});
+    }
+  }
+  for (size_t i = 0; i < mdr.F.rows(); i++) {
+    for (int iu = 0; iu < 3; iu++) {
+      int u = mdr.F(i, iu);
+      int v = mdr.F(i, (iu + 1) % 3);
+      edges[u].push_back(EdgeInfo{v, (mdr.V.row(v) - mdr.V.row(u)).norm()});
+    }
+  }
+  while (!q.empty()) {
+    VertexInfo now = q.top();
+    q.pop();
+    double nextDist;
+    for (const auto& next : edges[now.id]) {
+      if ((nextDist = dist[now.id] + next.dist) < dist[next.id]) {
+        dist[next.id] = nextDist;
+        par[next.id] = now.id;
+        q.push(VertexInfo{next.id, nextDist});
+      }
+    }
+  }
+  out_dist = dist;
+  out_par = par;
 }
 
 void CreateSpheres(const Eigen::MatrixXd& P,

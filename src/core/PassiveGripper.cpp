@@ -1,5 +1,7 @@
 #include "PassiveGripper.h"
 
+#include <igl/copyleft/cgal/mesh_boolean.h>
+
 #include "CostFunctions.h"
 #include "GeometryUtils.h"
 #include "Initialization.h"
@@ -25,7 +27,6 @@ void PassiveGripper::SetMesh(const Eigen::MatrixXd& V,
 }
 
 // Contact Points
-
 void PassiveGripper::SetMeshTrans(const Eigen::Affine3d& trans) {
   mesh_trans_ = trans;
 }
@@ -42,18 +43,6 @@ void PassiveGripper::TransformMesh(const Eigen::Affine3d& trans) {
 
 void PassiveGripper::AddContactPoint(const ContactPoint& contact_point) {
   params_.contact_points.push_back(contact_point);
-
-  Eigen::Affine3d effector_pos = robots::Forward(params_.trajectory.front());
-
-  Eigen::MatrixXd&& finger = InitializeFinger(contact_point,
-                                              mdr_,
-                                              effector_pos.translation(),
-                                              settings_.finger.n_finger_joints);
-  params_.fingers.push_back(finger);
-  std::vector<ContactPoint>&& cone = GenerateContactCone(
-      contact_point, settings_.contact.cone_res, settings_.contact.friction);
-  contact_cones_.insert(contact_cones_.end(), cone.begin(), cone.end());
-
   contact_changed_ = true;
   Invalidate();
 }
@@ -61,34 +50,12 @@ void PassiveGripper::AddContactPoint(const ContactPoint& contact_point) {
 void PassiveGripper::SetContactPoints(
     const std::vector<ContactPoint>& contact_points) {
   params_.contact_points = contact_points;
-  params_.fingers.clear();
-  contact_cones_.clear();
-  Eigen::Affine3d effector_pos = robots::Forward(params_.trajectory.front());
-
-  for (size_t i = 0; i < contact_points.size(); i++) {
-    Eigen::MatrixXd&& finger =
-        InitializeFinger(contact_points[i],
-                         mdr_,
-                         effector_pos.translation(),
-                         settings_.finger.n_finger_joints);
-    params_.fingers.push_back(finger);
-    std::vector<ContactPoint>&& cone =
-        GenerateContactCone(contact_points[i],
-                            settings_.contact.cone_res,
-                            settings_.contact.friction);
-    contact_cones_.insert(contact_cones_.end(), cone.begin(), cone.end());
-  }
-
   contact_changed_ = true;
   Invalidate();
 }
 
 void PassiveGripper::RemoveContactPoint(size_t index) {
   params_.contact_points.erase(params_.contact_points.begin() + index);
-  params_.fingers.erase(params_.fingers.begin() + index);
-  contact_cones_.erase(
-      contact_cones_.begin() + (index * settings_.contact.cone_res),
-      contact_cones_.begin() + ((index + 1) * settings_.contact.cone_res));
   contact_changed_ = true;
   Invalidate();
 }
@@ -96,7 +63,6 @@ void PassiveGripper::RemoveContactPoint(size_t index) {
 void PassiveGripper::ClearContactPoint() {
   params_.contact_points.clear();
   params_.fingers.clear();
-  contact_cones_.clear();
   contact_changed_ = true;
   Invalidate();
 }
@@ -126,6 +92,13 @@ void PassiveGripper::ClearKeyframe() {
   Pose front = params_.trajectory.front();
   params_.trajectory.clear();
   params_.trajectory.push_back(front);
+  trajectory_changed_ = true;
+  Invalidate();
+}
+
+void PassiveGripper::SetTrajectory(const Trajectory& trajectory) {
+  params_.trajectory = trajectory;
+  FixTrajectory(params_.trajectory);
   trajectory_changed_ = true;
   Invalidate();
 }
@@ -184,14 +157,7 @@ void PassiveGripper::SetParams(const GripperParams& params, bool invalidate) {
   reinit_fingers = false;
   reinit_trajectory = false;
   params_ = params;
-  contact_cones_.clear();
-  for (size_t i = 0; i < params_.contact_points.size(); i++) {
-    std::vector<ContactPoint>&& cone =
-        GenerateContactCone(params_.contact_points[i],
-                            settings_.contact.cone_res,
-                            settings_.contact.friction);
-    contact_cones_.insert(contact_cones_.end(), cone.begin(), cone.end());
-  }
+
   contact_changed_ = true;
   finger_changed_ = true;
   trajectory_changed_ = true;
@@ -261,6 +227,7 @@ void PassiveGripper::InvalidateMesh() {
   mesh_changed_ = false;
   params_.contact_points.clear();
   params_.fingers.clear();
+  mdr_floor_value_ = -1;
   InvokeInvalidated(InvalidatedReason::kMesh);
   contact_changed_ = true;
 }
@@ -278,30 +245,50 @@ void PassiveGripper::InvalidateContactSettings() {
     contact_cones_.insert(contact_cones_.end(), cones.begin(), cones.end());
   }
   contact_changed_ = true;
+
+  // Update mdr_floor_;
+  if (mdr_floor_value_ != settings_.contact.floor) {
+    mdr_floor_value_ = settings_.contact.floor;
+    Eigen::MatrixXd cur_cube_V = cube_V;
+
+    Eigen::MatrixXd NV;
+    Eigen::MatrixXi NF;
+    if (!Remesh(mdr_.V, mdr_.F, 5, NV, NF)) {
+      std::cerr << "Remesh failed! Defaulted to using original mesh" << std::endl;
+      NV = mdr_.V;
+      NF = mdr_.F;
+    }
+
+    Eigen::RowVector3d p_min = NV.colwise().minCoeff();
+    Eigen::RowVector3d p_max = NV.colwise().maxCoeff();
+    Eigen::RowVector3d range = p_max - p_min;
+    range.y() = settings_.contact.floor;
+
+    cur_cube_V.array().rowwise() *= range.array();
+    cur_cube_V.rowwise() += p_min;
+
+    Eigen::MatrixXd RV;
+    Eigen::MatrixXi RF;
+    igl::copyleft::cgal::mesh_boolean(NV,
+                                      NF,
+                                      cur_cube_V,
+                                      cube_F,
+                                      igl::MESH_BOOLEAN_TYPE_UNION,
+                                      RV,
+                                      RF);
+
+    mdr_floor_.init(RV, RF);
+  }
 }
 
 void PassiveGripper::InvalidateFingerSettings() {
   finger_settings_changed_ = false;
-  // Re-initialize finger
-  if (reinit_fingers) {
-    Eigen::Affine3d effector_pos = robots::Forward(params_.trajectory.front());
-    for (size_t i = 0; i < params_.contact_points.size(); i++) {
-      Eigen::MatrixXd&& finger =
-          InitializeFinger(params_.contact_points[i],
-                           mdr_,
-                           effector_pos.translation(),
-                           settings_.finger.n_finger_joints);
-      params_.fingers[i] = finger;
-    }
-    finger_changed_ = true;
-  }
+  finger_changed_ = true;
 }
 
 void PassiveGripper::InvalidateTrajectorySettings() {
   trajectory_settings_changed_ = false;
-  if (reinit_trajectory) {
-    trajectory_changed_ = true;
-  }
+  trajectory_changed_ = true;
 }
 
 void PassiveGripper::InvalidateCostSettings() {
@@ -311,6 +298,11 @@ void PassiveGripper::InvalidateCostSettings() {
 
 void PassiveGripper::InvalidateContact() {
   contact_changed_ = false;
+
+  contact_cones_ = GenerateContactCones(params_.contact_points,
+                                        settings_.contact.cone_res,
+                                        settings_.contact.friction);
+
   InvokeInvalidated(InvalidatedReason::kContactPoints);
   finger_changed_ = true;
   quality_changed_ = true;
@@ -318,21 +310,27 @@ void PassiveGripper::InvalidateContact() {
 
 void PassiveGripper::InvalidateFinger() {
   finger_changed_ = false;
-  InvokeInvalidated(InvalidatedReason::kFingers);
-  if (reinit_trajectory) {
-    trajectory_changed_ = true;
+  if (reinit_fingers) {
+    Eigen::Affine3d effector_pos = robots::Forward(params_.trajectory.front());
+    params_.fingers = InitializeFingers(params_.contact_points,
+                                        mdr_floor_,
+                                        effector_pos.translation(),
+                                        settings_.finger.n_finger_joints);
+    if (reinit_trajectory) {
+      // Re-initialize trajectory
+      params_.trajectory =
+          InitializeTrajectory(params_.fingers,
+                               params_.trajectory.front(),
+                               settings_.trajectory.n_keyframes);
+      trajectory_changed_ = true;
+    }
   }
+  InvokeInvalidated(InvalidatedReason::kFingers);
   cost_changed_ = true;
 }
 
 void PassiveGripper::InvalidateTrajectory() {
   trajectory_changed_ = false;
-  if (reinit_trajectory) {
-    // Re-initialize trajectory
-    params_.trajectory = InitializeTrajectory(params_.fingers,
-                                              params_.trajectory.front(),
-                                              settings_.trajectory.n_keyframes);
-  }
   InvokeInvalidated(InvalidatedReason::kTrajectory);
   cost_changed_ = true;
 }

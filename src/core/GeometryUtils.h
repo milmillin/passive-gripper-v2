@@ -6,6 +6,7 @@
 
 #include "../Constants.h"
 #include "models/ContactPoint.h"
+#include "models/MeshDependentResource.h"
 
 namespace psg {
 namespace core {
@@ -14,6 +15,7 @@ using namespace models;
 
 bool Remesh(const Eigen::MatrixXd& V,
             const Eigen::MatrixXi& F,
+            size_t n_iters,
             Eigen::MatrixXd& out_V,
             Eigen::MatrixXi& out_F);
 
@@ -55,8 +57,17 @@ std::vector<ContactPoint> GenerateContactCones(
 
 double Volume(const Eigen::MatrixXd& V, const Eigen::MatrixXi& F);
 
+Eigen::Vector3d CenterOfMass(const Eigen::MatrixXd& V,
+                             const Eigen::MatrixXi& F);
+
 Eigen::MatrixXd CreateCubeV(const Eigen::Vector3d& lb,
                             const Eigen::Vector3d& ub);
+
+// par (>=0) vertex id, (-1) from, (-2) unreachable
+void ComputeConnectivityFrom(const MeshDependentResource& mdr,
+                             const Eigen::Vector3d& from,
+                             std::vector<double>& out_dist,
+                             std::vector<int>& out_par);
 
 // Creates sphere meshes
 // Input:
@@ -140,6 +151,16 @@ const Eigen::Matrix<int, 3, 2> axis_E = (Eigen::Matrix<int, 3, 2>() <<
   0, 1,
   0, 2,
   0, 3).finished();
+
+const Eigen::Matrix<double, 4, 3> plane_V = (Eigen::Matrix<double, 4, 3>() <<
+  -1, 0, -1,
+  -1, 0, 1,
+  1, 0, 1,
+  1, 0, -1).finished();
+
+const Eigen::Matrix<int, 2, 3> plane_F = (Eigen::Matrix<int, 2, 3>() <<
+  0, 1, 2,
+  0, 2, 3).finished();
 // clang-format on
 
 }  // namespace core

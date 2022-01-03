@@ -16,6 +16,7 @@
 #include "../core/serialization/Serialization.h"
 #include "Assets.h"
 #include "Components.h"
+#include "../core/RRTStarPlanner.h"
 
 using namespace psg::core;
 
@@ -45,6 +46,15 @@ void MainUI::init(igl::opengl::glfw::Viewer* viewer_) {
   axisLayer.line_width = 2;
 
   GetLayer(Layer::kSweptSurface).show_lines = false;
+
+  auto& floorLayer = GetLayer(Layer::kFloor);
+  floorLayer.set_mesh(plane_V * 10, plane_F);
+  floorLayer.uniform_colors((Eigen::Vector3d)Eigen::Vector3d::Constant(0.5),
+                            Eigen::Vector3d::Constant(0.75),
+                            Eigen::Vector3d::Ones());
+  floorLayer.show_lines = false;
+  floorLayer.set_visible(false, -1);
+  GetLayer(Layer::kContactFloor).set_visible(false, -1);
 }
 
 inline bool MainUI::pre_draw() {
@@ -235,6 +245,8 @@ void MainUI::DrawContactPointPanel() {
         "Friction Coeff", &contact_settings.friction, 0.1, 0.5);
     contact_update |=
         ImGui::InputInt("Cone Resolution", (int*)&contact_settings.cone_res);
+    contact_update |= ImGui::InputDouble(
+        "Contact Floor", &contact_settings.floor, 0.001, 0.001);
     finger_update |= ImGui::InputInt("Finger Joints",
                                      (int*)&finger_settings.n_finger_joints);
     if (finger_update) vm_.PSG().SetFingerSettings(finger_settings);
@@ -262,11 +274,13 @@ void MainUI::DrawContactPointPanel() {
     ImGui::InputInt("# Candidates", (int*)&cp_num_candidates, 1000);
     ImGui::InputInt("# Seeds", (int*)&cp_num_seeds, 1000);
     if (ImGui::Button("Generate Candidates", ImVec2(w, 0))) {
-      contact_point_candidates_ =
-          InitializeContactPoints(vm_.PSG().GetMDR(),
-                                  vm_.PSG().GetSettings(),
-                                  cp_num_candidates,
-                                  cp_num_seeds);
+      contact_point_candidates_ = InitializeContactPoints(
+          vm_.PSG().GetMDR(),
+          vm_.PSG().GetFloorMDR(),
+          vm_.PSG().GetContactSettings(),
+          robots::Forward(vm_.PSG().GetTrajectory().front()).translation(),
+          cp_num_candidates,
+          cp_num_seeds);
     }
     ImGui::Separator();
     size_t k = std::min((size_t)10, contact_point_candidates_.size());
@@ -274,7 +288,19 @@ void MainUI::DrawContactPointPanel() {
     for (size_t i = 0; i < k; i++) {
       ImGui::PushID(std::to_string(i).c_str());
       if (ImGui::Button("Select")) {
-        vm_.PSG().SetContactPoints(contact_point_candidates_[i].contact_points);
+        const ContactPointMetric& cp = contact_point_candidates_[i];
+        // vm_.PSG().reinit_trajectory = false;
+        vm_.PSG().SetContactPoints(cp.contact_points);
+        // vm_.PSG().ClearKeyframe();
+
+        // std::vector<Pose> candidates;
+        // size_t best_i;
+        // if (robots::BestInverse(cp.trans * robots::Forward(kInitPose),
+        // kInitPose,
+        // candidates,
+        // best_i)) {
+        // vm_.PSG().AddKeyframe(FixAngles(kInitPose, candidates[best_i]));
+        // }
       }
       ImGui::SameLine();
       ImGui::Text("mw: %.4e, pmw: %.4e",
@@ -316,7 +342,7 @@ void MainUI::DrawTransformPanel() {
     if (ImGui::Button("Remesh##a", ImVec2(w, 0))) {
       Eigen::MatrixXd V;
       Eigen::MatrixXi F;
-      Remesh(vm_.PSG().GetMeshV(), vm_.PSG().GetMeshF(), V, F);
+      Remesh(vm_.PSG().GetMeshV(), vm_.PSG().GetMeshF(), 1, V, F);
       vm_.SetMesh(V, F);
     }
   }
@@ -444,6 +470,13 @@ void MainUI::DrawOptimizationPanel() {
     if (ImGui::Button("Optimize", ImVec2(w, 0))) {
       optimizer_.Optimize(vm_.PSG());
     }
+    if (ImGui::Button("RRT Optimize", ImVec2(w, 0))) {
+      RRTStarPlanner planner;
+      Trajectory trajectory;
+      if (planner.Optimize(vm_.PSG(), trajectory)) {
+        vm_.PSG().SetTrajectory(trajectory);      
+      }
+    }
   }
   ImGui::PopID();
 }
@@ -537,6 +570,8 @@ void MainUI::DrawViewPanel() {
     DrawLayerOptions(Layer::kGripper, "Gripper");
     DrawLayerOptions(Layer::kInitFingers, "Init Finger");
     DrawLayerOptions(Layer::kInitTrajectory, "Init Trajectory");
+    DrawLayerOptions(Layer::kFloor, "Floor");
+    DrawLayerOptions(Layer::kContactFloor, "Contact Floor");
     ImGui::PopID();
   }
 }
@@ -690,7 +725,7 @@ void MainUI::OnLoadMeshClicked() {
   }
   if (is_swap_yz_) {
     SV.col(1).swap(SV.col(2));
-    SF.col(1).swap(SF.col(2));
+    SV.col(0) *= -1;
   }
 
   SV_ = SV;
@@ -714,7 +749,6 @@ void MainUI::OnSaveMeshClicked() {
     std::cerr << "Error: Not an .stl file" << filename << std::endl;
     return;
   }
-
 
   igl::writeSTL(filename, SV_, SF_, igl::FileEncoding::Binary);
   std::cout << "Mesh saved to " << filename << std::endl;
@@ -841,6 +875,9 @@ void MainUI::OnLayerInvalidated(Layer layer) {
       break;
     case Layer::kGradient:
       OnGradientInvalidated();
+      break;
+    case Layer::kContactFloor:
+      OnContactFloorInvalidated();
       break;
   }
 }
@@ -1217,8 +1254,8 @@ void MainUI::OnGripperInvalidated() {
   if (vm_.GetGripperV().size() != 0)
     layer.set_mesh((robots::Forward(vm_.GetCurrentPose()) *
                     vm_.GetGripperV().transpose().colwise().homogeneous())
-                      .transpose(),
-                  vm_.GetGripperF());
+                       .transpose(),
+                   vm_.GetGripperF());
   layer.set_colors(colors::kBrown);
 }
 
@@ -1265,6 +1302,17 @@ void MainUI::OnGradientInvalidated() {
 
   layer.set_edges(V, E, Eigen::RowVector3d(0.8, 0.4, 0));
   layer.line_width = 2;
+}
+
+void MainUI::OnContactFloorInvalidated() {
+  auto& layer = GetLayer(Layer::kContactFloor);
+  Eigen::MatrixXd V = plane_V * 3;
+  V.col(1).array() += vm_.PSG().GetContactSettings().floor;
+  layer.set_mesh(V, plane_F);
+  layer.show_lines = false;
+  layer.uniform_colors((Eigen::Vector3d)Eigen::Vector3d::Constant(0.5),
+                       colors::kBlue.transpose(),
+                       colors::kWhite.transpose());
 }
 
 inline bool MainUI::IsGuizmoVisible() {

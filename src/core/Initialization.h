@@ -16,10 +16,11 @@ void InitializeMeshPosition(const Eigen::MatrixXd& V,
                             Eigen::MatrixXd& out_V,
                             Eigen::Affine3d& out_trans);
 
-Eigen::MatrixXd InitializeFinger(const ContactPoint& contact_point,
-                                 const MeshDependentResource& mdr,
-                                 const Eigen::Vector3d& effector_pos,
-                                 size_t num_finger_joints);
+std::vector<Eigen::MatrixXd> InitializeFingers(
+    const std::vector<ContactPoint>& contact_points,
+    const MeshDependentResource& mdr,
+    const Eigen::Vector3d& effector_pos,
+    size_t num_finger_joints);
 
 Trajectory InitializeTrajectory(const std::vector<Eigen::MatrixXd>& fingers,
                                 const Pose& init_pose,
@@ -27,7 +28,9 @@ Trajectory InitializeTrajectory(const std::vector<Eigen::MatrixXd>& fingers,
 
 std::vector<ContactPointMetric> InitializeContactPoints(
     const MeshDependentResource& mdr,
-    const GripperSettings& settings,
+    const MeshDependentResource& mdr_floor,
+    const ContactSettings& settings,
+    const Eigen::Vector3d& effector_pos,
     size_t num_candidates,
     size_t num_seeds);
 
