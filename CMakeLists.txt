@@ -9,6 +9,13 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
+message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
+
+# Enable link-time optimization
+# if (CMAKE_BUILD_TYPE STREQUAL "Release")
+#   set (CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+#   message(STATUS "Link time optimization enabled")
+# endif()
 
 
 # Add your project files
