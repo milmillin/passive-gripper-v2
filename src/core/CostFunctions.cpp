@@ -495,7 +495,12 @@ double ComputeCost2(const GripperParams& params,
         Eigen::RowVector3d p1 =
             new_t_fingers[i + 1][j].row(kJoint) * (1 - fingerT) +
             new_t_fingers[i + 1][j].row(kJoint + 1) * fingerT;
-        t_totalCost += MyCost(p0, p1, debugger);
+        double contrib =
+            (params.fingers[j].row(kJoint + 1) - params.fingers[j].row(kJoint))
+                .norm() *
+            fingerStep;
+        if (k == 0 || k == nFingerSubs - 1) contrib /= 2;
+        t_totalCost += MyCost(p0, p1, debugger) * contrib;
       }
     }
   }
