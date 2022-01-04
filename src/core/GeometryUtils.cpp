@@ -30,8 +30,17 @@ bool Remesh(const Eigen::MatrixXd& V,
     out_F = F;
     return false;
   }
+  Eigen::RowVector3d p_min = V.colwise().minCoeff();
+  Eigen::RowVector3d p_max = V.colwise().maxCoeff();
+  Eigen::RowVector3d p_range = p_max - p_min;
+
+  double r_max = p_range.maxCoeff();
+  double edge_len = std::clamp(r_max * 0.02, 0.0005, 0.003);
+
+  std::cout << "edge_len: " << edge_len << std::endl;
+
   PMP::isotropic_remeshing(
-      faces(mesh), 0.003, mesh, PMP::parameters::number_of_iterations(n_iters));
+      faces(mesh), edge_len, mesh, PMP::parameters::number_of_iterations(n_iters));
   igl::copyleft::cgal::polyhedron_to_mesh(mesh, out_V, out_F);
   return true;
 }
