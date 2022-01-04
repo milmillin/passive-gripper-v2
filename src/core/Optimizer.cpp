@@ -55,7 +55,6 @@ void MyFlattenGrad(const GripperParams& meta, double* x) {
       *(x++) = keyframe[j];
     }
   }
-
 }
 
 // x -> meta
@@ -95,7 +94,9 @@ void Optimizer::Optimize(const PassiveGripper& psg) {
   params_proto_ = psg.GetParams();
   const auto& mdr = psg.GetRemeshedMDR();
   mdr_.init(mdr.V, mdr.F);
-  mdr_.init_sp();
+  mdr_.SP = mdr.SP;
+  mdr_.SP_valid = true;
+  // mdr_.init_sp();
   settings_ = psg.GetSettings();
   dimension_ = MyFlattenSize(params_);
   x_.reset(new double[dimension_]);
@@ -178,14 +179,16 @@ const GripperParams& Optimizer::GetCurrentParams() {
   MyUnflatten(params_proto_, g_min_x_.get());
   return params_proto_;
 }
-double Optimizer::ComputeCostInternal(unsigned n, const double* x, double* grad) {
+double Optimizer::ComputeCostInternal(unsigned n,
+                                      const double* x,
+                                      double* grad) {
   MyUnflatten(params_, x);
   // GripperParams dCost_dParam;
-  double cost = ComputeCost2(params_, settings_, mdr_);
+  double cost = ComputeCost2(params_, settings_, mdr_, nullptr);
   if (grad != nullptr) {
     // MyFlattenGrad(dCost_dParam, grad);
     // for (unsigned i = 0; i < n; i++) {
-      // std::cout << grad[i] << "\n";    
+    // std::cout << grad[i] << "\n";
     // }
     // std::cout << "-----" << std::endl;
   }

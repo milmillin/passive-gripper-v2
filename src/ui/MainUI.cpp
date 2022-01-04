@@ -441,6 +441,8 @@ void MainUI::DrawOptimizationPanel() {
     opt_update |=
         ImGui::InputDouble("Max Runtime (s)", &opt_settings.max_runtime, 1);
     opt_update |=
+        ImGui::InputInt("Max Iters", (int*)&opt_settings.max_iters, 1);
+    opt_update |=
         ImGui::InputDouble("Tolerance", &opt_settings.tolerance, 0.0001);
 
     if (ImGui::BeginCombo("Algorithm",
@@ -563,6 +565,9 @@ void MainUI::DrawViewPanel() {
     DrawLayerOptions(Layer::kInitTrajectory, "Init Trajectory");
     DrawLayerOptions(Layer::kFloor, "Floor");
     DrawLayerOptions(Layer::kContactFloor, "Contact Floor");
+    DrawLayerOptions(Layer::kGradient, "Gradient");
+    DrawLayerOptions(Layer::kDebug, "Debug");
+    DrawLayerOptions(Layer::kRemesh, "Remesh");
     ImGui::PopID();
   }
 }
@@ -650,6 +655,15 @@ void MainUI::DrawDebugPanel() {
                                   t_fingers);
       std::cerr << "New Trajectory: " << trajectory.size() << std::endl;
       vm_.PSG().SetTrajectory(trajectory);
+    }
+    if (ImGui::Button("Debug SP Cost", ImVec2(w, 0))) {
+      Debugger debugger;
+      MeshDependentResource mdr;
+      ComputeCost2(vm_.PSG().GetParams(),
+                   vm_.PSG().GetSettings(),
+                   vm_.PSG().GetRemeshedMDR(),
+                   &debugger);
+      VisualizeDebugger(debugger);
     }
   }
   ImGui::PopID();
@@ -876,6 +890,12 @@ void MainUI::OnMeshInvalidated() {
   meshLayer.clear();
   meshLayer.set_mesh(V, F);
   meshLayer.uniform_colors((colors::kGold * 0.3).transpose(),
+                           (Eigen::Vector3d)colors::kGold.transpose(),
+                           Eigen::Vector3d::Zero());
+  auto& remeshLayer = GetLayer(Layer::kRemesh);
+  remeshLayer.clear();
+  remeshLayer.set_mesh(vm_.PSG().GetRemeshedMDR().V, vm_.PSG().GetRemeshedMDR().F);
+  remeshLayer.uniform_colors((colors::kGold * 0.3).transpose(),
                            (Eigen::Vector3d)colors::kGold.transpose(),
                            Eigen::Vector3d::Zero());
 }
@@ -1299,6 +1319,17 @@ void MainUI::OnContactFloorInvalidated() {
   layer.uniform_colors((Eigen::Vector3d)Eigen::Vector3d::Constant(0.5),
                        colors::kBlue.transpose(),
                        colors::kWhite.transpose());
+}
+
+void MainUI::VisualizeDebugger(const Debugger& debugger) {
+  auto& layer = GetLayer(Layer::kDebug);
+  Eigen::MatrixXd P;
+  Eigen::MatrixXi E;
+  Eigen::MatrixXd C;
+  debugger.Get(P, E, C);
+  layer.set_edges(P, E, C);
+  layer.show_lines = true;
+  layer.line_width = 5;
 }
 
 inline bool MainUI::IsGuizmoVisible() {

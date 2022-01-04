@@ -386,7 +386,8 @@ double ComputeFloorCost(Eigen::RowVector3d p0,
 
 double ComputeCost2(const GripperParams& params,
                     const GripperSettings& settings,
-                    const MeshDependentResource& remesh_mdr) {
+                    const MeshDependentResource& remesh_mdr,
+                    Debugger* const debugger) {
   const size_t nKeyframes = params.trajectory.size();
   const size_t nFingers = params.fingers.size();
   const size_t nFingerJoints = settings.finger.n_finger_joints;
@@ -405,15 +406,16 @@ double ComputeCost2(const GripperParams& params,
   double floor = settings.cost.floor;
 
   auto MyCost = [floor, &remesh_mdr](const Eigen::RowVector3d& p0,
-                                     const Eigen::RowVector3d& p1) -> double {
+                                     const Eigen::RowVector3d& p1,
+                                     Debugger* const debugger) -> double {
     // std::cout << "My Cost: " << p0 << "," << p1 << std::endl;
-    return remesh_mdr.ComputeRequiredDistance(p0, p1) +
+    return remesh_mdr.ComputeRequiredDistance(p0, p1, debugger) +
            ComputeFloorCost(p0, p1, floor);
   };
 
   Eigen::Affine3d fingerTransInv =
       robots::Forward(params.trajectory.front()).inverse();
-// #pragma omp parallel for
+#pragma omp parallel for
   for (long long i = 0; i < nFrames; i++) {
     size_t iKeyframe = i / nTrajectorySteps;
     size_t trajStep = i % nTrajectorySteps;
@@ -431,7 +433,7 @@ double ComputeCost2(const GripperParams& params,
           (curTrans * params.fingers[j].transpose().colwise().homogeneous())
               .transpose();
       for (size_t k = 0; k < nFingerJoints - 1; k++) {
-        costs[i] += MyCost(tdFingers.row(k), tdFingers.row(k + 1));
+        costs[i] += MyCost(tdFingers.row(k), tdFingers.row(k + 1), debugger);
       }
     }
   }
@@ -493,7 +495,7 @@ double ComputeCost2(const GripperParams& params,
         Eigen::RowVector3d p1 =
             new_t_fingers[i + 1][j].row(kJoint) * (1 - fingerT) +
             new_t_fingers[i + 1][j].row(kJoint + 1) * fingerT;
-        t_totalCost += MyCost(p0, p1);
+        t_totalCost += MyCost(p0, p1, debugger);
       }
     }
   }

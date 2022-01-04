@@ -3,10 +3,11 @@
 #include <igl/opengl/glfw/imgui/ImGuiMenu.h>
 #include <igl/opengl/glfw/imgui/ImGuizmoPlugin.h>
 
-#include "Layer.h"
-#include "ViewModel.h"
+#include "../core/Debugger.h"
 #include "../core/Optimizer.h"
 #include "../core/models/ContactPointMetric.h"
+#include "Layer.h"
+#include "ViewModel.h"
 
 namespace psg {
 namespace ui {
@@ -88,6 +89,9 @@ class MainUI : public igl::opengl::glfw::imgui::ImGuiMenu {
   void OnGripperInvalidated();
   void OnGradientInvalidated();
   void OnContactFloorInvalidated();
+
+  // Debug
+  void VisualizeDebugger(const Debugger& debugger);
 
   // Robot Viz
   bool robot_viz_ = false;

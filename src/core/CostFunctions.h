@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../Constants.h"
+#include "Debugger.h"
 #include "models/GripperParams.h"
 #include "models/GripperSettings.h"
 #include "models/MeshDependentResource.h"
@@ -22,7 +23,8 @@ double ComputeCost(const GripperParams& params,
 
 double ComputeCost2(const GripperParams& params,
                     const GripperSettings& settings,
-                    const MeshDependentResource& remeshed_mdr);
+                    const MeshDependentResource& remeshed_mdr,
+                    Debugger *const debugger);
 
 double MinDistance(const GripperParams& params,
                    const GripperSettings& settings,

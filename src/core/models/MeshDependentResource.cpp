@@ -115,12 +115,13 @@ size_t MeshDependentResource::ComputeClosestVertex(
 
 double MeshDependentResource::ComputeRequiredDistance(
     const Eigen::Vector3d& A,
-    const Eigen::Vector3d& B) const {
+    const Eigen::Vector3d& B,
+    Debugger* const debugger) const {
   assert(SP_valid);
   Eigen::RowVector3d dir = B - A;
-  double norm = dir.squaredNorm();
+  double norm = dir.norm();
   if (norm < 1e-12) return 0;
-  dir /= sqrt(norm);
+  dir /= norm;
   std::vector<igl::Hit> hits;
   int numRays;
   intersector.intersectRay(A.cast<float>(), dir.cast<float>(), hits, numRays);
@@ -148,6 +149,10 @@ double MeshDependentResource::ComputeRequiredDistance(
     if (isIn) {
       totalDis += SP(lastVid, vid) + bestDis + hit.t - lastT;
     }
+    if (debugger) {
+      debugger->AddEdge(
+          A.transpose() + dir * lastT, P, isIn ? colors::kRed : colors::kGreen);
+    }
     lastVid = vid;
     isIn = !isIn;
     lastT = hit.t;
@@ -157,6 +162,9 @@ double MeshDependentResource::ComputeRequiredDistance(
     size_t vid = ComputeClosestVertex(B);
     totalDis +=
         SP(lastVid, vid) + (V.row(vid) - B.transpose()).norm() + norm - lastT;
+    if (debugger) {
+      debugger->AddEdge(A.transpose() + dir * lastT, B, colors::kRed);
+    }
   }
   return totalDis;
 }

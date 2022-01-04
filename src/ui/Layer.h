@@ -20,6 +20,8 @@ enum class Layer : int {
   kGradient,
   kFloor,
   kContactFloor,
+  kDebug,
+  kRemesh,
   kMax
 };
 

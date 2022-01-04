@@ -5,6 +5,7 @@
 #include <Eigen/Core>
 
 #include "../../Constants.h"
+#include "../Debugger.h"
 #include "../serialization/Serialization.h"
 
 namespace psg {
@@ -49,7 +50,8 @@ struct MeshDependentResource : psg::core::serialization::Serializable {
   // Returns the length of non-intersecting path from A to B
   // minus the displacement from A to B.
   double ComputeRequiredDistance(const Eigen::Vector3d& A,
-                                 const Eigen::Vector3d& B) const;
+                                 const Eigen::Vector3d& B,
+                                 Debugger *const debugger) const;
 
   DECL_SERIALIZE() {
     constexpr int version = 1;
