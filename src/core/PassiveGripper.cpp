@@ -104,6 +104,13 @@ void PassiveGripper::ClearKeyframe() {
   Invalidate();
 }
 
+void PassiveGripper::SetTrajectory(const Trajectory& trajectory) {
+  params_.trajectory = trajectory;
+  FixTrajectory(params_.trajectory);
+  trajectory_changed_ = true;
+  Invalidate();
+}
+
 void PassiveGripper::SetContactSettings(const ContactSettings& settings) {
   settings_.contact = settings;
   contact_settings_changed_ = true;

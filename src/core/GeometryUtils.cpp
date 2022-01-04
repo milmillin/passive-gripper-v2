@@ -10,9 +10,118 @@
 #include <libqhullcpp/QhullPoint.h>
 #include <libqhullcpp/QhullVertexSet.h>
 #include <libqhullcpp/RboxPoints.h>
+#include <list>
+
+#include "robots/Robots.h"
 
 namespace psg {
 namespace core {
+
+static void AdaptiveSubdivideTrajectoryImpl(
+    const Eigen::MatrixXd& fingers,
+    double flatness,
+    std::list<Eigen::MatrixXd>& l,
+    std::list<Eigen::MatrixXd>::iterator l_p0,
+    std::list<Eigen::MatrixXd>::iterator l_p2,
+    std::list<Pose>& lp,
+    std::list<Pose>::iterator lp_p0,
+    std::list<Pose>::iterator lp_p2) {
+  Pose p1 = (*lp_p0 + *lp_p2) / 2.;
+  Eigen::MatrixXd fingers_p1 =
+      (robots::Forward(p1) * fingers.transpose().colwise().homogeneous())
+          .transpose();
+
+  size_t n_joints = fingers.rows();
+
+  double max_deviation = 0;
+  Eigen::MatrixXd fingers_p02 =
+      (*l_p2 - *l_p0).rowwise().normalized();
+  Eigen::MatrixXd fingers_p01 = (fingers_p1 - *l_p0);
+  for (size_t i = 0; i < n_joints; i++) {
+    Eigen::RowVector3d p02 = fingers_p02.row(i);
+    Eigen::RowVector3d p01 = fingers_p01.row(i);
+    max_deviation = std::max(max_deviation, p01.cross(p02).norm());
+  }
+  if (max_deviation > flatness) {
+    auto l_p1 = l.insert(l_p2, fingers_p1);
+    auto lp_p1 = lp.insert(lp_p2, p1);
+    AdaptiveSubdivideTrajectoryImpl(
+        fingers, flatness, l, l_p0, l_p1, lp, lp_p0, lp_p1);
+    AdaptiveSubdivideTrajectoryImpl(
+        fingers, flatness, l, l_p1, l_p2, lp, lp_p1, lp_p2);
+  }
+}
+
+void AdaptiveSubdivideTrajectory(
+    const Trajectory& trajectory,
+    const std::vector<Eigen::MatrixXd>& fingers,
+    double flatness,
+    Trajectory& out_trajectory,
+    std::vector<std::vector<Eigen::MatrixXd>>& out_t_fingers) {
+  Eigen::Affine3d finger_trans_inv =
+      robots::Forward(trajectory.front()).inverse();
+
+  std::list<Eigen::MatrixXd> l;
+
+  std::list<Pose> lp;
+
+  std::vector<size_t> n_joints_l;
+  size_t n_fingers = fingers.size();
+  size_t n_joints = 0;
+  for (size_t i = 0; i < n_fingers; i++) {
+    size_t cur_joints = fingers[i].rows();
+    n_joints += cur_joints;
+    n_joints_l.push_back(cur_joints);  
+  }
+  Eigen::MatrixXd flatten_fingers(n_joints, 3);
+  size_t cur_rows = 0;
+  for (size_t i = 0; i < n_fingers; i++) {
+    flatten_fingers.block(cur_rows, 0, n_joints_l[i], 3) =
+        fingers[i];
+    cur_rows += n_joints_l[i];
+  }
+  flatten_fingers =
+      (finger_trans_inv * flatten_fingers.transpose().colwise().homogeneous())
+          .transpose();
+
+  size_t n_keyframes = trajectory.size();
+  for (size_t i = 0; i < n_keyframes; i++) {
+    lp.push_back(trajectory[i]);
+    l.push_back((robots::Forward(trajectory[i]) *
+                 flatten_fingers.transpose().colwise().homogeneous())
+                    .transpose());
+  }
+
+  std::list<Eigen::MatrixXd>::iterator l_p0 = l.begin();
+  std::list<Eigen::MatrixXd>::iterator l_p2 = ++l.begin();
+  std::list<Pose>::iterator lp_p0 = lp.begin();
+  std::list<Pose>::iterator lp_p2 = ++lp.begin();
+  for (size_t i = 1; i < n_keyframes; i++) {
+    AdaptiveSubdivideTrajectoryImpl(
+        flatten_fingers, flatness, l, l_p0, l_p2, lp, lp_p0, lp_p2);  
+    l_p0 = l_p2;
+    l_p2++;
+    lp_p0 = lp_p2;
+    lp_p2++;
+  }
+  size_t n_new_keyframes = lp.size();
+  out_trajectory.resize(n_new_keyframes);
+  out_t_fingers.resize(n_new_keyframes);
+  std::list<Eigen::MatrixXd>::iterator l_it = l.begin();
+  std::list<Pose>::iterator lp_it = lp.begin();
+  for (size_t i = 0; i < n_new_keyframes; i++) {
+    out_trajectory[i] = *lp_it;
+    const Eigen::MatrixXd& f = *l_it;
+    out_t_fingers[i].resize(n_joints_l.size());
+    size_t cur_rows = 0;
+    for (size_t j = 0; j < n_joints_l.size(); j++) {
+      out_t_fingers[i][j] = f.block(cur_rows, 0, n_joints_l[j], 3);      
+      cur_rows += n_joints_l[j];
+    }
+    lp_it++;
+    l_it++;
+  }
+}
 
 bool Remesh(const Eigen::MatrixXd& V,
             const Eigen::MatrixXi& F,
@@ -39,8 +148,10 @@ bool Remesh(const Eigen::MatrixXd& V,
 
   std::cout << "edge_len: " << edge_len << std::endl;
 
-  PMP::isotropic_remeshing(
-      faces(mesh), edge_len, mesh, PMP::parameters::number_of_iterations(n_iters));
+  PMP::isotropic_remeshing(faces(mesh),
+                           edge_len,
+                           mesh,
+                           PMP::parameters::number_of_iterations(n_iters));
   igl::copyleft::cgal::polyhedron_to_mesh(mesh, out_V, out_F);
   return true;
 }

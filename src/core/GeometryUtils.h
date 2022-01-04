@@ -13,6 +13,13 @@ namespace core {
 
 using namespace models;
 
+void AdaptiveSubdivideTrajectory(
+    const Trajectory& trajectory,
+    const std::vector<Eigen::MatrixXd>& fingers,
+    double flatness,
+    Trajectory& out_trajectory,
+    std::vector<std::vector<Eigen::MatrixXd>>& out_t_fingers);
+
 bool Remesh(const Eigen::MatrixXd& V,
             const Eigen::MatrixXi& F,
             size_t n_iters,
