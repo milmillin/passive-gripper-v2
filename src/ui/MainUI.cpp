@@ -461,6 +461,8 @@ void MainUI::DrawOptimizationPanel() {
         ImGui::InputInt("Population", (int*)&opt_settings.population, 1000);
 
     cost_update = ImGui::InputDouble("Floor", &cost_settings.floor, 0.001);
+    cost_update |= ImGui::InputInt("Finger Subdivision", (int*)&cost_settings.n_finger_steps, 1);
+    cost_update |= ImGui::InputInt("Trajectory Subdivision", (int*)&cost_settings.n_trajectory_steps, 1);
     if (opt_update) vm_.PSG().SetOptSettings(opt_settings);
     if (cost_update) vm_.PSG().SetCostSettings(cost_settings);
     if (ImGui::Button("Optimize", ImVec2(w, 0))) {
