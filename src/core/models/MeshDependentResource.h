@@ -29,6 +29,13 @@ struct MeshDependentResource : psg::core::serialization::Serializable {
   bool initialized = false;
   void init(const Eigen::MatrixXd& V, const Eigen::MatrixXi& F);
 
+  // All-pair shortest path
+  // A proxy for geodesic distance
+  bool SP_valid = false;
+  Eigen::MatrixXd SP;
+  // Eigen::MatrixXi SP_par;
+  void init_sp();
+
   // out_c: closest point
   // out_s: sign
   double ComputeSignedDistance(const Eigen::Vector3d& position,
@@ -38,6 +45,11 @@ struct MeshDependentResource : psg::core::serialization::Serializable {
   size_t ComputeClosestFacet(const Eigen::Vector3d& position) const;
 
   size_t ComputeClosestVertex(const Eigen::Vector3d& position) const;
+
+  // Returns the length of non-intersecting path from A to B
+  // minus the displacement from A to B.
+  double ComputeRequiredDistance(const Eigen::Vector3d& A,
+                                 const Eigen::Vector3d& B) const;
 
   DECL_SERIALIZE() {
     constexpr int version = 1;

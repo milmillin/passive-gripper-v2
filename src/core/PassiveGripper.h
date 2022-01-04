@@ -165,6 +165,7 @@ class PassiveGripper : public psg::core::serialization::Serializable {
   DECLARE_GETTER(GetSettings, settings_)
   DECLARE_GETTER(GetMDR, mdr_)
   DECLARE_GETTER(GetFloorMDR, mdr_contact_)
+  DECLARE_GETTER(GetRemeshedMDR, mdr_remeshed_)
 
   DECL_SERIALIZE() {
     constexpr int version = 1;

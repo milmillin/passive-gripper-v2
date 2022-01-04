@@ -172,8 +172,9 @@ double ComputeCost(const GripperParams& params,
                                       angVelocity,
                                       duration_idx,
                                       duration_flip);
-    //std::cout << std::setprecision(12) << duration << " " << duration_idx << " "
-              //<< duration_flip << std::endl;
+    // std::cout << std::setprecision(12) << duration << " " << duration_idx <<
+    // " "
+    //<< duration_flip << std::endl;
     Pose t_lerpedKeyframe;
     for (long long j = 1; j <= nTrajectorySteps; j++) {
       double trajectoryT = j * trajectoryStep;
@@ -367,6 +368,81 @@ double MinDistance(const GripperParams& params,
     min_dist = std::min(min_dist, t_min_dist);
   }
   return min_dist;
+}
+
+double ComputeCost2(const GripperParams& params,
+                    const GripperSettings& settings,
+                    const MeshDependentResource& remesh_mdr) {
+  const size_t nKeyframes = params.trajectory.size();
+  const size_t nFingers = params.fingers.size();
+  const size_t nFingerJoints = settings.finger.n_finger_joints;
+
+  const size_t nTrajectorySteps = settings.cost.n_trajectory_steps;
+  const double angVelocity = settings.cost.ang_velocity;
+  const double trajectoryStep = 1. / nTrajectorySteps;
+  const size_t nFrames = (nKeyframes - 1) * nTrajectorySteps + 1;
+
+  if (nKeyframes == 1) return 0;
+
+  std::vector<std::vector<Eigen::MatrixXd>> tdFingers(
+      nFrames, std::vector<Eigen::MatrixXd>(nFingers));
+  std::vector<std::vector<std::vector<double>>> costs(
+      nFrames,
+      std::vector<std::vector<double>>(nFingers,
+                                       std::vector<double>(nFingerJoints - 1)));
+
+  Eigen::Affine3d fingerTransInv =
+      robots::Forward(params.trajectory.front()).inverse();
+#pragma omp parallel for
+  for (long long i = 0; i < nFrames; i++) {
+    size_t iKeyframe = i / nTrajectorySteps;
+    size_t trajStep = i % nTrajectorySteps;
+    if (i == nFrames - 1) {
+      iKeyframe = nKeyframes - 2;
+      trajStep = nTrajectorySteps;
+    }
+    double trajT = trajStep * trajectoryStep;
+
+    Pose lKeyframe = params.trajectory[iKeyframe] * (1. - trajT) +
+                     params.trajectory[iKeyframe + 1] * trajT;
+    Eigen::Affine3d curTrans = robots::Forward(lKeyframe) * fingerTransInv;
+    for (size_t j = 0; j < nFingers; j++) {
+      tdFingers[i][j] =
+          (curTrans * params.fingers[j].transpose().colwise().homogeneous())
+              .transpose();
+      for (size_t k = 0; k < nFingerJoints - 1; k++) {
+        double floorCost =
+            abs(pow(std::min(0.,
+                             tdFingers[i][j].row(k).y() - settings.cost.floor),
+                    2) -
+                pow(std::min(
+                        0.,
+                        tdFingers[i][j].row(k + 1).y() - settings.cost.floor),
+                    2)) /
+            2.;
+        costs[i][j][k] =
+            remesh_mdr.ComputeRequiredDistance(tdFingers[i][j].row(k),
+                                               tdFingers[i][j].row(k + 1)) +
+            floorCost;
+      }
+    }
+  }
+
+  double totalCost = 0;
+#pragma omp parallel for reduction(+ : totalCost)
+  for (long long i = 1; i < nFrames; i++) {
+    for (size_t j = 0; j < nFingers; j++) {
+      for (size_t k = 0; k < nFingerJoints - 1; k++) {
+        double d1 =
+            (tdFingers[i - 1][j].row(k) - tdFingers[i][j].row(k)).norm();
+        double d2 =
+            (tdFingers[i - 1][j].row(k + 1) - tdFingers[i][j].row(k + 1))
+                .norm();
+        totalCost += (costs[i - 1][j][k] + costs[i][j][k]) * (d1 + d2);
+      }
+    }
+  }
+  return totalCost / 4.;
 }
 
 bool Intersects(const GripperParams& params,
