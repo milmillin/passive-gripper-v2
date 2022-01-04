@@ -118,54 +118,45 @@ double MeshDependentResource::ComputeRequiredDistance(
     const Eigen::Vector3d& B) const {
   assert(SP_valid);
   Eigen::RowVector3d dir = B - A;
-  double norm = dir.norm();
-  dir /= norm;
+  double norm = dir.squaredNorm();
+  if (norm < 1e-12) return 0;
+  dir /= sqrt(norm);
   std::vector<igl::Hit> hits;
   int numRays;
   intersector.intersectRay(A.cast<float>(), dir.cast<float>(), hits, numRays);
   bool isIn = hits.size() % 2 == 1;
-  size_t lastFid = -1;
+  size_t lastVid = -1;
   double lastT = 0;
   if (isIn) {
-    lastFid = ComputeClosestFacet(A);
+    lastVid = ComputeClosestVertex(A);
   }
   double totalDis = 0;
   for (const igl::Hit& hit : hits) {
     if (hit.t >= norm) break;
-    if (isIn) {
-      size_t fid = hit.id;
-      double bestDis = std::numeric_limits<double>::max();
-      for (size_t i = 0; i < 3; i++) {
-        for (size_t j = 0; j < 3; j++) {
-          int u = F(lastFid, i);
-          int v = F(fid, j);
-          double dU = ((A.transpose() + dir * lastT) - V.row(u)).norm();
-          double dV = ((A.transpose() + dir * hit.t) - V.row(v)).norm();
-          bestDis = std::min(bestDis, SP(u, v) + dU + dV);
-        }
+    Eigen::RowVector3d P = A.transpose() + dir * hit.t;
+    size_t vid = -1;
+    double bestDis = std::numeric_limits<double>::max();
+    for (size_t i = 0; i < 3; i++) {
+      int u = F(hit.id, i);
+      double d = (P - V.row(u)).squaredNorm();
+      if (d < bestDis) {
+        bestDis = d;
+        vid = u;
       }
-      totalDis += bestDis;
-      // } else {
-      // totalDis += hit.t - lastT;
     }
-    lastFid = hit.id;
+    bestDis = sqrt(bestDis);
+    if (isIn) {
+      totalDis += SP(lastVid, vid) + bestDis + hit.t - lastT;
+    }
+    lastVid = vid;
     isIn = !isIn;
     lastT = hit.t;
   }
   if (isIn) {
     // B is in
-    size_t fid = ComputeClosestFacet(B);
-    double bestDis = std::numeric_limits<double>::max();
-    for (size_t i = 0; i < 3; i++) {
-      for (size_t j = 0; j < 3; j++) {
-        int u = F(lastFid, i);
-        int v = F(fid, j);
-        double dU = ((A.transpose() + dir * lastT) - V.row(u)).norm();
-        double dV = (B.transpose() - V.row(v)).norm();
-        bestDis = std::min(bestDis, SP(u, v) + dU + dV);
-      }
-    }
-    totalDis += bestDis;
+    size_t vid = ComputeClosestVertex(B);
+    totalDis +=
+        SP(lastVid, vid) + (V.row(vid) - B.transpose()).norm() + norm - lastT;
   }
   return totalDis;
 }
