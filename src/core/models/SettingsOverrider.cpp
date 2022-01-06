@@ -41,8 +41,12 @@ void SettingsOverrider::Apply(psg::core::PassiveGripper& psg) const {
 
   OptSettings opt_settings = psg.GetOptSettings();
   TopoOptSettings topo_opt_settings = psg.GetTopoOptSettings();
+  ContactSettings contact_settings = psg.GetContactSettings();
+  CostSettings cost_settings = psg.GetCostSettings();
   bool opt_changed = false;
   bool topo_opt_changed = false;
+  bool cost_settings_changed = false;
+  bool contact_settings_changed = false;
 
   for (const auto& kv : mp) {
     if (kv.first == "algorithm") {
@@ -69,11 +73,21 @@ void SettingsOverrider::Apply(psg::core::PassiveGripper& psg) const {
     } else if (kv.first == "neg_vol_res") {
       topo_opt_settings.neg_vol_res = std::stod(kv.second);
       topo_opt_changed = true;
+    } else if (kv.first == "cost.floor") {
+      cost_settings.floor = std::stod(kv.second);
+      cost_settings_changed = true;
+    } else if (kv.first == "contact.floor") {
+      contact_settings.floor = std::stod(kv.second);
+      contact_settings_changed = true;
+    } else {
+      Error() << "Unknown settings: " << kv.first << std::endl;    
     }
   }
 
   if (opt_changed) psg.SetOptSettings(opt_settings);
   if (topo_opt_changed) psg.SetTopoOptSettings(topo_opt_settings);
+  if (contact_settings_changed) psg.SetContactSettings(contact_settings);
+  if (cost_settings_changed) psg.SetCostSettings(cost_settings);
 
   psg.reinit_fingers = tmp_reinit_fingers;
   psg.reinit_trajectory = tmp_reinit_trajectory;

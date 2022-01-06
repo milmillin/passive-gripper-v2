@@ -13,11 +13,11 @@ struct OptSettings : psg::core::serialization::Serializable {
   double max_runtime = 0;  // seconds
   size_t max_iters = 10000;
   double finger_wiggle = 0.01;
-  Pose trajectory_wiggle = (Pose() << 15. * kDegToRad,
-                            15. * kDegToRad,
-                            15. * kDegToRad,
-                            45. * kDegToRad,
-                            45. * kDegToRad,
+  Pose trajectory_wiggle = (Pose() << 5. * kDegToRad,
+                            5. * kDegToRad,
+                            5. * kDegToRad,
+                            10. * kDegToRad,
+                            25. * kDegToRad,
                             90. * kDegToRad)
                                .finished();
   double tolerance = 0;
