@@ -23,7 +23,7 @@ static double PotentialSDF(double s, double& out_dP_ds) {
   return tmp * tmp / (2. * epsilon);
 }
 
-static double GetDist(const Eigen::Vector3d& p,
+double GetDist(const Eigen::Vector3d& p,
                       const CostSettings& settings,
                       const MeshDependentResource& mdr,
                       Eigen::RowVector3d& out_ds_dp) {

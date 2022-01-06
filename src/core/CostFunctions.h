@@ -13,6 +13,11 @@ namespace core {
 
 using namespace models;
 
+double GetDist(const Eigen::Vector3d& p,
+               const CostSettings& settings,
+               const MeshDependentResource& mdr,
+               Eigen::RowVector3d& out_ds_dp);
+
 double EvalAt(const Eigen::Vector3d& p,
               const CostSettings& settings,
               const MeshDependentResource& mdr,
