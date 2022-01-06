@@ -308,6 +308,7 @@ double ComputeCost(const GripperParams& params,
   return totalCost;
 }
 
+// TODO: Wrong
 double MinDistance(const GripperParams& params,
                    const GripperSettings& settings,
                    const MeshDependentResource& mdr) {

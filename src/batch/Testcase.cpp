@@ -76,7 +76,8 @@ void ProcessFrom(std::string raw_fn,
     Log() << "> Optimization took " << duration.count() << " ms." << std::endl;
 
     psg.SetParams(optimizer.GetCurrentParams());
-    bool failed = psg.GetMinDist() < -1e-5;
+    // bool failed = psg.GetMinDist() < -1e-5;
+    bool failed = psg.GetCost() > 0.001; // 1mm
 
     Log() << "> Success: " << psg::kBoolStr[!failed] << std::endl;
 
