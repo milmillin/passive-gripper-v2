@@ -17,7 +17,7 @@ void Debugger::AddEdge(const Eigen::Vector3d& p0,
   if (n_E_ + 1 > E_.rows()) {
     E_.conservativeResize(E_.rows() + 5000, 2);
   }
-  if (n_C_ + 1 > E_.rows()) {
+  if (n_C_ + 1 > C_.rows()) {
     C_.conservativeResize(C_.rows() + 5000, 3);
   }
   P_.row(n_P_) = p0;
