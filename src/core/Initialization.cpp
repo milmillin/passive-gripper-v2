@@ -275,9 +275,10 @@ std::vector<ContactPointMetric> InitializeContactPoints(
       // filter unreachable point
       if (v_par[mdr_floor.ComputeClosestVertex(x)] == -2) continue;
       // filter hole less than 8mm
+      Eigen::RowVector3d n = mdr.FN.row(FI_(i));
       igl::Hit hit;
       if (mdr.intersector.intersectRay(
-              x.cast<float>(), mdr.FN.row(FI_(i)).cast<float>(), hit)) {
+              (x + n * 1e-6).cast<float>(), n.cast<float>(), hit)) {
         if (hit.t < 0.008) continue;
       }
 
