@@ -39,9 +39,9 @@ void MeshDependentResource::init_sp() {
   size_t nF = F.rows();
   std::vector<std::vector<std::pair<int, double>>> edges(nV);
   SP.resize(nV, nV);
-  // SP_par.resize(nV, nV);
+  SP_par.resize(nV, nV);
   SP.setConstant(std::numeric_limits<double>::max() / 2.);
-  // SP_par.setConstant(-1);
+  SP_par.setConstant(-1);
   for (size_t i = 0; i < nF; i++) {
     for (size_t k = 0; k < 3; k++) {
       size_t jj = (k + 1) % 3;
@@ -68,7 +68,7 @@ void MeshDependentResource::init_sp() {
       for (const auto& v : edges[u.id]) {
         if ((curDis = u.dist + v.second) < SP(v.first, src)) {
           SP(v.first, src) = curDis;
-          // SP_par(v.first, src) = u.id;
+          SP_par(v.first, src) = u.id;
           q.push(VertexInfo{v.first, curDis});
         }
       }
@@ -151,6 +151,13 @@ double MeshDependentResource::ComputeRequiredDistance(
       totalDis += SP(lastVid, vid) + bestDis + hit.t - lastT;
       if (debugger) {
         debugger->AddEdge(A.transpose() + dir * lastT, P, colors::kRed);
+        int cur = lastVid;
+        while (SP_par(cur, vid) != -1) {
+          debugger->AddEdge(V.row(cur), V.row(SP_par(cur, vid)), colors::kRed);
+          cur = SP_par(cur, vid);
+        }
+        debugger->AddEdge(P, V.row(vid), colors::kRed);
+        debugger->AddEdge(A.transpose() + dir * lastT, V.row(lastVid), colors::kRed);
       }
     }
     lastVid = vid;
@@ -164,6 +171,14 @@ double MeshDependentResource::ComputeRequiredDistance(
         SP(lastVid, vid) + (V.row(vid) - B.transpose()).norm() + norm - lastT;
     if (debugger) {
       debugger->AddEdge(A.transpose() + dir * lastT, B, colors::kRed);
+      int cur = lastVid;
+      while (SP_par(cur, vid) != -1) {
+        debugger->AddEdge(V.row(cur), V.row(SP_par(cur, vid)), colors::kRed);
+        cur = SP_par(cur, vid);
+      }
+      debugger->AddEdge(B, V.row(vid), colors::kRed);
+      debugger->AddEdge(
+          A.transpose() + dir * lastT, V.row(lastVid), colors::kRed);
     }
   }
   return totalDis;

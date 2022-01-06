@@ -34,7 +34,7 @@ struct MeshDependentResource : psg::core::serialization::Serializable {
   // A proxy for geodesic distance
   bool SP_valid = false;
   Eigen::MatrixXd SP;
-  // Eigen::MatrixXi SP_par;
+  Eigen::MatrixXi SP_par;
   void init_sp();
 
   // out_c: closest point
