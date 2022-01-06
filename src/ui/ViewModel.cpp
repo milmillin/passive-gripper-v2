@@ -175,7 +175,7 @@ void ViewModel::OnPsgInvalidated(PassiveGripper::InvalidatedReason reason) {
       InvokeLayerInvalidated(Layer::kNegVol);
       break;
     case PassiveGripper::InvalidatedReason::kCost:
-      InvokeLayerInvalidated(Layer::kGradient);
+      // TODO: InvokeLayerInvalidated(Layer::kGradient);
       break;
   }
 }
