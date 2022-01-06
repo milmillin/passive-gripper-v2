@@ -305,8 +305,8 @@ std::vector<ContactPointMetric> InitializeContactPoints(
         if (iters > 100) {
           total_iters += iters;
           iters = 0;
-          if (total_iters > num_candidates &&
-              (total_iters / (prelim.size() + 1)) > 100)  // success rate < 1%
+          if (total_iters > num_candidates * 10000 &&
+              total_iters > 10000 * prelim.size())  // success rate < 0.01%
             toContinue = false;
         }
       }
@@ -375,8 +375,10 @@ std::vector<ContactPointMetric> InitializeContactPoints(
     }
   }
 
-  std::cout << "low success rate. exit early. got: " << prelim.size()
-            << " expected: " << num_candidates << std::endl;
+  if (prelim.size() < num_candidates) {
+    std::cout << "low success rate. exit early. got: " << prelim.size()
+              << " expected: " << num_candidates << std::endl;
+  }
 
   std::sort(prelim.begin(),
             prelim.end(),
