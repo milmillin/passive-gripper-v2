@@ -256,7 +256,6 @@ std::vector<ContactPointMetric> InitializeContactPoints(
     const Eigen::Vector3d& effector_pos,
     size_t num_candidates,
     size_t num_seeds) {
-
   std::vector<double> v_dist;
   std::vector<int> v_par;
   ComputeConnectivityFrom(mdr_floor, effector_pos, v_dist, v_par);
@@ -275,6 +274,13 @@ std::vector<ContactPointMetric> InitializeContactPoints(
       if (x.y() <= settings.floor) continue;
       // filter unreachable point
       if (v_par[mdr_floor.ComputeClosestVertex(x)] == -2) continue;
+      // filter hole less than 8mm
+      igl::Hit hit;
+      if (mdr.intersector.intersectRay(
+              x.cast<float>(), mdr.FN.row(FI_(i)).cast<float>(), hit)) {
+        if (hit.t < 0.008) continue;
+      }
+
       FI.push_back(FI_(i));
       X.push_back(X_.row(i));
     }
@@ -286,12 +292,24 @@ std::vector<ContactPointMetric> InitializeContactPoints(
 
   std::vector<ContactPointMetric> prelim;
   prelim.reserve(num_candidates);
+  size_t total_iters = 0;
 #pragma omp parallel
   {
+    size_t iters = 0;
     while (true) {
+      iters++;
       bool toContinue;
 #pragma omp critical
-      { toContinue = prelim.size() < num_candidates; }
+      {
+        toContinue = prelim.size() < num_candidates;
+        if (iters > 100) {
+          total_iters += iters;
+          iters = 0;
+          if (total_iters > num_candidates &&
+              (total_iters / (prelim.size() + 1)) > 100)  // success rate < 1%
+            toContinue = false;
+        }
+      }
       if (!toContinue) break;
 
       // Random 3 contact points
@@ -309,9 +327,8 @@ std::vector<ContactPointMetric> InitializeContactPoints(
       std::vector<ContactPoint> contact_cones;
       contact_cones.reserve(3 * settings.cone_res);
       for (size_t i = 0; i < 3; i++) {
-        const auto&& cone = GenerateContactCone(contactPoints[i],
-                                                settings.cone_res,
-                                                settings.friction);
+        const auto&& cone = GenerateContactCone(
+            contactPoints[i], settings.cone_res, settings.friction);
         contact_cones.insert(contact_cones.end(), cone.begin(), cone.end());
       }
 
@@ -351,12 +368,15 @@ std::vector<ContactPointMetric> InitializeContactPoints(
 #pragma omp critical
       {
         prelim.push_back(candidate);
-        if (prelim.size() % 100 == 0)
+        if (prelim.size() % 500 == 0)
           std::cout << "prelim prog: " << prelim.size() << "/" << num_candidates
                     << std::endl;
       }
     }
   }
+
+  std::cout << "low success rate. exit early. got: " << prelim.size()
+            << " expected: " << num_candidates << std::endl;
 
   std::sort(prelim.begin(),
             prelim.end(),
