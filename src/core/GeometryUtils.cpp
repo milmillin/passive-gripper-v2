@@ -34,8 +34,7 @@ static void AdaptiveSubdivideTrajectoryImpl(
   size_t n_joints = fingers.rows();
 
   double max_deviation = 0;
-  Eigen::MatrixXd fingers_p02 =
-      (*l_p2 - *l_p0).rowwise().normalized();
+  Eigen::MatrixXd fingers_p02 = (*l_p2 - *l_p0).rowwise().normalized();
   Eigen::MatrixXd fingers_p01 = (fingers_p1 - *l_p0);
   for (size_t i = 0; i < n_joints; i++) {
     Eigen::RowVector3d p02 = fingers_p02.row(i);
@@ -49,6 +48,16 @@ static void AdaptiveSubdivideTrajectoryImpl(
         fingers, flatness, l, l_p0, l_p1, lp, lp_p0, lp_p1);
     AdaptiveSubdivideTrajectoryImpl(
         fingers, flatness, l, l_p1, l_p2, lp, lp_p1, lp_p2);
+  }
+}
+
+void TransformFingers(const std::vector<Eigen::MatrixXd>& fingers,
+                      const Eigen::Affine3d& trans,
+                      std::vector<Eigen::MatrixXd>& out_fingers) {
+  out_fingers.resize(fingers.size());
+  for (size_t i = 0; i < fingers.size(); i++) {
+    out_fingers[i] =
+        (trans * fingers[i].transpose().colwise().homogeneous()).transpose();
   }
 }
 
@@ -71,13 +80,12 @@ void AdaptiveSubdivideTrajectory(
   for (size_t i = 0; i < n_fingers; i++) {
     size_t cur_joints = fingers[i].rows();
     n_joints += cur_joints;
-    n_joints_l.push_back(cur_joints);  
+    n_joints_l.push_back(cur_joints);
   }
   Eigen::MatrixXd flatten_fingers(n_joints, 3);
   size_t cur_rows = 0;
   for (size_t i = 0; i < n_fingers; i++) {
-    flatten_fingers.block(cur_rows, 0, n_joints_l[i], 3) =
-        fingers[i];
+    flatten_fingers.block(cur_rows, 0, n_joints_l[i], 3) = fingers[i];
     cur_rows += n_joints_l[i];
   }
   flatten_fingers =
@@ -98,7 +106,7 @@ void AdaptiveSubdivideTrajectory(
   std::list<Pose>::iterator lp_p2 = ++lp.begin();
   for (size_t i = 1; i < n_keyframes; i++) {
     AdaptiveSubdivideTrajectoryImpl(
-        flatten_fingers, flatness, l, l_p0, l_p2, lp, lp_p0, lp_p2);  
+        flatten_fingers, flatness, l, l_p0, l_p2, lp, lp_p0, lp_p2);
     l_p0 = l_p2;
     l_p2++;
     lp_p0 = lp_p2;
@@ -115,7 +123,7 @@ void AdaptiveSubdivideTrajectory(
     out_t_fingers[i].resize(n_joints_l.size());
     size_t cur_rows = 0;
     for (size_t j = 0; j < n_joints_l.size(); j++) {
-      out_t_fingers[i][j] = f.block(cur_rows, 0, n_joints_l[j], 3);      
+      out_t_fingers[i][j] = f.block(cur_rows, 0, n_joints_l[j], 3);
       cur_rows += n_joints_l[j];
     }
     lp_it++;

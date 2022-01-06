@@ -26,6 +26,11 @@ double ComputeCost2(const GripperParams& params,
                     const MeshDependentResource& remeshed_mdr,
                     Debugger *const debugger);
 
+double ComputeCost3(const GripperParams& params,
+                    const GripperSettings& settings,
+                    const MeshDependentResource& remeshed_mdr,
+                    Debugger* const debugger);
+
 double MinDistance(const GripperParams& params,
                    const GripperSettings& settings,
                    const MeshDependentResource& mdr);

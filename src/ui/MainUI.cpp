@@ -659,7 +659,7 @@ void MainUI::DrawDebugPanel() {
     if (ImGui::Button("Debug SP Cost", ImVec2(w, 0))) {
       Debugger debugger;
       MeshDependentResource mdr;
-      ComputeCost2(vm_.PSG().GetParams(),
+      ComputeCost3(vm_.PSG().GetParams(),
                    vm_.PSG().GetSettings(),
                    vm_.PSG().GetRemeshedMDR(),
                    &debugger);

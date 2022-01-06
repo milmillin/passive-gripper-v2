@@ -13,6 +13,10 @@ namespace core {
 
 using namespace models;
 
+void TransformFingers(const std::vector<Eigen::MatrixXd>& fingers,
+                      const Eigen::Affine3d& trans,
+                      std::vector<Eigen::MatrixXd>& out_fingers);
+
 void AdaptiveSubdivideTrajectory(
     const Trajectory& trajectory,
     const std::vector<Eigen::MatrixXd>& fingers,

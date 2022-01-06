@@ -120,8 +120,9 @@ double MeshDependentResource::ComputeRequiredDistance(
   assert(SP_valid);
   Eigen::RowVector3d dir = B - A;
   double norm = dir.norm();
-  if (norm < 1e-12) return 0;
+  if (norm < 1e-12 || isnan(norm)) return 0;
   dir /= norm;
+  // std::cout << dir << std::endl;
   std::vector<igl::Hit> hits;
   int numRays;
   intersector.intersectRay(A.cast<float>(), dir.cast<float>(), hits, numRays);
@@ -148,10 +149,9 @@ double MeshDependentResource::ComputeRequiredDistance(
     bestDis = sqrt(bestDis);
     if (isIn) {
       totalDis += SP(lastVid, vid) + bestDis + hit.t - lastT;
-    }
-    if (debugger) {
-      debugger->AddEdge(
-          A.transpose() + dir * lastT, P, isIn ? colors::kRed : colors::kGreen);
+      if (debugger) {
+        debugger->AddEdge(A.transpose() + dir * lastT, P, colors::kRed);
+      }
     }
     lastVid = vid;
     isIn = !isIn;

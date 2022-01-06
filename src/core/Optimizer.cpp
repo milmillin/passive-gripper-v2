@@ -184,7 +184,7 @@ double Optimizer::ComputeCostInternal(unsigned n,
                                       double* grad) {
   MyUnflatten(params_, x);
   // GripperParams dCost_dParam;
-  double cost = ComputeCost2(params_, settings_, mdr_, nullptr);
+  double cost = ComputeCost3(params_, settings_, mdr_, nullptr);
   if (grad != nullptr) {
     // MyFlattenGrad(dCost_dParam, grad);
     // for (unsigned i = 0; i < n; i++) {
