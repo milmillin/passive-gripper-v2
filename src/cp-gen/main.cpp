@@ -41,18 +41,19 @@ int main(int argc, char** argv) {
   auto cps2 = psg::core::InitializeContactPoints(
       psg, cp_filter_2, n_candidates, n_seeds);
 
-  std::vector<psg::core::models::ContactPointMetric> cps(cps1.size() +
-                                                         cps2.size());
+  std::vector<psg::core::models::ContactPointMetric> cps;
+  cps.reserve(cps1.size() + cps2.size());
+
   // interleave
   size_t ii = 0;
   size_t jj = 0;
   while (ii < cps1.size() || jj < cps2.size()) {
     if (ii < cps1.size()) {
-      cps.push_back(cps1[ii]);    
+      cps.push_back(cps1[ii]);
       ii++;
     }
     if (jj < cps2.size()) {
-      cps.push_back(cps2[jj]);    
+      cps.push_back(cps2[jj]);
       jj++;
     }
   }

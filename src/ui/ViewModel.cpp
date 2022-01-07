@@ -197,6 +197,7 @@ bool ViewModel::ComputeInitParams() {
 
   InvokeLayerInvalidated(Layer::kInitFingers);
   InvokeLayerInvalidated(Layer::kInitTrajectory);
+  return true;
 }
 
 void ViewModel::PoseChanged() {
