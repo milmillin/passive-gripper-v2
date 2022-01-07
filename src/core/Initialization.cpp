@@ -249,44 +249,83 @@ Trajectory InitializeTrajectory(const std::vector<Eigen::MatrixXd>& fingers,
   return result;
 }
 
-std::vector<ContactPointMetric> InitializeContactPoints(
-    const MeshDependentResource& mdr,
-    const MeshDependentResource& mdr_floor,
-    const ContactSettings& settings,
-    const Eigen::Vector3d& effector_pos,
-    size_t num_candidates,
-    size_t num_seeds) {
+void InitializeContactPointSeeds(const PassiveGripper& psg,
+                                 size_t num_seeds,
+                                 double filter_hole,
+                                 double filter_curvature,
+                                 std::vector<int>& out_FI,
+                                 std::vector<Eigen::Vector3d>& out_X) {
+  const MeshDependentResource& mdr_floor = psg.GetFloorMDR();
+  const MeshDependentResource& mdr_remeshed = psg.GetRemeshedMDR();
+  const MeshDependentResource& mdr = psg.GetMDR();
+  double floor = psg.GetContactSettings().floor;
+
+  Eigen::Vector3d effector_pos =
+      robots::Forward(psg.GetParams().trajectory.front()).translation();
+
   std::vector<double> v_dist;
   std::vector<int> v_par;
   ComputeConnectivityFrom(mdr_floor, effector_pos, v_dist, v_par);
 
-  std::vector<int> FI;
-  std::vector<Eigen::Vector3d> X;
+  Eigen::VectorXd K = mdr_remeshed.PV1.cwiseMax(mdr_remeshed.PV2);
 
-  while (FI.size() < num_seeds) {
+  out_X.clear();
+  out_FI.clear();
+
+  while (out_FI.size() < num_seeds) {
     Eigen::MatrixXd B_;
-    Eigen::VectorXi FI_;
+    Eigen::VectorXi out_FI_;
     Eigen::MatrixXd X_;
-    igl::random_points_on_mesh(num_seeds, mdr.V, mdr.F, B_, FI_, X_);
+    igl::random_points_on_mesh(num_seeds, mdr.V, mdr.F, B_, out_FI_, X_);
     for (long long i = 0; i < X_.rows(); i++) {
       Eigen::RowVector3d x = X_.row(i);
+
       // filter floor
-      if (x.y() <= settings.floor) continue;
+      if (x.y() <= floor) continue;
       // filter unreachable point
       if (v_par[mdr_floor.ComputeClosestVertex(x)] == -2) continue;
-      // filter hole less than 8mm
-      Eigen::RowVector3d n = mdr.FN.row(FI_(i));
+      // filter hole
+      Eigen::RowVector3d n = mdr.FN.row(out_FI_(i));
       igl::Hit hit;
       if (mdr.intersector.intersectRay(
               (x + n * 1e-6).cast<float>(), n.cast<float>(), hit)) {
-        if (hit.t < 0.008) continue;
+        if (hit.t < filter_hole) continue;
       }
+      // filter curvature
+      Eigen::RowVector3d c;
+      int fid;
+      mdr_remeshed.ComputeClosestPoint(x, c, fid);
+      Eigen::RowVector3i f = mdr_remeshed.F.row(fid);
+      double u, v, w;
+      Barycentric(c,
+                  mdr_remeshed.V.row(f(0)),
+                  mdr_remeshed.V.row(f(1)),
+                  mdr_remeshed.V.row(f(2)),
+                  u,
+                  v,
+                  w);
+      double curvature = u * K(f(0)) + v * K(f(1)) + w * K(f(2));
+      if (curvature > filter_curvature) continue;
 
-      FI.push_back(FI_(i));
-      X.push_back(X_.row(i));
+      out_FI.push_back(out_FI_(i));
+      out_X.push_back(X_.row(i));
     }
   }
-  std::cout << "Num seeds: " << X.size() << std::endl;
+  std::cout << "Num seeds: " << out_X.size() << std::endl;
+}
+
+std::vector<ContactPointMetric> InitializeContactPoints(
+    const PassiveGripper& psg,
+    size_t num_candidates,
+    size_t num_seeds) {
+  const MeshDependentResource& mdr = psg.GetMDR();
+  const ContactSettings& settings = psg.GetContactSettings();
+
+  std::vector<int> FI;
+  std::vector<Eigen::Vector3d> X;
+
+  // TODO:
+  InitializeContactPointSeeds(psg, num_seeds, 0.005, 1 / 0.002, FI, X);
 
   std::mt19937 gen;
   std::uniform_int_distribution<int> dist(0, num_seeds - 1);

@@ -1,10 +1,14 @@
 #include "MeshDependentResource.h"
 
+#include <igl/gaussian_curvature.h>
+#include <igl/invert_diag.h>
+#include <igl/massmatrix.h>
 #include <igl/per_edge_normals.h>
 #include <igl/per_face_normals.h>
 #include <igl/per_vertex_normals.h>
 #include <igl/signed_distance.h>
 #include "../GeometryUtils.h"
+#include <igl/principal_curvature.h>
 
 namespace psg {
 namespace core {
@@ -30,18 +34,40 @@ void MeshDependentResource::init(const Eigen::MatrixXd& V_,
   size = maximum - minimum;
 
   center_of_mass = CenterOfMass(V, F);
-  SP_valid = false;
+
+  igl::principal_curvature(V, F, PD1, PD2, PV1, PV2);
+
+  SP_valid_ = false;
+  // curvature_valid_ = false;
 }
 
-void MeshDependentResource::init_sp() {
-  if (SP_valid) return;
+void MeshDependentResource::init(const MeshDependentResource& other) {
+  init(other.V, other.F);
+  if (other.SP_valid_) {
+    SP_valid_ = other.SP_valid_;
+    SP_ = other.SP_;
+    SP_par_ = other.SP_par_;
+  }
+  /*
+  if (other.curvature_valid_) {
+    curvature_valid_ = other.curvature_valid_;
+    curvature_ = other.curvature_;
+  }
+  */
+}
+
+void MeshDependentResource::init_sp() const {
+  if (SP_valid_) return;
+  std::lock_guard<std::mutex> lock(SP_mutex_);
+  if (SP_valid_) return;
+
   size_t nV = V.rows();
   size_t nF = F.rows();
   std::vector<std::vector<std::pair<int, double>>> edges(nV);
-  SP.resize(nV, nV);
-  SP_par.resize(nV, nV);
-  SP.setConstant(std::numeric_limits<double>::max() / 2.);
-  SP_par.setConstant(-1);
+  SP_.resize(nV, nV);
+  SP_par_.resize(nV, nV);
+  SP_.setConstant(std::numeric_limits<double>::max() / 2.);
+  SP_par_.setConstant(-1);
   for (size_t i = 0; i < nF; i++) {
     for (size_t k = 0; k < 3; k++) {
       size_t jj = (k + 1) % 3;
@@ -60,22 +86,50 @@ void MeshDependentResource::init_sp() {
   for (int src = 0; src < nV; src++) {
     std::priority_queue<VertexInfo> q;
     q.push(VertexInfo{src, 0});
-    SP(src, src) = 0;
+    SP_(src, src) = 0;
     while (!q.empty()) {
       VertexInfo u = q.top();
       q.pop();
       double curDis;
       for (const auto& v : edges[u.id]) {
-        if ((curDis = u.dist + v.second) < SP(v.first, src)) {
-          SP(v.first, src) = curDis;
-          SP_par(v.first, src) = u.id;
+        if ((curDis = u.dist + v.second) < SP_(v.first, src)) {
+          SP_(v.first, src) = curDis;
+          SP_par_(v.first, src) = u.id;
           q.push(VertexInfo{v.first, curDis});
         }
       }
     }
   }
-  SP_valid = true;
+  SP_valid_ = true;
 }
+
+/*
+void MeshDependentResource::init_curvature() const {
+  if (curvature_valid_) return;  // reduce lock overhead?
+  std::lock_guard<std::mutex> lock(curvature_mutex_);
+  if (curvature_valid_) return;
+
+  // https://github.com/libigl/libigl/blob/main/tutorial/202_GaussianCurvature/main.cpp
+  /*
+  Eigen::VectorXd K;
+  // Compute integral of Gaussian curvature
+  igl::gaussian_curvature(V, F, K);
+  // Compute mass matrix
+  Eigen::SparseMatrix<double> M, Minv;
+  igl::massmatrix(V, F, igl::MASSMATRIX_TYPE_DEFAULT, M);
+  igl::invert_diag(M, Minv);
+  // Divide by area to get integral average
+  K = (Minv * K).eval();
+  curvature_ = K;
+
+
+  Eigen::MatrixXd PD1, PD2;
+  Eigen::VectorXd PV1, PV2;
+  igl::principal_curvature(V, F, PD1, PD2, PV1, PV2);
+
+  curvature_valid_ = true;
+}
+*/
 
 double MeshDependentResource::ComputeSignedDistance(
     const Eigen::Vector3d& position,
@@ -87,6 +141,11 @@ double MeshDependentResource::ComputeSignedDistance(
   igl::signed_distance_pseudonormal(
       tree, V, F, FN, VN, EN, EMAP, position.transpose(), s, sqrd, i, c, n);
   return s * sqrt(sqrd);
+}
+void MeshDependentResource::ComputeClosestPoint(const Eigen::Vector3d& position,
+                                                Eigen::RowVector3d& out_c,
+                                                int& out_fid) const {
+  tree.squared_distance(V, F, position.transpose(), out_fid, out_c);
 }
 size_t MeshDependentResource::ComputeClosestFacet(
     const Eigen::Vector3d& position) const {
@@ -117,7 +176,7 @@ double MeshDependentResource::ComputeRequiredDistance(
     const Eigen::Vector3d& A,
     const Eigen::Vector3d& B,
     Debugger* const debugger) const {
-  assert(SP_valid);
+  init_sp();
   Eigen::RowVector3d dir = B - A;
   double norm = dir.norm();
   if (norm < 1e-12 || isnan(norm)) return 0;
@@ -148,16 +207,17 @@ double MeshDependentResource::ComputeRequiredDistance(
     }
     bestDis = sqrt(bestDis);
     if (isIn) {
-      totalDis += SP(lastVid, vid) + bestDis + hit.t - lastT;
+      totalDis += SP_(lastVid, vid) + bestDis + hit.t - lastT;
       if (debugger) {
         debugger->AddEdge(A.transpose() + dir * lastT, P, colors::kRed);
         int cur = lastVid;
-        while (SP_par(cur, vid) != -1) {
-          debugger->AddEdge(V.row(cur), V.row(SP_par(cur, vid)), colors::kRed);
-          cur = SP_par(cur, vid);
+        while (SP_par_(cur, vid) != -1) {
+          debugger->AddEdge(V.row(cur), V.row(SP_par_(cur, vid)), colors::kRed);
+          cur = SP_par_(cur, vid);
         }
         debugger->AddEdge(P, V.row(vid), colors::kRed);
-        debugger->AddEdge(A.transpose() + dir * lastT, V.row(lastVid), colors::kRed);
+        debugger->AddEdge(
+            A.transpose() + dir * lastT, V.row(lastVid), colors::kRed);
       }
     }
     lastVid = vid;
@@ -168,13 +228,13 @@ double MeshDependentResource::ComputeRequiredDistance(
     // B is in
     size_t vid = ComputeClosestVertex(B);
     totalDis +=
-        SP(lastVid, vid) + (V.row(vid) - B.transpose()).norm() + norm - lastT;
+        SP_(lastVid, vid) + (V.row(vid) - B.transpose()).norm() + norm - lastT;
     if (debugger) {
       debugger->AddEdge(A.transpose() + dir * lastT, B, colors::kRed);
       int cur = lastVid;
-      while (SP_par(cur, vid) != -1) {
-        debugger->AddEdge(V.row(cur), V.row(SP_par(cur, vid)), colors::kRed);
-        cur = SP_par(cur, vid);
+      while (SP_par_(cur, vid) != -1) {
+        debugger->AddEdge(V.row(cur), V.row(SP_par_(cur, vid)), colors::kRed);
+        cur = SP_par_(cur, vid);
       }
       debugger->AddEdge(B, V.row(vid), colors::kRed);
       debugger->AddEdge(
@@ -183,6 +243,24 @@ double MeshDependentResource::ComputeRequiredDistance(
   }
   return totalDis;
 }
+
+// Getters
+const Eigen::MatrixXd& MeshDependentResource::GetSP() const {
+  init_sp();
+  return SP_;
+}
+
+const Eigen::MatrixXi& MeshDependentResource::GetSPPar() const {
+  init_sp();
+  return SP_par_;
+}
+
+/*
+const Eigen::VectorXd& MeshDependentResource::GetCurvature() const {
+  init_curvature();
+  return curvature_;
+}
+*/
 
 }  // namespace models
 }  // namespace core

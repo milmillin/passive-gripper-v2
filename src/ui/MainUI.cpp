@@ -271,10 +271,7 @@ void MainUI::DrawContactPointPanel() {
     ImGui::InputInt("# Seeds", (int*)&cp_num_seeds, 1000);
     if (ImGui::Button("Generate Candidates", ImVec2(w, 0))) {
       contact_point_candidates_ = InitializeContactPoints(
-          vm_.PSG().GetMDR(),
-          vm_.PSG().GetFloorMDR(),
-          vm_.PSG().GetContactSettings(),
-          robots::Forward(vm_.PSG().GetTrajectory().front()).translation(),
+          vm_.PSG(),
           cp_num_candidates,
           cp_num_seeds);
     }
@@ -463,8 +460,10 @@ void MainUI::DrawOptimizationPanel() {
         ImGui::InputInt("Population", (int*)&opt_settings.population, 1000);
 
     cost_update = ImGui::InputDouble("Floor", &cost_settings.floor, 0.001);
-    cost_update |= ImGui::InputInt("Finger Subdivision", (int*)&cost_settings.n_finger_steps, 1);
-    cost_update |= ImGui::InputInt("Trajectory Subdivision", (int*)&cost_settings.n_trajectory_steps, 1);
+    cost_update |= ImGui::InputInt(
+        "Finger Subdivision", (int*)&cost_settings.n_finger_steps, 1);
+    cost_update |= ImGui::InputInt(
+        "Trajectory Subdivision", (int*)&cost_settings.n_trajectory_steps, 1);
     if (opt_update) vm_.PSG().SetOptSettings(opt_settings);
     if (cost_update) vm_.PSG().SetCostSettings(cost_settings);
     if (ImGui::Button("Optimize", ImVec2(w, 0))) {
@@ -665,6 +664,27 @@ void MainUI::DrawDebugPanel() {
                    &debugger);
       VisualizeDebugger(debugger);
     }
+    if (ImGui::Button("Debug CP Seeds", ImVec2(w, 0))) {
+      std::vector<int> FI;
+      std::vector<Eigen::Vector3d> X;
+      InitializeContactPointSeeds(vm_.PSG(),
+                                  cp_num_seeds,
+                                  cp_filter_hole_,
+                                  1. / cp_filter_curvature_radius_,
+                                  FI,
+                                  X);
+      Eigen::MatrixXd P(X.size(), 3);
+      for (size_t i = 0; i < X.size(); i++) {
+        P.row(i) = X[i];
+      }
+      auto& layer = GetLayer(Layer::kDebug);
+      layer.set_points(P, colors::kBlue);
+      layer.point_size = 5;
+    }
+    ImGui::InputInt("# Seeds", (int*)&cp_num_seeds, 1000);
+    ImGui::InputDouble("Filter Hole", &cp_filter_hole_, 0.001);
+    ImGui::InputDouble(
+        "Filter Curvature Radius", &cp_filter_curvature_radius_, 0.001);
   }
   ImGui::PopID();
 }
@@ -894,10 +914,11 @@ void MainUI::OnMeshInvalidated() {
                            Eigen::Vector3d::Zero());
   auto& remeshLayer = GetLayer(Layer::kRemesh);
   remeshLayer.clear();
-  remeshLayer.set_mesh(vm_.PSG().GetRemeshedMDR().V, vm_.PSG().GetRemeshedMDR().F);
+  remeshLayer.set_mesh(vm_.PSG().GetRemeshedMDR().V,
+                       vm_.PSG().GetRemeshedMDR().F);
   remeshLayer.uniform_colors((colors::kGold * 0.3).transpose(),
-                           (Eigen::Vector3d)colors::kGold.transpose(),
-                           Eigen::Vector3d::Zero());
+                             (Eigen::Vector3d)colors::kGold.transpose(),
+                             Eigen::Vector3d::Zero());
 }
 
 void MainUI::OnCenterOfMassInvalidated() {

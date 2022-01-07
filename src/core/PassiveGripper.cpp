@@ -28,7 +28,6 @@ void PassiveGripper::SetMesh(const Eigen::MatrixXd& V,
   }
   std::cerr << "Remesh: V: " << RV.rows() << std::endl;
   mdr_remeshed_.init(RV, RF);
-  mdr_remeshed_.init_sp();
 
   mesh_changed_ = true;
   mesh_loaded_ = true;

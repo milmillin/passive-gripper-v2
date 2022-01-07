@@ -12,7 +12,8 @@ namespace psg {
 namespace core {
 namespace models {
 
-struct MeshDependentResource : psg::core::serialization::Serializable {
+class MeshDependentResource : psg::core::serialization::Serializable {
+ public:
   Eigen::MatrixXd V;
   Eigen::MatrixXi F;
   Eigen::MatrixXd FN;
@@ -26,22 +27,43 @@ struct MeshDependentResource : psg::core::serialization::Serializable {
   Eigen::Vector3d size;
   igl::AABB<Eigen::MatrixXd, 3> tree;
   igl::embree::EmbreeIntersector intersector;
+  
+  // curvature
+  Eigen::MatrixXd PD1, PD2;
+  Eigen::VectorXd PV1, PV2;
 
-  bool initialized = false;
-  void init(const Eigen::MatrixXd& V, const Eigen::MatrixXi& F);
-
+ private:
   // All-pair shortest path
   // A proxy for geodesic distance
-  bool SP_valid = false;
-  Eigen::MatrixXd SP;
-  Eigen::MatrixXi SP_par;
-  void init_sp();
+  mutable bool SP_valid_ = false;
+  mutable Eigen::MatrixXd SP_;
+  mutable Eigen::MatrixXi SP_par_;
+  mutable std::mutex SP_mutex_;
+  void init_sp() const;
+
+  // Curvature
+  /*
+  mutable bool curvature_valid_ = false;
+  mutable Eigen::VectorXd curvature_;
+  mutable std::mutex curvature_mutex_;
+  void init_curvature() const;
+  */
+
+  bool initialized = false;
+
+ public:
+  void init(const Eigen::MatrixXd& V, const Eigen::MatrixXi& F);
+  void init(const MeshDependentResource& other);
 
   // out_c: closest point
   // out_s: sign
   double ComputeSignedDistance(const Eigen::Vector3d& position,
                                Eigen::RowVector3d& out_c,
                                double& out_s) const;
+
+  void ComputeClosestPoint(const Eigen::Vector3d& position,
+                           Eigen::RowVector3d& out_c,
+                           int& out_fid) const;
 
   size_t ComputeClosestFacet(const Eigen::Vector3d& position) const;
 
@@ -51,7 +73,12 @@ struct MeshDependentResource : psg::core::serialization::Serializable {
   // minus the displacement from A to B.
   double ComputeRequiredDistance(const Eigen::Vector3d& A,
                                  const Eigen::Vector3d& B,
-                                 Debugger *const debugger) const;
+                                 Debugger* const debugger) const;
+
+  // Getters
+  const Eigen::MatrixXd& GetSP() const;
+  const Eigen::MatrixXi& GetSPPar() const;
+  // const Eigen::VectorXd& GetCurvature() const;
 
   DECL_SERIALIZE() {
     constexpr int version = 1;

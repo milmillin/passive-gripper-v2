@@ -30,6 +30,14 @@ bool Remesh(const Eigen::MatrixXd& V,
             Eigen::MatrixXd& out_V,
             Eigen::MatrixXi& out_F);
 
+void Barycentric(const Eigen::Vector3d& p,
+                 const Eigen::Vector3d& a,
+                 const Eigen::Vector3d& b,
+                 const Eigen::Vector3d& c,
+                 double& out_u,
+                 double& out_v,
+                 double& out_w);
+
 // points: N by dim matrix
 bool ComputeConvexHull(const Eigen::MatrixXd& points,
                        std::vector<size_t>& out_hull_indices,

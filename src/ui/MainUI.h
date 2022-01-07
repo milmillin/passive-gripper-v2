@@ -92,6 +92,8 @@ class MainUI : public igl::opengl::glfw::imgui::ImGuiMenu {
 
   // Debug
   void VisualizeDebugger(const Debugger& debugger);
+  double cp_filter_hole_ = 0.005;
+  double cp_filter_curvature_radius_ = 0.002;
 
   // Robot Viz
   bool robot_viz_ = false;

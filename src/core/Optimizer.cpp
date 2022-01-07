@@ -93,10 +93,7 @@ void Optimizer::Optimize(const PassiveGripper& psg) {
   params_ = psg.GetParams();
   params_proto_ = psg.GetParams();
   const auto& mdr = psg.GetRemeshedMDR();
-  mdr_.init(mdr.V, mdr.F);
-  mdr_.SP = mdr.SP;
-  mdr_.SP_valid = true;
-  // mdr_.init_sp();
+  mdr_.init(mdr);
   settings_ = psg.GetSettings();
   dimension_ = MyFlattenSize(params_);
   x_.reset(new double[dimension_]);

@@ -164,6 +164,26 @@ bool Remesh(const Eigen::MatrixXd& V,
   return true;
 }
 
+void Barycentric(const Eigen::Vector3d& p,
+                 const Eigen::Vector3d& a,
+                 const Eigen::Vector3d& b,
+                 const Eigen::Vector3d& c,
+                 double& out_u,
+                 double& out_v,
+                 double& out_w) {
+  // https://gamedev.stackexchange.com/questions/23743/whats-the-most-efficient-way-to-find-barycentric-coordinates
+  Eigen::Vector3d v0 = b - a, v1 = c - a, v2 = p - a;
+  float d00 = v0.dot(v0);
+  float d01 = v0.dot(v1);
+  float d11 = v1.dot(v1);
+  float d20 = v2.dot(v0);
+  float d21 = v2.dot(v1);
+  float denom = d00 * d11 - d01 * d01;
+  out_v = (d11 * d20 - d01 * d21) / denom;
+  out_w = (d00 * d21 - d01 * d20) / denom;
+  out_u = 1. - out_v - out_w;
+}
+
 bool ComputeConvexHull(const Eigen::MatrixXd& points,
                        std::vector<size_t>& out_hullIndices,
                        std::vector<std::vector<size_t>>& out_facets) {

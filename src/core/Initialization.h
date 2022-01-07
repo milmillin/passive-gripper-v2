@@ -26,11 +26,15 @@ Trajectory InitializeTrajectory(const std::vector<Eigen::MatrixXd>& fingers,
                                 const Pose& init_pose,
                                 size_t n_keyframes);
 
+void InitializeContactPointSeeds(const PassiveGripper& psg,
+                                 size_t num_seeds,
+                                 double filter_hole,
+                                 double filter_curvature,
+                                 std::vector<int>& out_FI,
+                                 std::vector<Eigen::Vector3d>& out_X);
+
 std::vector<ContactPointMetric> InitializeContactPoints(
-    const MeshDependentResource& mdr,
-    const MeshDependentResource& mdr_floor,
-    const ContactSettings& settings,
-    const Eigen::Vector3d& effector_pos,
+    const PassiveGripper& psg,
     size_t num_candidates,
     size_t num_seeds);
 
