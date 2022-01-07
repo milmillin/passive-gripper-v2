@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "../Constants.h"
 #include "../core/Initialization.h"
 #include "../core/PassiveGripper.h"
 #include "../core/robots/Robots.h"
@@ -26,13 +27,35 @@ int main(int argc, char** argv) {
 
   psg::core::PassiveGripper psg;
   psg.Deserialize(psg_f);
-  auto cps = psg::core::InitializeContactPoints(
-      psg.GetMDR(),
-      psg.GetFloorMDR(),
-      psg.GetContactSettings(),
-      psg::core::robots::Forward(psg.GetTrajectory().front()).translation(),
-      10000,
-      1000);
+
+  size_t n_seeds = 1000;
+  size_t n_candidates = 5000;
+  psg::core::models::ContactPointFilter cp_filter_1;
+  psg::core::models::ContactPointFilter cp_filter_2;
+  cp_filter_2.angle = psg::kPi / 2 - atan(psg.GetContactSettings().friction);
+
+  Log() << "Phase 1" << std::endl;
+  auto cps1 = psg::core::InitializeContactPoints(
+      psg, cp_filter_1, n_candidates, n_seeds);
+  Log() << "Phase 2" << std::endl;
+  auto cps2 = psg::core::InitializeContactPoints(
+      psg, cp_filter_1, n_candidates, n_seeds);
+
+  std::vector<psg::core::models::ContactPointMetric> cps(cps1.size() +
+                                                         cps2.size());
+  // interleave
+  size_t ii = 0;
+  size_t jj = 0;
+  while (ii < cps1.size() || jj < cps2.size()) {
+    if (ii < cps1.size()) {
+      cps.push_back(cps1[ii]);    
+      ii++;
+    }
+    if (jj < cps2.size()) {
+      cps.push_back(cps2[jj]);    
+      jj++;
+    }
+  }
 
   std::string cp_fn = argv[2];
   std::ofstream cp_f(cp_fn, std::ios::out | std::ios::binary);
