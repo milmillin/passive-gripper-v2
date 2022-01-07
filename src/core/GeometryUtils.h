@@ -17,6 +17,11 @@ void TransformFingers(const std::vector<Eigen::MatrixXd>& fingers,
                       const Eigen::Affine3d& trans,
                       std::vector<Eigen::MatrixXd>& out_fingers);
 
+inline auto TransformMatrix(const Eigen::MatrixXd& mat,
+                            const Eigen::Affine3d& trans) {
+  return (trans * mat.transpose().colwise().homogeneous()).transpose();
+}
+
 void AdaptiveSubdivideTrajectory(
     const Trajectory& trajectory,
     const std::vector<Eigen::MatrixXd>& fingers,
