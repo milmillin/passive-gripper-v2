@@ -205,7 +205,7 @@ void ViewModel::PoseChanged() {
   InvokeLayerInvalidated(Layer::kGripperBound);
   InvokeLayerInvalidated(Layer::kNegVol);
   InvokeLayerInvalidated(Layer::kGripper);
-  InvokeLayerInvalidated(Layer::kGradient);
+  // InvokeLayerInvalidated(Layer::kGradient);
 }
 
 }  // namespace ui
