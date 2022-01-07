@@ -93,14 +93,6 @@ int main(int argc, char** argv) {
 
   TestcaseCallback cb = [hook_set, &ckpt_fn, &hook_str, &out_dir](
                             size_t i, size_t need, const Result& r) {
-    std::ofstream ckpt_file(ckpt_fn);
-    if (!ckpt_file.is_open()) {
-      Error() << "Warning: cannot open checkpoint file: " << ckpt_fn
-              << std::endl;
-    } else {
-      ckpt_file << i << ' ' << need << std::endl;
-      Log() << "Checkpoint updated: " << i << ' ' << need << std::endl;
-    }
     if (hook_set) {
       bp::ipstream out;
       bp::child c(hook_str,
@@ -130,6 +122,14 @@ int main(int argc, char** argv) {
       }
       out_s << std::endl;
       c.wait();
+    }
+    std::ofstream ckpt_file(ckpt_fn);
+    if (!ckpt_file.is_open()) {
+      Error() << "Warning: cannot open checkpoint file: " << ckpt_fn
+              << std::endl;
+    } else {
+      ckpt_file << i << ' ' << need << std::endl;
+      Log() << "Checkpoint updated: " << i << ' ' << need << std::endl;
     }
   };
 
