@@ -5,6 +5,19 @@
 namespace psg {
 namespace ui {
 
+bool MyInputDoubleConvert(const char* name,
+                          double* v,
+                          double factor,
+                          double step,
+                          const char* fmt) {
+  double conv = *v * factor;
+  if (ImGui::InputDouble(name, &conv, step, step, fmt)) {
+    *v = conv / factor;
+    return true;
+  }
+  return false;
+}
+
 bool MyInputDouble3(const char* name, double* v, double step, const char* fmt) {
   float w = ImGui::GetContentRegionAvailWidth();
   float p = ImGui::GetStyle().FramePadding.x;

@@ -270,10 +270,8 @@ void MainUI::DrawContactPointPanel() {
     ImGui::InputInt("# Candidates", (int*)&cp_num_candidates, 1000);
     ImGui::InputInt("# Seeds", (int*)&cp_num_seeds, 1000);
     if (ImGui::Button("Generate Candidates", ImVec2(w, 0))) {
-      contact_point_candidates_ = InitializeContactPoints(
-          vm_.PSG(),
-          cp_num_candidates,
-          cp_num_seeds);
+      contact_point_candidates_ =
+          InitializeContactPoints(vm_.PSG(), cp_filter, cp_num_candidates, cp_num_seeds);
     }
     ImGui::Separator();
     size_t k = std::min((size_t)10, contact_point_candidates_.size());
@@ -667,12 +665,7 @@ void MainUI::DrawDebugPanel() {
     if (ImGui::Button("Debug CP Seeds", ImVec2(w, 0))) {
       std::vector<int> FI;
       std::vector<Eigen::Vector3d> X;
-      InitializeContactPointSeeds(vm_.PSG(),
-                                  cp_num_seeds,
-                                  cp_filter_hole_,
-                                  1. / cp_filter_curvature_radius_,
-                                  FI,
-                                  X);
+      InitializeContactPointSeeds(vm_.PSG(), cp_num_seeds, cp_filter, FI, X);
       Eigen::MatrixXd P(X.size(), 3);
       for (size_t i = 0; i < X.size(); i++) {
         P.row(i) = X[i];
@@ -682,9 +675,10 @@ void MainUI::DrawDebugPanel() {
       layer.point_size = 5;
     }
     ImGui::InputInt("# Seeds", (int*)&cp_num_seeds, 1000);
-    ImGui::InputDouble("Filter Hole", &cp_filter_hole_, 0.001);
+    ImGui::InputDouble("Filter Hole", &cp_filter.hole, 0.001);
     ImGui::InputDouble(
-        "Filter Curvature Radius", &cp_filter_curvature_radius_, 0.001);
+        "Filter Curvature Radius", &cp_filter.curvature_radius, 0.001);
+    MyInputDoubleConvert("Filter Angle", &cp_filter.angle, kRadToDeg, 1);
   }
   ImGui::PopID();
 }

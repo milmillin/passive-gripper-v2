@@ -6,6 +6,7 @@
 #include "../core/Debugger.h"
 #include "../core/Optimizer.h"
 #include "../core/models/ContactPointMetric.h"
+#include "../core/models/ContactPointFilter.h"
 #include "Layer.h"
 #include "ViewModel.h"
 
@@ -92,8 +93,7 @@ class MainUI : public igl::opengl::glfw::imgui::ImGuiMenu {
 
   // Debug
   void VisualizeDebugger(const Debugger& debugger);
-  double cp_filter_hole_ = 0.005;
-  double cp_filter_curvature_radius_ = 0.002;
+  ContactPointFilter cp_filter;
 
   // Robot Viz
   bool robot_viz_ = false;

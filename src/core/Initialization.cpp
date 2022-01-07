@@ -251,8 +251,7 @@ Trajectory InitializeTrajectory(const std::vector<Eigen::MatrixXd>& fingers,
 
 void InitializeContactPointSeeds(const PassiveGripper& psg,
                                  size_t num_seeds,
-                                 double filter_hole,
-                                 double filter_curvature,
+                                 const ContactPointFilter& filter,
                                  std::vector<int>& out_FI,
                                  std::vector<Eigen::Vector3d>& out_X) {
   const MeshDependentResource& mdr_floor = psg.GetFloorMDR();
@@ -272,6 +271,8 @@ void InitializeContactPointSeeds(const PassiveGripper& psg,
   out_X.clear();
   out_FI.clear();
 
+  double cos_angle = -cos(filter.angle);
+
   while (out_FI.size() < num_seeds) {
     Eigen::MatrixXd B_;
     Eigen::VectorXi out_FI_;
@@ -284,12 +285,14 @@ void InitializeContactPointSeeds(const PassiveGripper& psg,
       if (x.y() <= floor) continue;
       // filter unreachable point
       if (v_par[mdr_floor.ComputeClosestVertex(x)] == -2) continue;
-      // filter hole
+      // filter angle
       Eigen::RowVector3d n = mdr.FN.row(out_FI_(i));
+      if (n.y() > cos_angle) continue;
+      // filter hole
       igl::Hit hit;
       if (mdr.intersector.intersectRay(
               (x + n * 1e-6).cast<float>(), n.cast<float>(), hit)) {
-        if (hit.t < filter_hole) continue;
+        if (hit.t < filter.hole) continue;
       }
       // filter curvature
       Eigen::RowVector3d c;
@@ -305,7 +308,7 @@ void InitializeContactPointSeeds(const PassiveGripper& psg,
                   v,
                   w);
       double curvature = u * K(f(0)) + v * K(f(1)) + w * K(f(2));
-      if (curvature > filter_curvature) continue;
+      if (filter.curvature_radius * curvature > 1) continue;  // curvature > 1/r
 
       out_FI.push_back(out_FI_(i));
       out_X.push_back(X_.row(i));
@@ -316,6 +319,7 @@ void InitializeContactPointSeeds(const PassiveGripper& psg,
 
 std::vector<ContactPointMetric> InitializeContactPoints(
     const PassiveGripper& psg,
+    const ContactPointFilter& filter,
     size_t num_candidates,
     size_t num_seeds) {
   const MeshDependentResource& mdr = psg.GetMDR();
@@ -324,8 +328,7 @@ std::vector<ContactPointMetric> InitializeContactPoints(
   std::vector<int> FI;
   std::vector<Eigen::Vector3d> X;
 
-  // TODO:
-  InitializeContactPointSeeds(psg, num_seeds, 0.005, 1 / 0.002, FI, X);
+  InitializeContactPointSeeds(psg, num_seeds, filter, FI, X);
 
   std::mt19937 gen;
   std::uniform_int_distribution<int> dist(0, num_seeds - 1);
@@ -342,11 +345,11 @@ std::vector<ContactPointMetric> InitializeContactPoints(
 #pragma omp critical
       {
         toContinue = prelim.size() < num_candidates;
-        if (iters > 100) {
+        if (iters >= 1000) {
           total_iters += iters;
           iters = 0;
-          if (total_iters > num_candidates * 10000 &&
-              total_iters > 10000 * prelim.size())  // success rate < 0.01%
+          if (total_iters > num_candidates * 100 &&
+              total_iters > 1000 * prelim.size())  // success rate < 0.01%
             toContinue = false;
         }
       }

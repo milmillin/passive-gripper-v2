@@ -3,6 +3,7 @@
 #include <Eigen/Core>
 #include "PassiveGripper.h"
 #include "models/ContactPoint.h"
+#include "models/ContactPointFilter.h"
 #include "models/ContactPointMetric.h"
 #include "models/GripperSettings.h"
 #include "models/MeshDependentResource.h"
@@ -28,13 +29,13 @@ Trajectory InitializeTrajectory(const std::vector<Eigen::MatrixXd>& fingers,
 
 void InitializeContactPointSeeds(const PassiveGripper& psg,
                                  size_t num_seeds,
-                                 double filter_hole,
-                                 double filter_curvature,
+                                 const ContactPointFilter& filter,
                                  std::vector<int>& out_FI,
                                  std::vector<Eigen::Vector3d>& out_X);
 
 std::vector<ContactPointMetric> InitializeContactPoints(
     const PassiveGripper& psg,
+    const ContactPointFilter& filter,
     size_t num_candidates,
     size_t num_seeds);
 
