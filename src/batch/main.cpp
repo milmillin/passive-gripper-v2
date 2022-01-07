@@ -53,6 +53,9 @@ int main(int argc, char** argv) {
   // -m
   int maxiters = 15;
 
+  // -n
+  int ckpt_need = 1;
+
   for (int i = 3; i < argc; i++) {
     if (strncmp(argv[i], "-x", 4) == 0) {
       restart_set = true;
@@ -67,6 +70,9 @@ int main(int argc, char** argv) {
     } else if (strncmp(argv[i], "-m", 4) == 0) {
       maxiters = std::stoi(argv[i + 1]);
       i++;
+    } else if (strncmp(argv[i], "-n", 4) == 0) {
+      ckpt_need = std::stoi(argv[i + 1]);
+      i++;
     }
   }
 
@@ -76,7 +82,6 @@ int main(int argc, char** argv) {
   }
 
   int ckpt_i = 0;
-  int ckpt_need = 1;
   if (!restart_set) {
     std::ifstream ckpt_file(ckpt_fn);
     if (!ckpt_file.is_open()) {
