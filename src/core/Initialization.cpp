@@ -348,8 +348,8 @@ std::vector<ContactPointMetric> InitializeContactPoints(
         if (iters >= 1000) {
           total_iters += iters;
           iters = 0;
-          if (total_iters > num_candidates * 100 &&
-              total_iters > 1000 * prelim.size())  // success rate < 0.01%
+          if (total_iters > num_candidates * 1000 &&
+              total_iters > 10000 * prelim.size())  // success rate < 0.01%
             toContinue = false;
         }
       }
