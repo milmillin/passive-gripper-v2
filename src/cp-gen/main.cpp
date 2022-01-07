@@ -39,7 +39,7 @@ int main(int argc, char** argv) {
       psg, cp_filter_1, n_candidates, n_seeds);
   Log() << "Phase 2" << std::endl;
   auto cps2 = psg::core::InitializeContactPoints(
-      psg, cp_filter_1, n_candidates, n_seeds);
+      psg, cp_filter_2, n_candidates, n_seeds);
 
   std::vector<psg::core::models::ContactPointMetric> cps(cps1.size() +
                                                          cps2.size());
