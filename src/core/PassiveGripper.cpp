@@ -17,6 +17,34 @@ PassiveGripper::PassiveGripper() {
   params_.trajectory.push_back(kInitPose);
 }
 
+static void InitMdrFloor(const Eigen::MatrixXd& V,
+                         const Eigen::MatrixXi& F,
+                         double floor,
+                         MeshDependentResource& out_mdr) {
+  Eigen::MatrixXd cur_cube_V = cube_V;
+
+  Eigen::RowVector3d p_min = V.colwise().minCoeff();
+  Eigen::RowVector3d p_max = V.colwise().maxCoeff();
+  Eigen::RowVector3d range = p_max - p_min;
+  p_min = p_min.cwiseMin(Eigen::RowVector3d::Zero());
+  p_max = p_max.cwiseMax(Eigen::RowVector3d::Zero());
+  range.y() = 0;
+  p_min -= range;
+  p_max += range;
+  range = p_max - p_min;
+  range.y() = floor;
+
+  cur_cube_V.array().rowwise() *= range.array();
+  cur_cube_V.rowwise() += p_min;
+
+  Eigen::MatrixXd RV;
+  Eigen::MatrixXi RF;
+  igl::copyleft::cgal::mesh_boolean(
+      V, F, cur_cube_V, cube_F, igl::MESH_BOOLEAN_TYPE_UNION, RV, RF);
+
+  out_mdr.init(RV, RF);
+}
+
 void PassiveGripper::SetMesh(const Eigen::MatrixXd& V,
                              const Eigen::MatrixXi& F,
                              bool invalidate) {
@@ -29,6 +57,8 @@ void PassiveGripper::SetMesh(const Eigen::MatrixXd& V,
   std::cerr << "Remesh: V: " << RV.rows() << std::endl;
   mdr_remeshed_.init(RV, RF);
   mdr_remeshed_.GetSP();
+  InitMdrFloor(
+      mdr_remeshed_.V, mdr_remeshed_.F, settings_.contact.floor, mdr_contact_);
 
   mesh_changed_ = true;
   mesh_loaded_ = true;
@@ -41,13 +71,10 @@ void PassiveGripper::SetMeshTrans(const Eigen::Affine3d& trans) {
 }
 
 void PassiveGripper::TransformMesh(const Eigen::Affine3d& trans) {
-  Eigen::MatrixXd V = mdr_.V;
   Eigen::MatrixXi F = mdr_.F;
-  V = (trans * V.transpose().colwise().homogeneous()).transpose();
-  mdr_.init(V, F);
+  auto V = (trans * mdr_.V.transpose().colwise().homogeneous()).transpose();
   mesh_trans_ = trans * mesh_trans_;
-  mesh_changed_ = true;
-  Invalidate();
+  SetMesh(V, F);
 }
 
 void PassiveGripper::AddContactPoint(const ContactPoint& contact_point) {
@@ -241,33 +268,6 @@ void PassiveGripper::InvalidateMesh() {
   contact_changed_ = true;
 }
 
-static void InitMdrFloor(const Eigen::MatrixXd& V,
-                         const Eigen::MatrixXi& F,
-                         double floor,
-                         MeshDependentResource& out_mdr) {
-  Eigen::MatrixXd cur_cube_V = cube_V;
-
-  Eigen::RowVector3d p_min = V.colwise().minCoeff();
-  Eigen::RowVector3d p_max = V.colwise().maxCoeff();
-  Eigen::RowVector3d range = p_max - p_min;
-  p_min = p_min.cwiseMin(Eigen::RowVector3d::Zero());
-  p_max = p_max.cwiseMax(Eigen::RowVector3d::Zero());
-  range.y() = 0;
-  p_min -= range;
-  p_max += range;
-  range = p_max - p_min;
-  range.y() = floor;
-
-  cur_cube_V.array().rowwise() *= range.array();
-  cur_cube_V.rowwise() += p_min;
-
-  Eigen::MatrixXd RV;
-  Eigen::MatrixXi RF;
-  igl::copyleft::cgal::mesh_boolean(
-      V, F, cur_cube_V, cube_F, igl::MESH_BOOLEAN_TYPE_UNION, RV, RF);
-
-  out_mdr.init(RV, RF);
-}
 
 void PassiveGripper::InvalidateContactSettings() {
   contact_settings_changed_ = false;
