@@ -308,6 +308,37 @@ double ComputeCost(const GripperParams& params,
   return totalCost;
 }
 
+double MinDistanceAtPose(const std::vector<Eigen::MatrixXd>& fingers,
+                         const Eigen::Affine3d& finger_trans_inv,
+                         const MeshDependentResource& mdr,
+                         const GripperSettings& settings,
+                         const Pose& current_pose) {
+  const size_t n_finger_steps = settings.cost.n_finger_steps;
+  const size_t n_finger_joints = settings.finger.n_finger_joints;
+  const size_t n_evals_per_finger = (n_finger_joints - 1) * n_finger_steps + 1;
+  const double finger_step = 1. / n_finger_steps;
+
+  double t_min_dist = 0;
+  Eigen::RowVector3d t_dP_ds;  // unused
+  Eigen::Affine3d trans = robots::Forward(current_pose) * finger_trans_inv;
+  for (const auto& finger : fingers) {
+    Eigen::MatrixXd t_finger =
+        (trans * finger.transpose().colwise().homogeneous()).transpose();
+    for (long long jj = 1; jj < n_evals_per_finger; jj++) {
+      long long kk = (jj - 1) % n_finger_steps + 1;
+      long long joint = (jj - 1) / n_finger_steps + 1;
+      double fingerT = kk * finger_step;
+      Eigen::RowVector3d lerpedFinger =
+          t_finger.row(joint - 1) * (1. - fingerT) +
+          t_finger.row(joint) * fingerT;
+      t_min_dist = std::min(
+          t_min_dist,
+          GetDist(lerpedFinger.transpose(), settings.cost, mdr, t_dP_ds));
+    }
+  }
+  return t_min_dist;
+}
+
 double MinDistance(const GripperParams& params,
                    const GripperSettings& settings,
                    const MeshDependentResource& mdr) {

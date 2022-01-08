@@ -2,9 +2,12 @@
 
 #include <Eigen/Core>
 #include <vector>
+#include <unordered_map>
+#include <unordered_set>
 
 #include "../Constants.h"
 #include "models/ContactPoint.h"
+#include "DiscreteDistanceField.h"
 
 namespace psg {
 namespace core {
@@ -45,13 +48,31 @@ bool CheckApproachDirection(const std::vector<ContactPoint>& contactPoints,
                             double maxV,
                             double learningRate,
                             double threshold,
-                            int max_iterations);
+                            int max_iterations,
+                            Eigen::Affine3d& out_trans);
 
 bool CheckApproachDirection2(const std::vector<ContactPoint>& contact_points,
                              double away_dist,
                              double max_angle,
                              const Eigen::Vector3d& center_of_mass,
                              Eigen::Affine3d& out_trans);
+
+struct NeighborInfo {
+  std::unordered_map<int, std::unordered_set<int>> neighbor;
+};
+
+void buildNeighborInfo(const Eigen::MatrixXi &F, NeighborInfo &info);
+
+std::vector<int> getNeighbors(
+    const NeighborInfo &info,
+    const ContactPoint& contact_point,
+    const Eigen::MatrixXd &V,
+    const Eigen::MatrixXi &F,
+    double tolerance);
+
+int getFingerDistance(
+    const DiscreteDistanceField &distanceField,
+    const std::vector<ContactPoint>& contact_points);
 
 }  // namespace core
 }  // namespace psg

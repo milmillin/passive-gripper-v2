@@ -70,6 +70,7 @@ class MainUI : public igl::opengl::glfw::imgui::ImGuiMenu {
   // Button Callback
   void OnLoadMeshClicked();
   void OnSaveMeshClicked();
+  void OnMergeMeshClicked();
   void OnLoadPSGClicked();
   void OnSavePSGClicked();
   void OnAlignCameraCenter();

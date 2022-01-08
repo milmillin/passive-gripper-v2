@@ -1,5 +1,8 @@
 #pragma once
 
+#include <Eigen/Core>
+#include <Eigen/Geometry>
+#include <vector>
 #include "../Constants.h"
 #include "Debugger.h"
 #include "models/GripperParams.h"
@@ -30,6 +33,12 @@ double ComputeCost3(const GripperParams& params,
                     const GripperSettings& settings,
                     const MeshDependentResource& remeshed_mdr,
                     Debugger* const debugger);
+
+double MinDistanceAtPose(const std::vector<Eigen::MatrixXd>& fingers,
+                         const Eigen::Affine3d& finger_trans_inv,
+                         const MeshDependentResource& mdr,
+                         const GripperSettings& settings,
+                         const Pose& current_pose);
 
 double MinDistance(const GripperParams& params,
                    const GripperSettings& settings,

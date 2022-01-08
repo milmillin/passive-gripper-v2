@@ -1,8 +1,12 @@
 #include "GeometryUtils.h"
 
+#include <unordered_map>
+#include <unordered_set>
+
 #include <CGAL/Polygon_mesh_processing/remesh.h>
 #include <CGAL/Polyhedron_3.h>
 #include <igl/copyleft/cgal/mesh_to_polyhedron.h>
+#include <igl/copyleft/cgal/mesh_boolean.h>
 #include <igl/copyleft/cgal/polyhedron_to_mesh.h>
 #include <igl/volume.h>
 #include <libqhullcpp/Qhull.h>
@@ -13,6 +17,8 @@
 #include <list>
 
 #include "robots/Robots.h"
+
+#include "UnionFind.h"
 
 namespace psg {
 namespace core {
@@ -463,6 +469,79 @@ void CreateCylinderXY(const Eigen::Vector3d& o,
   for (int i = 2; i < res; i++) {
     out_F.row(2 * res + i - 2) << 0, i, i - 1;
     out_F.row(2 * res + res - 4 + i) << res, res + i - 1, res + i;
+  }
+}
+
+void MergeMesh(const Eigen::MatrixXd &V,
+               const Eigen::MatrixXi &F,
+               Eigen::MatrixXd &out_V,
+               Eigen::MatrixXi &out_F) {
+  struct Submesh {
+    Eigen::MatrixXd V;
+    Eigen::MatrixXi F;
+    size_t face_count = 0;
+    size_t next_face = 0;
+    std::unordered_map<size_t, size_t> vertex_map;
+  };
+  std::unordered_map<size_t, Submesh> submeshes;
+  UnionFind unionFind(V.rows());
+
+  // Find sub-mesh that are linked by faces
+  for (Eigen::Index f = 0; f < F.rows(); f++) {
+    unionFind.merge(F(f, 0), F(f, 1));
+    unionFind.merge(F(f, 1), F(f, 2));
+  }
+
+  // Assign vertices and faces for sub-mesh
+  for (Eigen::Index f = 0; f < F.rows(); f++) {
+    submeshes[unionFind.find(F(f, 0))].face_count++;
+  }
+  for (Eigen::Index v = 0; v < V.rows(); v++) {
+    auto &vertex_map = submeshes[unionFind.find(v)].vertex_map;
+    size_t next_id = vertex_map.size();
+    vertex_map[v] = next_id;
+  }
+
+  for (auto &item : submeshes) {
+    auto &submesh = item.second;
+    submesh.V.resize(submesh.vertex_map.size(), 3);
+    submesh.F.resize(submesh.face_count, 3);
+  }
+
+  // Map vertices and faces information to sub-mesh
+  for (Eigen::Index f = 0; f < F.rows(); f++) {
+    auto &submesh = submeshes[unionFind.find(F(f, 0))];
+    size_t sub_f = submesh.next_face++;
+    for (int i = 0; i < 3; i++) {
+      submesh.F(sub_f, i) = submesh.vertex_map[F(f, i)];
+    }
+  }
+  for (Eigen::Index v = 0; v < V.rows(); v++) {
+    auto &submesh = submeshes[unionFind.find(v)];
+    submesh.V.row(submesh.vertex_map[v]) = V.row(v);
+  }
+
+  // Merge all sub-mesh
+  auto it = submeshes.begin();
+  Eigen::MatrixXd VCurrent = it->second.V, VResult;
+  Eigen::MatrixXi FCurrent = it->second.F, FResult;
+  for (it++; it != submeshes.end(); it++) {
+    auto &submesh = it->second;
+    igl::copyleft::cgal::mesh_boolean(submesh.V, submesh.F, VCurrent, FCurrent,
+                                      igl::MESH_BOOLEAN_TYPE_UNION,
+                                      VResult, FResult);
+    VCurrent.swap(VResult);
+    FCurrent.swap(FResult);
+  }
+  out_V.swap(VCurrent);
+  out_F.swap(FCurrent);
+
+  int count = 0;
+  for (auto &item : submeshes) {
+    auto &submesh = item.second;
+    std::cout << "submesh " << count++ << std::endl;
+    std::cout << "  Faces: " << submesh.next_face << std::endl;
+    std::cout << "  Vertices: " << submesh.V.rows() << std::endl;
   }
 }
 

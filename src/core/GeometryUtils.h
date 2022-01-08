@@ -121,6 +121,12 @@ void CreateCylinderXY(const Eigen::Vector3d& o,
                       Eigen::MatrixXd& out_V,
                       Eigen::MatrixXi& out_F);
 
+// Merge all disjoint sub-meshes in the mesh if they overlap
+void MergeMesh(const Eigen::MatrixXd &V,
+               const Eigen::MatrixXi &F,
+               Eigen::MatrixXd &out_V,
+               Eigen::MatrixXi &out_F);
+
 // clang-format off
 // Inline mesh of a cube
 const Eigen::Matrix<double, 8, 3> cube_V = (Eigen::MatrixXd(8, 3) <<
