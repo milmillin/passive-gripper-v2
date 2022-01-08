@@ -195,9 +195,9 @@ static void LengthParameterize(const Eigen::MatrixXd& V,
   out_V.row(nSteps) = V.row(V.rows() - 1);
 }
 
-Trajectory InitializeTrajectory(const std::vector<Eigen::MatrixXd>& fingers,
-                                const Pose& initPose,
-                                size_t n_keyframes) {
+Trajectory InitializeTrajectory0(const std::vector<Eigen::MatrixXd>& fingers,
+                                 const Pose& initPose,
+                                 size_t n_keyframes) {
   static constexpr size_t subdivide = 4;
   const size_t nSize = (n_keyframes - 1) * subdivide;
   Eigen::MatrixXd avgNorms(nSize, 3);
@@ -247,6 +247,41 @@ Trajectory InitializeTrajectory(const std::vector<Eigen::MatrixXd>& fingers,
     }
   }
   return result;
+}
+
+Trajectory InitializeTrajectory1(const std::vector<Eigen::MatrixXd>& fingers,
+                                 const Pose& init_pose,
+                                 size_t n_keyframes) {
+  Eigen::RowVector3d n(0, 0, 0);
+  Eigen::RowVector3d eff_pos = robots::Forward(init_pose).translation();
+  for (size_t i = 0; i < fingers.size(); i++) {
+    n += (eff_pos - fingers[i].row(0));
+  }
+  n /= fingers.size();
+
+  constexpr double min_y = -0.05;
+  Eigen::Affine3d init_trans = robots::Forward(init_pose);
+  Eigen::Affine3d end_trans = Eigen::Translation3d(n) * init_trans;
+  end_trans.translation().y() =
+      std::max(end_trans.translation().y(), -min_y + 0.003);
+
+  Trajectory result;
+  result.push_back(init_pose);
+  result.push_back(init_pose);
+  std::vector<Pose> candidates;
+  size_t best_i;
+  if (robots::BestInverse(end_trans, init_pose, candidates, best_i)) {
+    Pose to_push = FixAngles(init_pose, candidates[best_i]);
+    result.push_back(to_push);  
+    result.push_back(to_push);  
+  }
+  return result;
+}
+
+Trajectory InitializeTrajectory(const std::vector<Eigen::MatrixXd>& fingers,
+                                const Pose& initPose,
+                                size_t n_keyframes) {
+  return InitializeTrajectory1(fingers, initPose, n_keyframes);
 }
 
 void InitializeContactPointSeeds(const PassiveGripper& psg,
