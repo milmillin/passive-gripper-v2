@@ -321,7 +321,13 @@ bool CheckApproachDirection2(const std::vector<ContactPoint>& contact_points,
 
   constexpr double learningRate = 0.1;
 
+
   Vector3real trans = Vector3real::Zero();
+  for (size_t i = 0; i < contact_points.size(); i++) {
+    trans += contact_points[i].normal;
+  }
+  trans /= contact_points.size();
+
   Vector3real rot = Vector3real::Zero();
   Vector3real center = center_of_mass.cast<real>();
 

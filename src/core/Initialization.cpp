@@ -511,17 +511,16 @@ std::vector<ContactPointMetric> InitializeContactPoints(
             });
 
   // Remove solutions that are not in the frontier
-  double partial_min_wrench = 0;
+  double partial_min_wrench = -1;
+  std::vector<ContactPointMetric> result;
   for (int i = 0; i < prelim.size(); i++) {
     if (prelim[i].partial_min_wrench >= partial_min_wrench) {
+      result.push_back(prelim[i]);
       partial_min_wrench = prelim[i].partial_min_wrench;
-    } else {
-      prelim.erase(prelim.begin() + i);
-      i--;
     }
   }
 
-  return prelim;
+  return result;
 }
 
 void InitializeGripperBound(const PassiveGripper& psg,
