@@ -311,7 +311,6 @@ std::vector<ContactPointMetric> InitializeContactPoints(
         continue;
       std::vector<ContactPoint> contactPoints(3);
       std::vector<std::vector<int>> neighbors;
-      // std::cout << "0" << std::endl;
       for (int i = 0; i < 3; i++) {
         contactPoints[i].position = X[pids[i]];
         contactPoints[i].normal = mdr.FN.row(FI[pids[i]]);
@@ -320,7 +319,6 @@ std::vector<ContactPointMetric> InitializeContactPoints(
         // Check tolerance
         neighbors.push_back(getNeighbors(neighborInfo, contactPoints[i], mdr.V, mdr.F, 0.01));
       }
-      // std::cout << "1" << std::endl;
 
       // Check Feasibility: Minimum Wrench
       bool passMinimumWrench = true;
@@ -337,14 +335,12 @@ std::vector<ContactPointMetric> InitializeContactPoints(
           sample_contact_cones.insert(sample_contact_cones.end(), cone.begin(), cone.end());
         }
 
-      // std::cout << "2" << std::endl;
         double samplePartialMinWrench =
             ComputePartialMinWrenchQP(sample_contact_cones,
                                       mdr.center_of_mass,
                                       -Eigen::Vector3d::UnitY(),
                                       Eigen::Vector3d::Zero());
 
-      // std::cout << "3" << std::endl;
         if (sample == 0) {
           contact_cones = sample_contact_cones;
           partialMinWrench = samplePartialMinWrench;
@@ -355,7 +351,6 @@ std::vector<ContactPointMetric> InitializeContactPoints(
           break;
         }
 
-      // std::cout << "4" << std::endl;
         // Prepare next sample
         for (size_t i = 0; i < 3; i++) {
           std::uniform_int_distribution<> dist(0, neighbors[i].size() - 1);
