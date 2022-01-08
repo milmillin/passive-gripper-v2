@@ -2,9 +2,9 @@
 
 #include <igl/random_points_on_mesh.h>
 #include <random>
+#include "DiscreteDistanceField.h"
 #include "GeometryUtils.h"
 #include "QualityMetric.h"
-#include "DiscreteDistanceField.h"
 #include "robots/Robots.h"
 
 #include <autodiff/forward/real.hpp>
@@ -273,8 +273,8 @@ Trajectory InitializeTrajectory1(const std::vector<Eigen::MatrixXd>& fingers,
   size_t best_i;
   if (robots::BestInverse(end_trans, init_pose, candidates, best_i)) {
     Pose to_push = FixAngles(init_pose, candidates[best_i]);
-    result.push_back(to_push);  
-    result.push_back(to_push);  
+    result.push_back(to_push);
+    result.push_back(to_push);
   }
   return result;
 }
@@ -376,9 +376,8 @@ std::vector<ContactPointMetric> InitializeContactPoints(
   size_t total_iters = 0;
 
   // To be used for tolerance check
-  NeighborInfo neighborInfo;
   std::cout << "Building neighbor info" << std::endl;
-  buildNeighborInfo(mdr.F, neighborInfo);
+  NeighborInfo neighborInfo(mdr.F);
   std::cout << "Done building neighbor info" << std::endl;
 
   std::cout << "Building distance field" << std::endl;
@@ -415,7 +414,8 @@ std::vector<ContactPointMetric> InitializeContactPoints(
         contactPoints[i].fid = FI[pids[i]];
 
         // Check tolerance
-        neighbors.push_back(getNeighbors(neighborInfo, contactPoints[i], mdr.V, mdr.F, 0.01));
+        neighbors.push_back(
+            neighborInfo.GetNeighbors(contactPoints[i], mdr.V, mdr.F, 0.01));
       }
 
       // Check Feasibility: Minimum Wrench
@@ -427,10 +427,10 @@ std::vector<ContactPointMetric> InitializeContactPoints(
         std::vector<ContactPoint> sample_contact_cones;
         sample_contact_cones.reserve(3 * settings.cone_res);
         for (size_t i = 0; i < 3; i++) {
-          const auto&& cone = GenerateContactCone(contactPoints[i],
-                                                  settings.cone_res,
-                                                  settings.friction);
-          sample_contact_cones.insert(sample_contact_cones.end(), cone.begin(), cone.end());
+          const auto&& cone = GenerateContactCone(
+              contactPoints[i], settings.cone_res, settings.friction);
+          sample_contact_cones.insert(
+              sample_contact_cones.end(), cone.begin(), cone.end());
         }
 
         double samplePartialMinWrench =
@@ -469,17 +469,12 @@ std::vector<ContactPointMetric> InitializeContactPoints(
       // Check Feasiblity: Approach Direction
       Eigen::Affine3d trans;
       if (!CheckApproachDirection(
-              contactPoints,
-              kPi / 2 * 8 / 9,
-              1,
-              0.1,
-              1e-12,
-              100,
-              trans)) {
+              contactPoints, kPi / 2 * 8 / 9, 1, 0.1, 1e-12, 100, trans)) {
         continue;
       }
       // if (!CheckApproachDirection(
-      //         contactPoints, 0.01, kDegToRad * 80, mdr.center_of_mass, trans)) {
+      //         contactPoints, 0.01, kDegToRad * 80, mdr.center_of_mass,
+      //         trans)) {
       //   continue;
       // }
 
@@ -490,7 +485,8 @@ std::vector<ContactPointMetric> InitializeContactPoints(
       candidate.partial_min_wrench = partialMinWrench;
       candidate.min_wrench = minWrench;
       candidate.trans = trans;
-      candidate.finger_distance = getFingerDistance(distanceField, contactPoints);
+      candidate.finger_distance =
+          GetFingerDistance(distanceField, contactPoints);
 #pragma omp critical
       {
         prelim.push_back(candidate);

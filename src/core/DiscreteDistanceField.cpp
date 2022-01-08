@@ -47,7 +47,7 @@ DiscreteDistanceField::DiscreteDistanceField(
     queue.pop();
 
     int current_cost = getVoxel(next) + 1;
-    std::cout << current_cost << std::endl;
+    // std::cout << current_cost << std::endl;
 
     for (int dx = -1; dx <= 1; dx++)
       for (int dy = -1; dy <= 1; dy++)

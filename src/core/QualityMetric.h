@@ -1,13 +1,13 @@
 #pragma once
 
 #include <Eigen/Core>
-#include <vector>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 #include "../Constants.h"
-#include "models/ContactPoint.h"
 #include "DiscreteDistanceField.h"
+#include "models/ContactPoint.h"
 
 namespace psg {
 namespace core {
@@ -59,20 +59,16 @@ bool CheckApproachDirection2(const std::vector<ContactPoint>& contact_points,
 
 struct NeighborInfo {
   std::unordered_map<int, std::unordered_set<int>> neighbor;
+
+  NeighborInfo(const Eigen::MatrixXi& F);
+  std::vector<int> GetNeighbors(const ContactPoint& contact_point,
+                                const Eigen::MatrixXd& V,
+                                const Eigen::MatrixXi& F,
+                                double tolerance) const;
 };
 
-void buildNeighborInfo(const Eigen::MatrixXi &F, NeighborInfo &info);
-
-std::vector<int> getNeighbors(
-    const NeighborInfo &info,
-    const ContactPoint& contact_point,
-    const Eigen::MatrixXd &V,
-    const Eigen::MatrixXi &F,
-    double tolerance);
-
-int getFingerDistance(
-    const DiscreteDistanceField &distanceField,
-    const std::vector<ContactPoint>& contact_points);
+int GetFingerDistance(const DiscreteDistanceField& distanceField,
+                      const std::vector<ContactPoint>& contact_points);
 
 }  // namespace core
 }  // namespace psg
