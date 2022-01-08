@@ -303,7 +303,8 @@ void MainUI::DrawContactPointPanel() {
         // }
       }
       ImGui::SameLine();
-      ImGui::Text("mw: %.4e, pmw: %.4e",
+      ImGui::Text("dist: %d mw: %.4e, pmw: %.4e",
+                  contact_point_candidates_[i].finger_distance,
                   contact_point_candidates_[i].min_wrench,
                   contact_point_candidates_[i].partial_min_wrench);
       ImGui::PopID();
@@ -474,7 +475,7 @@ void MainUI::DrawOptimizationPanel() {
       RRTStarPlanner planner;
       Trajectory trajectory;
       if (planner.Optimize(vm_.PSG(), trajectory)) {
-        vm_.PSG().SetTrajectory(trajectory);      
+        vm_.PSG().SetTrajectory(trajectory);
       }
     }
   }

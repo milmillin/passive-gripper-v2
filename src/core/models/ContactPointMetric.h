@@ -14,6 +14,7 @@ struct ContactPointMetric : psg::core::serialization::Serializable {
   std::vector<ContactPoint> contact_points;
   double min_wrench;
   double partial_min_wrench;
+  int finger_distance;
   Eigen::Affine3d trans;
 
   DECL_SERIALIZE() {

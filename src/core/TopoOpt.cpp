@@ -18,7 +18,7 @@
 namespace psg {
 namespace core {
 
-static std::vector<Eigen::Vector3i> GetForbiddenVoxels(
+std::vector<Eigen::Vector3i> GetForbiddenVoxels(
     const Eigen::MatrixXd& V,
     const Eigen::MatrixXi& F,
     const Eigen::Vector3d& lb,
