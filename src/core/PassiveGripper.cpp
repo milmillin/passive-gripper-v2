@@ -360,7 +360,8 @@ void PassiveGripper::InvalidateCost() {
   cost_changed_ = false;
   cost_ = ComputeCost3(params_, settings_, mdr_remeshed_, nullptr);
   min_dist_ = MinDistance(params_, settings_, mdr_);
-  intersecting_ = Intersects(params_, settings_, mdr_);
+  // intersecting_ = Intersects(params_, settings_, mdr_); // TODO: Fails with duplicate trajectory
+  intersecting_ = true;
   InvokeInvalidated(InvalidatedReason::kCost);
 }
 
