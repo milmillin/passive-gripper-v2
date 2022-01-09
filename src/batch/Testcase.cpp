@@ -67,7 +67,6 @@ void ProcessFrom(std::string raw_fn,
     Log() << "> Optimizating for " << i << "-th candidate" << std::endl;
     psg.reinit_trajectory = true;
     psg.SetContactPoints(cps[i].contact_points);
-    Log() << "> Contact points set" << std::endl;
     auto start_time = std::chrono::high_resolution_clock::now();
     optimizer.Optimize(psg);
     optimizer.Wait();
