@@ -504,7 +504,7 @@ std::vector<ContactPointMetric> InitializeContactPoints(
             prelim.end(),
             [](const ContactPointMetric& a, const ContactPointMetric& b) {
               if (a.finger_distance == b.finger_distance)
-                return a.partial_min_wrench > b.partial_min_wrench;
+                return a.partial_min_wrench < b.partial_min_wrench;
               return a.finger_distance < b.finger_distance;
             });
 

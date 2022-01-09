@@ -29,11 +29,12 @@ int main(int argc, char** argv) {
   psg.Deserialize(psg_f);
 
   size_t n_seeds = 1000;
-  size_t n_candidates = 10000;
+  size_t n_candidates = 3000;
   psg::core::models::ContactPointFilter cp_filter_1;
 
   auto cps = psg::core::InitializeContactPoints(
       psg, cp_filter_1, n_candidates, n_seeds);
+  Log() << cps.size() << " candidates generated" << std::endl;
 
   std::string cp_fn = argv[2];
   std::ofstream cp_f(cp_fn, std::ios::out | std::ios::binary);
