@@ -600,19 +600,38 @@ double ComputeCost3(const GripperParams& params,
                               new_trajectory,
                               new_fingers);
   size_t n_trajectory = new_trajectory.size();
+  std::vector<bool> traj_skip(n_trajectory - 1, false);
+  std::vector<size_t> traj_subs(n_trajectory - 1, 0);
 
-  double traj_max = 0;
-  for (size_t i = 0; i < n_trajectory - 1; i++) {
+#pragma omp parallel for
+  for (long long i = 0; i < n_trajectory - 1; i++) {
     double max_deviation = 0;
+    bool intersects = false;
     for (size_t j = 0; j < new_fingers[i].size(); j++) {
       double dev = (new_fingers[i + 1][j] - new_fingers[i][j])
                        .rowwise()
                        .norm()
                        .maxCoeff();
       max_deviation = std::max(max_deviation, dev);
+      Eigen::RowVector3d p_min =
+          new_fingers[i][j].colwise().minCoeff().cwiseMin(
+              new_fingers[i + 1][j].colwise().minCoeff());
+      Eigen::RowVector3d p_max =
+          new_fingers[i][j].colwise().maxCoeff().cwiseMin(
+              new_fingers[i + 1][j].colwise().maxCoeff());
+      p_min.array() -= precision;
+      p_max.array() += precision;
+      intersects = intersects ||
+                   remeshed_mdr.Intersects(Eigen::AlignedBox3d(p_min, p_max));
     }
-    size_t cur_sub = std::ceil(max_deviation / precision);
 
+    traj_subs[i] = std::ceil(max_deviation / precision);
+    traj_skip[i] = !intersects;
+  }
+
+  double traj_max = 0;
+  for (size_t i = 0; i < n_trajectory - 1; i++) {
+    size_t cur_sub = traj_subs[i];
     size_t iters = cur_sub;
     if (i == n_trajectory - 2) iters++;
 
