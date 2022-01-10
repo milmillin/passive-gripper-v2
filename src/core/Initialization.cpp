@@ -423,7 +423,7 @@ std::vector<ContactPointMetric> InitializeContactPoints(
       std::vector<ContactPoint> contact_cones;
       double partialMinWrench = 0;
       int sample;
-      for (sample = 0; sample < 20; sample++) {
+      for (sample = 0; sample < 1; sample++) {
         std::vector<ContactPoint> sample_contact_cones;
         sample_contact_cones.reserve(3 * settings.cone_res);
         for (size_t i = 0; i < 3; i++) {
@@ -469,7 +469,7 @@ std::vector<ContactPointMetric> InitializeContactPoints(
       // Check Feasiblity: Approach Direction
       Eigen::Affine3d trans;
       if (!CheckApproachDirection(
-              contactPoints, kPi / 2, 1, 0.01, 1e-12, 500, trans)) {
+              contactPoints, kPi / 2 * 8 / 9, 1, 0.01, 1e-12, 500, trans)) {
         // std::cout << "Failed due to approach direction" << std::endl;
         continue;
       }
