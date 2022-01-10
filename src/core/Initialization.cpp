@@ -415,7 +415,7 @@ std::vector<ContactPointMetric> InitializeContactPoints(
 
         // Check tolerance
         neighbors.push_back(
-            neighborInfo.GetNeighbors(contactPoints[i], mdr.V, mdr.F, 0.01));
+            neighborInfo.GetNeighbors(contactPoints[i], mdr.V, mdr.F, 0.001));
       }
 
       // Check Feasibility: Minimum Wrench
@@ -469,9 +469,11 @@ std::vector<ContactPointMetric> InitializeContactPoints(
       // Check Feasiblity: Approach Direction
       Eigen::Affine3d trans;
       if (!CheckApproachDirection(
-              contactPoints, kPi / 2 * 8 / 9, 1, 0.1, 1e-12, 100, trans)) {
+              contactPoints, kPi / 2, 1, 0.01, 1e-12, 500, trans)) {
+        // std::cout << "Failed due to approach direction" << std::endl;
         continue;
       }
+      // std::cout << "Success" << std::endl;
       // if (!CheckApproachDirection(
       //         contactPoints, 0.01, kDegToRad * 80, mdr.center_of_mass,
       //         trans)) {
