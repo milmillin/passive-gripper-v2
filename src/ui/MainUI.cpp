@@ -830,6 +830,14 @@ void MainUI::OnLoadPSGClicked() {
     std::cout << stl_fn << " gripper stl loaded!" << std::endl;
   }
   OnAlignCameraCenter();
+
+  // Try load contact points
+  std::string cpx_fn = filename.substr(0, last_dot) + ".cpx";
+  std::ifstream cpx_file(cpx_fn, std::ios::in | std::ios::binary);
+  if (cpx_file.good()) {
+    contact_point_candidates_.clear();
+    psg::core::serialization::Deserialize(contact_point_candidates_, cpx_file);
+  }
 }
 
 void MainUI::OnSavePSGClicked() {
