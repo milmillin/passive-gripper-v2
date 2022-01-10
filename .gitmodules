@@ -4,3 +4,6 @@
 [submodule "external/autodiff"]
 	path = external/autodiff
 	url = https://github.com/LouYu2015/autodiff.git
+[submodule "external/manif"]
+	path = external/manif
+	url = https://github.com/artivis/manif.git
