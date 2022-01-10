@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.14)
 project(passive-gripper)
+
+option(CLUSTER_RELEASE_BUILD "Release build that should run on cluster" OFF)
+
 set (CMAKE_CXX_STANDARD 17)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -11,11 +14,11 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
-# Enable link-time optimization
-# if (CMAKE_BUILD_TYPE STREQUAL "Release")
-#   set (CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
-#   message(STATUS "Link time optimization enabled")
-# endif()
+if (CLUSTER_RELEASE_BUILD)
+  # Enable link-time optimization
+  set (CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+  message(STATUS "Link time optimization enabled")
+endif()
 
 
 # Add your project files
