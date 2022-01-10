@@ -102,6 +102,7 @@ void SettingsOverrider::Apply(psg::core::PassiveGripper& psg) const {
       for (size_t i = 0; i < kNumDOFs; i++) {
         opt_settings.trajectory_wiggle(i) = kDegToRad * std::stod(vec[i]);      
       }    
+      opt_changed = true;
     }
   }
   if (Contains("vol_frac", value)) {
