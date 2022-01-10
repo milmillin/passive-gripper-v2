@@ -12,6 +12,7 @@ namespace models {
 struct GripperParams : psg::core::serialization::Serializable {
   std::vector<Eigen::MatrixXd> fingers;
   Trajectory trajectory;
+  std::vector<manif::SE3d> trajectory_SE3;
   std::vector<ContactPoint> contact_points;
 
   DECL_SERIALIZE() {

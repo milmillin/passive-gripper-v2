@@ -273,8 +273,8 @@ void MainUI::DrawContactPointPanel() {
     ImGui::InputInt("# Candidates", (int*)&cp_num_candidates, 1000);
     ImGui::InputInt("# Seeds", (int*)&cp_num_seeds, 1000);
     if (ImGui::Button("Generate Candidates", ImVec2(w, 0))) {
-      contact_point_candidates_ =
-          InitializeContactPoints(vm_.PSG(), cp_filter, cp_num_candidates, cp_num_seeds);
+      contact_point_candidates_ = InitializeContactPoints(
+          vm_.PSG(), cp_filter, cp_num_candidates, cp_num_seeds);
     }
     ImGui::Separator();
     size_t k = std::min((size_t)10, contact_point_candidates_.size());
@@ -660,10 +660,10 @@ void MainUI::DrawDebugPanel() {
     if (ImGui::Button("Debug SP Cost", ImVec2(w, 0))) {
       Debugger debugger;
       MeshDependentResource mdr;
-      ComputeCost3(vm_.PSG().GetParams(),
-                   vm_.PSG().GetSettings(),
-                   vm_.PSG().GetRemeshedMDR(),
-                   &debugger);
+      ComputeCost3_SE3(vm_.PSG().GetParams(),
+                       vm_.PSG().GetSettings(),
+                       vm_.PSG().GetRemeshedMDR(),
+                       &debugger);
       VisualizeDebugger(debugger);
     }
     if (ImGui::Button("Debug CP Seeds", ImVec2(w, 0))) {

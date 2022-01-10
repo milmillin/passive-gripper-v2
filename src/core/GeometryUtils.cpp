@@ -5,8 +5,8 @@
 
 #include <CGAL/Polygon_mesh_processing/remesh.h>
 #include <CGAL/Polyhedron_3.h>
-#include <igl/copyleft/cgal/mesh_to_polyhedron.h>
 #include <igl/copyleft/cgal/mesh_boolean.h>
+#include <igl/copyleft/cgal/mesh_to_polyhedron.h>
 #include <igl/copyleft/cgal/polyhedron_to_mesh.h>
 #include <igl/volume.h>
 #include <libqhullcpp/Qhull.h>
@@ -14,11 +14,13 @@
 #include <libqhullcpp/QhullPoint.h>
 #include <libqhullcpp/QhullVertexSet.h>
 #include <libqhullcpp/RboxPoints.h>
+#include <manif/algorithms/interpolation.h>
+#include <autodiff/forward/dual.hpp>
 #include <list>
 
-#include "robots/Robots.h"
-
+#include "../utils.h"
 #include "UnionFind.h"
+#include "robots/Robots.h"
 
 namespace psg {
 namespace core {
@@ -65,6 +67,16 @@ void TransformFingers(const std::vector<Eigen::MatrixXd>& fingers,
     out_fingers[i] =
         (trans * fingers[i].transpose().colwise().homogeneous()).transpose();
   }
+}
+
+Fingers TransformFingers(const Fingers& fingers, const manif::SE3d& trans) {
+  Fingers out_fingers(fingers.size());
+  for (size_t i = 0; i < fingers.size(); i++) {
+    out_fingers[i] = (Eigen::Affine3d(trans.transform()) *
+                      fingers[i].transpose().colwise().homogeneous())
+                         .transpose();
+  }
+  return out_fingers;
 }
 
 void AdaptiveSubdivideTrajectory(
@@ -135,6 +147,115 @@ void AdaptiveSubdivideTrajectory(
     lp_it++;
     l_it++;
   }
+}
+
+static void AdaptiveSubdivideTrajectorySE3Impl(
+    const Fingers& fingers,
+    double flatness,
+  size_t depth,
+    std::list<Fingers>& l,
+    std::list<Fingers>::iterator l_p0,
+    std::list<Fingers>::iterator l_p2,
+    std::list<manif::SE3d>& lp,
+    std::list<manif::SE3d>::iterator lp_p0,
+    std::list<manif::SE3d>::iterator lp_p2) {
+  manif::SE3d p1 = manif::interpolate(*lp_p0, *lp_p2, 0.5);
+  Fingers fingers_p1 = TransformFingers(fingers, p1);
+  size_t n_fingers = fingers.size();
+
+  double max_deviation = 0;
+  for (size_t j = 0; j < n_fingers; j++) {
+    Eigen::MatrixXd fingers_p02 =
+        (l_p2->at(j) - l_p0->at(j)).rowwise().normalized();
+    Eigen::MatrixXd fingers_p01 = (fingers_p1[j] - l_p0->at(j));
+    for (size_t i = 0; i < fingers_p02.rows(); i++) {
+      Eigen::RowVector3d p02 = fingers_p02.row(i);
+      Eigen::RowVector3d p01 = fingers_p01.row(i);
+      max_deviation = std::max(max_deviation, p01.cross(p02).norm());
+    }
+  }
+  if (max_deviation > flatness && depth + 1 < 8) {
+    auto l_p1 = l.insert(l_p2, fingers_p1);
+    auto lp_p1 = lp.insert(lp_p2, p1);
+    AdaptiveSubdivideTrajectorySE3Impl(
+        fingers, flatness, depth + 1, l, l_p0, l_p1, lp, lp_p0, lp_p1);
+    AdaptiveSubdivideTrajectorySE3Impl(
+        fingers, flatness, depth + 1, l, l_p1, l_p2, lp, lp_p1, lp_p2);
+  }
+}
+
+void AdaptiveSubdivideTrajectorySE3(const std::vector<manif::SE3d>& trajectory,
+                                    const Fingers& fingers,
+                                    double flatness,
+                                    std::vector<manif::SE3d>& out_trajectory,
+                                    std::vector<Fingers>& out_fingers) {
+  if (trajectory.size() <= 1) {
+    out_trajectory = trajectory;
+    out_fingers.resize(trajectory.size());
+    if (trajectory.size() == 1) out_fingers[0] = fingers;
+    return;
+  }
+  std::list<Fingers> l;
+  std::list<manif::SE3d> lp;
+
+  size_t n_keyframes = trajectory.size();
+  for (size_t i = 0; i < n_keyframes; i++) {
+    lp.push_back(trajectory[i]);
+    l.push_back(TransformFingers(fingers, trajectory[i]));
+  }
+
+  std::list<Fingers>::iterator l_p0 = l.begin();
+  std::list<Fingers>::iterator l_p2 = ++l.begin();
+  std::list<manif::SE3d>::iterator lp_p0 = lp.begin();
+  std::list<manif::SE3d>::iterator lp_p2 = ++lp.begin();
+  for (size_t i = 1; i < n_keyframes; i++) {
+    AdaptiveSubdivideTrajectorySE3Impl(
+        fingers, flatness, 0, l, l_p0, l_p2, lp, lp_p0, lp_p2);
+    l_p0 = l_p2;
+    l_p2++;
+    lp_p0 = lp_p2;
+    lp_p2++;
+  }
+  size_t n_new_keyframes = lp.size();
+  out_trajectory.resize(n_new_keyframes);
+  out_fingers.resize(n_new_keyframes);
+  std::list<Fingers>::iterator l_it = l.begin();
+  std::list<manif::SE3d>::iterator lp_it = lp.begin();
+  for (size_t i = 0; i < n_new_keyframes; i++) {
+    out_trajectory[i] = *lp_it;
+    out_fingers[i] = *l_it;
+    lp_it++;
+    l_it++;
+  }
+}
+
+Trajectory TrajectoryFromSE3(const Trajectory_SE3& trajectory_SE3,
+                             const Fingers& fingers,
+                             const Pose& init_pose) {
+  std::vector<Fingers> interp_fingers;
+  Trajectory_SE3 interp;
+  AdaptiveSubdivideTrajectorySE3(
+      trajectory_SE3, fingers, 0.001, interp, interp_fingers);
+
+  Eigen::Affine3d init_trans = robots::Forward(init_pose);
+
+  Trajectory result;
+  result.reserve(interp.size());
+  result.push_back(init_pose);
+  for (size_t i = 1; i < interp.size(); i++) {
+    std::vector<Pose> candidates;
+    size_t best_i;
+    if (robots::BestInverse(Eigen::Affine3d(interp[i].transform()) * init_trans,
+                            result[i - 1],
+                            candidates,
+                            best_i)) {
+      result.push_back(candidates[best_i]);
+    } else {
+      Error() << "warning: inverse kinematic failed" << std::endl;
+    }
+  }
+  FixTrajectory(result);
+  return result;
 }
 
 bool Remesh(const Eigen::MatrixXd& V,
@@ -472,10 +593,10 @@ void CreateCylinderXY(const Eigen::Vector3d& o,
   }
 }
 
-void MergeMesh(const Eigen::MatrixXd &V,
-               const Eigen::MatrixXi &F,
-               Eigen::MatrixXd &out_V,
-               Eigen::MatrixXi &out_F) {
+void MergeMesh(const Eigen::MatrixXd& V,
+               const Eigen::MatrixXi& F,
+               Eigen::MatrixXd& out_V,
+               Eigen::MatrixXi& out_F) {
   struct Submesh {
     Eigen::MatrixXd V;
     Eigen::MatrixXi F;
@@ -497,27 +618,27 @@ void MergeMesh(const Eigen::MatrixXd &V,
     submeshes[unionFind.find(F(f, 0))].face_count++;
   }
   for (Eigen::Index v = 0; v < V.rows(); v++) {
-    auto &vertex_map = submeshes[unionFind.find(v)].vertex_map;
+    auto& vertex_map = submeshes[unionFind.find(v)].vertex_map;
     size_t next_id = vertex_map.size();
     vertex_map[v] = next_id;
   }
 
-  for (auto &item : submeshes) {
-    auto &submesh = item.second;
+  for (auto& item : submeshes) {
+    auto& submesh = item.second;
     submesh.V.resize(submesh.vertex_map.size(), 3);
     submesh.F.resize(submesh.face_count, 3);
   }
 
   // Map vertices and faces information to sub-mesh
   for (Eigen::Index f = 0; f < F.rows(); f++) {
-    auto &submesh = submeshes[unionFind.find(F(f, 0))];
+    auto& submesh = submeshes[unionFind.find(F(f, 0))];
     size_t sub_f = submesh.next_face++;
     for (int i = 0; i < 3; i++) {
       submesh.F(sub_f, i) = submesh.vertex_map[F(f, i)];
     }
   }
   for (Eigen::Index v = 0; v < V.rows(); v++) {
-    auto &submesh = submeshes[unionFind.find(v)];
+    auto& submesh = submeshes[unionFind.find(v)];
     submesh.V.row(submesh.vertex_map[v]) = V.row(v);
   }
 
@@ -526,10 +647,14 @@ void MergeMesh(const Eigen::MatrixXd &V,
   Eigen::MatrixXd VCurrent = it->second.V, VResult;
   Eigen::MatrixXi FCurrent = it->second.F, FResult;
   for (it++; it != submeshes.end(); it++) {
-    auto &submesh = it->second;
-    igl::copyleft::cgal::mesh_boolean(submesh.V, submesh.F, VCurrent, FCurrent,
+    auto& submesh = it->second;
+    igl::copyleft::cgal::mesh_boolean(submesh.V,
+                                      submesh.F,
+                                      VCurrent,
+                                      FCurrent,
                                       igl::MESH_BOOLEAN_TYPE_UNION,
-                                      VResult, FResult);
+                                      VResult,
+                                      FResult);
     VCurrent.swap(VResult);
     FCurrent.swap(FResult);
   }
@@ -537,8 +662,8 @@ void MergeMesh(const Eigen::MatrixXd &V,
   out_F.swap(FCurrent);
 
   int count = 0;
-  for (auto &item : submeshes) {
-    auto &submesh = item.second;
+  for (auto& item : submeshes) {
+    auto& submesh = item.second;
     std::cout << "submesh " << count++ << std::endl;
     std::cout << "  Faces: " << submesh.next_face << std::endl;
     std::cout << "  Vertices: " << submesh.V.rows() << std::endl;

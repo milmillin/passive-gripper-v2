@@ -27,6 +27,11 @@ Trajectory InitializeTrajectory(const std::vector<Eigen::MatrixXd>& fingers,
                                 const Pose& init_pose,
                                 size_t n_keyframes);
 
+Trajectory_SE3 InitializeTrajectory_SE3(
+    const std::vector<Eigen::MatrixXd>& fingers,
+    const Pose& init_pose,
+    size_t n_keyframes);
+
 void InitializeContactPointSeeds(const PassiveGripper& psg,
                                  size_t num_seeds,
                                  const ContactPointFilter& filter,

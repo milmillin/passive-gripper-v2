@@ -8,6 +8,7 @@
 #include <array>
 #include <map>
 #include <vector>
+#include <manif/SE3.h>
 
 namespace psg {
 
@@ -63,6 +64,10 @@ const Eigen::Vector3d kUrdfAxis[6] = {
 
 typedef Eigen::Array<double, kNumDOFs, 1> Pose;
 typedef std::vector<Pose> Trajectory;
+
+typedef manif::SE3d Pose_SE3;
+typedef std::vector<Pose_SE3> Trajectory_SE3;
+
 typedef std::vector<Eigen::MatrixXd> Fingers;
 
 // Jacobian 3x6 matrix [dpos/dtheta_0 | ... | dpos/dtheta_5]

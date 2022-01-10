@@ -17,6 +17,8 @@ void TransformFingers(const std::vector<Eigen::MatrixXd>& fingers,
                       const Eigen::Affine3d& trans,
                       std::vector<Eigen::MatrixXd>& out_fingers);
 
+Fingers TransformFingers(const Fingers& fingers, const manif::SE3d& trans);
+
 inline auto TransformMatrix(const Eigen::MatrixXd& mat,
                             const Eigen::Affine3d& trans) {
   return (trans * mat.transpose().colwise().homogeneous()).transpose();
@@ -28,6 +30,16 @@ void AdaptiveSubdivideTrajectory(
     double flatness,
     Trajectory& out_trajectory,
     std::vector<std::vector<Eigen::MatrixXd>>& out_t_fingers);
+
+void AdaptiveSubdivideTrajectorySE3(const std::vector<manif::SE3d>& trajectory,
+                                    const Fingers& fingers,
+                                    double flatness,
+                                    std::vector<manif::SE3d>& out_trajectory,
+                                    std::vector<Fingers>& out_fingers);
+
+Trajectory TrajectoryFromSE3(const Trajectory_SE3& trajectory_SE3,
+                             const Fingers& fingers,
+                             const Pose& init_pose);
 
 bool Remesh(const Eigen::MatrixXd& V,
             const Eigen::MatrixXi& F,
@@ -122,10 +134,10 @@ void CreateCylinderXY(const Eigen::Vector3d& o,
                       Eigen::MatrixXi& out_F);
 
 // Merge all disjoint sub-meshes in the mesh if they overlap
-void MergeMesh(const Eigen::MatrixXd &V,
-               const Eigen::MatrixXi &F,
-               Eigen::MatrixXd &out_V,
-               Eigen::MatrixXi &out_F);
+void MergeMesh(const Eigen::MatrixXd& V,
+               const Eigen::MatrixXi& F,
+               Eigen::MatrixXd& out_V,
+               Eigen::MatrixXi& out_F);
 
 // clang-format off
 // Inline mesh of a cube

@@ -68,7 +68,7 @@ else()
     PROPERTIES
     COMPILE_FLAGS "-Wall -Wextra -pedantic"
   )
-  set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+  # set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
   find_package(LAPACK)
 endif()
@@ -98,6 +98,10 @@ find_package(Boost COMPONENTS system filesystem REQUIRED)
 
 # Autodiff (not the best way)
 include_directories("external/autodiff")
+
+# Manif
+include_directories("external/manif/include")
+include_directories("external/manif/external/tl")
 
 # Link libigl
 option(LIBIGL_WITH_OPENGL            "Use OpenGL"         ON)

@@ -279,10 +279,37 @@ Trajectory InitializeTrajectory1(const std::vector<Eigen::MatrixXd>& fingers,
   return result;
 }
 
+Trajectory_SE3 InitializeTrajectory1_SE3(const Fingers& fingers,
+                                         const Pose& init_pose,
+                                         size_t n_keyframes) {
+  Eigen::RowVector3d n(0, 0, 0);
+  Eigen::RowVector3d eff_pos = robots::Forward(init_pose).translation();
+  for (size_t i = 0; i < fingers.size(); i++) {
+    n += (eff_pos - fingers[i].row(0));
+  }
+  n /= fingers.size();
+
+  Trajectory_SE3 result;
+  result.push_back(Pose_SE3::Identity());
+  result.push_back(Pose_SE3::Identity());
+
+  result.push_back(Pose_SE3(n, manif::SO3d::Identity()));
+  result.push_back(Pose_SE3(n, manif::SO3d::Identity()));
+
+  return result;
+}
+
 Trajectory InitializeTrajectory(const std::vector<Eigen::MatrixXd>& fingers,
                                 const Pose& initPose,
                                 size_t n_keyframes) {
   return InitializeTrajectory1(fingers, initPose, n_keyframes);
+}
+
+Trajectory_SE3 InitializeTrajectory_SE3(
+    const std::vector<Eigen::MatrixXd>& fingers,
+    const Pose& initPose,
+    size_t n_keyframes) {
+  return InitializeTrajectory1_SE3(fingers, initPose, n_keyframes);
 }
 
 void InitializeContactPointSeeds(const PassiveGripper& psg,
@@ -469,8 +496,8 @@ std::vector<ContactPointMetric> InitializeContactPoints(
       // Check Feasiblity: Approach Direction
       Eigen::Affine3d trans;
       // if (!CheckApproachDirection(
-              // contactPoints, kPi / 2 * 8 / 9, 1, 0.1, 1e-12, 100, trans)) {
-        // continue;
+      // contactPoints, kPi / 2 * 8 / 9, 1, 0.1, 1e-12, 100, trans)) {
+      // continue;
       // }
       if (!CheckApproachDirection2(
               contactPoints, 0.01, kDegToRad * 80, mdr.center_of_mass, trans)) {

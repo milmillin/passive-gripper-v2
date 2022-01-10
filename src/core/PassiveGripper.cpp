@@ -268,7 +268,6 @@ void PassiveGripper::InvalidateMesh() {
   contact_changed_ = true;
 }
 
-
 void PassiveGripper::InvalidateContactSettings() {
   contact_settings_changed_ = false;
   contact_changed_ = true;
@@ -320,10 +319,12 @@ void PassiveGripper::InvalidateFinger() {
                                         settings_.finger.n_finger_joints);
     if (reinit_trajectory) {
       // Re-initialize trajectory
-      params_.trajectory =
-          InitializeTrajectory(params_.fingers,
-                               params_.trajectory.front(),
-                               settings_.trajectory.n_keyframes);
+      params_.trajectory_SE3 =
+          InitializeTrajectory_SE3(params_.fingers,
+                                    params_.trajectory.front(),
+                                    settings_.trajectory.n_keyframes);
+      params_.trajectory = TrajectoryFromSE3(
+          params_.trajectory_SE3, params_.fingers, params_.trajectory.front());
       trajectory_changed_ = true;
     }
   }
@@ -358,9 +359,10 @@ void PassiveGripper::InvalidateQuality() {
 
 void PassiveGripper::InvalidateCost() {
   cost_changed_ = false;
-  cost_ = ComputeCost3(params_, settings_, mdr_remeshed_, nullptr);
+  cost_ = ComputeCost3_SE3(params_, settings_, mdr_remeshed_, nullptr);
   min_dist_ = MinDistance(params_, settings_, mdr_);
-  // intersecting_ = Intersects(params_, settings_, mdr_); // TODO: Fails with duplicate trajectory
+  // intersecting_ = Intersects(params_, settings_, mdr_); // TODO: Fails with
+  // duplicate trajectory
   intersecting_ = true;
   InvokeInvalidated(InvalidatedReason::kCost);
 }

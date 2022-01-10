@@ -10,6 +10,46 @@ size_t MyFlattenSize(const GripperParams& meta) {
          (meta.trajectory.size() - 2) * meta.trajectory.front().size();
 }
 
+size_t MyFlattenSize_SE3(const GripperParams& meta) {
+  return meta.fingers.size() * (meta.fingers.front().rows() - 2) * 3 +
+         (meta.trajectory_SE3.size() - 2) * meta.trajectory_SE3.front().size();
+}
+
+void MyFlatten_SE3(const GripperParams& meta,
+               const OptSettings& settings,
+               double* x,
+               double* lb,
+               double* ub) {
+  for (size_t i = 0; i < meta.fingers.size(); i++) {
+    const auto& finger = meta.fingers[i];
+    for (size_t r = 1; r < finger.rows() - 1; r++) {
+      for (size_t c = 0; c < 3; c++) {
+        *lb = *ub = *(x++) = finger(r, c);
+        *lb -= settings.finger_wiggle;
+        *ub += settings.finger_wiggle;
+        lb++;
+        ub++;
+      }
+    }
+  }
+  for (size_t i = 1; i < meta.trajectory_SE3.size() - 1; i++) {
+    const auto& keyframe = meta.trajectory_SE3[i];
+    for (size_t j = 0; j < keyframe.size(); j++) {
+      *lb = *ub = *(x++) = keyframe[j];
+      if (j < 3) {
+        *lb -= 0.02;
+        *ub += 0.02;
+      } else {
+        *lb = -1;
+        *ub = 1;
+      }
+      lb++;
+      ub++;
+    }
+  }
+}
+
+
 // meta -> x
 void MyFlatten(const GripperParams& meta,
                const OptSettings& settings,
@@ -57,6 +97,23 @@ void MyFlattenGrad(const GripperParams& meta, double* x) {
   }
 }
 
+void MyUnflatten_SE3(GripperParams& meta, const double* x) {
+  for (size_t i = 0; i < meta.fingers.size(); i++) {
+    auto& finger = meta.fingers[i];
+    for (size_t r = 1; r < finger.rows() - 1; r++) {
+      for (size_t c = 0; c < 3; c++) {
+        finger(r, c) = *(x++);
+      }
+    }
+  }
+  for (size_t i = 1; i < meta.trajectory_SE3.size() - 1; i++) {
+    auto& keyframe = meta.trajectory_SE3[i];
+    for (size_t j = 0; j < keyframe.size(); j++) {
+      keyframe[j] = *(x++);
+    }
+  }
+}
+
 // x -> meta
 void MyUnflatten(GripperParams& meta, const double* x) {
   for (size_t i = 0; i < meta.fingers.size(); i++) {
@@ -95,12 +152,12 @@ void Optimizer::Optimize(const PassiveGripper& psg) {
   const auto& mdr = psg.GetRemeshedMDR();
   mdr_.init(mdr);
   settings_ = psg.GetSettings();
-  dimension_ = MyFlattenSize(params_);
+  dimension_ = MyFlattenSize_SE3(params_);
   x_.reset(new double[dimension_]);
   lb_.reset(new double[dimension_]);
   ub_.reset(new double[dimension_]);
   g_min_x_.reset(new double[dimension_]);
-  MyFlatten(params_, settings_.opt, x_.get(), lb_.get(), ub_.get());
+  MyFlatten_SE3(params_, settings_.opt, x_.get(), lb_.get(), ub_.get());
 
   if (opt_ != nullptr) nlopt_destroy(opt_);
   opt_ = nlopt_create(settings_.opt.algorithm, dimension_);
@@ -131,7 +188,7 @@ void Optimizer::Optimize(const PassiveGripper& psg) {
   optimize_future_ = std::async(std::launch::async, [&] {
     double minf; /* minimum objective value, upon return */
     nlopt_result result = nlopt_optimize(opt_, x_.get(), &minf);
-    MyUnflatten(params_, x_.get());
+    MyUnflatten_SE3(params_, x_.get());
     is_running_ = false;
     return result;
   });
@@ -145,7 +202,7 @@ void Optimizer::Resume() {
   optimize_future_ = std::async(std::launch::async, [&] {
     double minf; /* minimum objective value, upon return */
     nlopt_result result = nlopt_optimize(opt_, x_.get(), &minf);
-    MyUnflatten(params_, x_.get());
+    MyUnflatten_SE3(params_, x_.get());
     is_running_ = false;
     return result;
   });
@@ -173,15 +230,15 @@ void Optimizer::Cancel() {
 
 const GripperParams& Optimizer::GetCurrentParams() {
   std::lock_guard<std::mutex> guard(g_min_x_mutex_);
-  MyUnflatten(params_proto_, g_min_x_.get());
+  MyUnflatten_SE3(params_proto_, g_min_x_.get());
   return params_proto_;
 }
 double Optimizer::ComputeCostInternal(unsigned n,
                                       const double* x,
                                       double* grad) {
-  MyUnflatten(params_, x);
+  MyUnflatten_SE3(params_, x);
   // GripperParams dCost_dParam;
-  double cost = ComputeCost3(params_, settings_, mdr_, nullptr);
+  double cost = ComputeCost3_SE3(params_, settings_, mdr_, nullptr);
   if (grad != nullptr) {
     // MyFlattenGrad(dCost_dParam, grad);
     // for (unsigned i = 0; i < n; i++) {

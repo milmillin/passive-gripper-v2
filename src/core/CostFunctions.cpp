@@ -1,6 +1,7 @@
 #include "CostFunctions.h"
 
 #include <igl/copyleft/cgal/intersect_other.h>
+#include <manif/algorithms/interpolation.h>
 #include "GeometryUtils.h"
 #include "robots/Robots.h"
 
@@ -561,16 +562,10 @@ double ComputeCost3(const GripperParams& params,
                     Debugger* const debugger) {
   constexpr double precision = 0.001;  // 1mm
 
-  struct _SubInfo {
-    // Pose pose;
-    Fingers fingers;
-    std::vector<Eigen::VectorXd> costs;
-  };
-
-  Eigen::Affine3d finger_trans_inv =
-      robots::Forward(params.trajectory.front()).inverse();
-  std::vector<Eigen::MatrixXd> fingers;
-  TransformFingers(params.fingers, finger_trans_inv, fingers);
+  // Eigen::Affine3d finger_trans_inv =
+  // robots::Forward(params.trajectory.front()).inverse();
+  std::vector<Eigen::MatrixXd> fingers = params.fingers;
+  // TransformFingers(params.fingers, finger_trans_inv, fingers);
 
   // Cost between two points
   const double floor = settings.cost.floor;
@@ -641,11 +636,11 @@ double ComputeCost3(const GripperParams& params,
 
 #pragma omp for
       for (long long j = 0; j < iters; j++) {
-        _SubInfo sub_info;
+        Fingers td_fingers;
         double t = (double)j / cur_sub;
         Pose pose = new_trajectory[i] * (1. - t) + new_trajectory[i + 1] * t;
-        TransformFingers(fingers, robots::Forward(pose), sub_info.fingers);
-        t_max = std::max(t_max, ProcessFinger(sub_info.fingers));
+        TransformFingers(fingers, robots::Forward(pose), td_fingers);
+        t_max = std::max(t_max, ProcessFinger(td_fingers));
       }
 
 #pragma omp critical
@@ -684,6 +679,148 @@ double ComputeCost3(const GripperParams& params,
       Eigen::Vector3d p0 = new_trans[0] * d_fingers[j];
       for (size_t k = 1; k < new_trajectory.size(); k++) {
         Eigen::Vector3d p1 = new_trans[k] * d_fingers[j];
+        t_max = std::max(t_max, MyCost(p0, p1));
+        p0 = p1;
+      }
+    }
+
+#pragma omp critical
+    finger_max = std::max(finger_max, t_max);
+  }
+
+  return traj_max + finger_max;
+}
+
+double ComputeCost3_SE3(const GripperParams& params,
+                        const GripperSettings& settings,
+                        const MeshDependentResource& remeshed_mdr,
+                        Debugger* const debugger) {
+  constexpr double precision = 0.001;  // 1mm
+
+  if (params.fingers.size() == 0) return 0;
+  if (params.trajectory_SE3.size() <= 1) return 0;
+
+  std::cout << "Trajectory_SE3: "
+            << "\n";
+  for (size_t i = 0; i < params.trajectory_SE3.size(); i++) {
+    std::cout << params.trajectory_SE3[i].coeffs().transpose() << "\n";
+  }
+  std::cout << std::endl;
+
+  // Eigen::Affine3d finger_trans_inv =
+  // robots::Forward(params.trajectory.front()).inverse();
+  const Fingers& fingers = params.fingers;
+  // TransformFingers(params.fingers, finger_trans_inv, fingers);
+
+  // Cost between two points
+  const double floor = settings.cost.floor;
+  auto MyCost = [floor, debugger, &remeshed_mdr](
+                    const Eigen::RowVector3d& p0,
+                    const Eigen::RowVector3d& p1) -> double {
+    return remeshed_mdr.ComputeRequiredDistance(p0, p1, debugger) +
+           ComputeFloorCost(p0, p1, floor);
+  };
+
+  // discretize time
+  auto ProcessFinger = [&MyCost](const Fingers& fingers) -> double {
+    double cost = 0;
+    for (size_t i = 0; i < fingers.size(); i++) {
+      for (size_t j = 0; j < fingers[i].rows() - 1; j++) {
+        cost += MyCost(fingers[i].row(j), fingers[i].row(j + 1));
+      }
+    }
+    return cost;
+  };
+
+  std::vector<manif::SE3d> new_trajectory;
+  std::vector<Fingers> new_fingers;
+  AdaptiveSubdivideTrajectorySE3(params.trajectory_SE3,
+                                 params.fingers,
+                                 precision,
+                                 new_trajectory,
+                                 new_fingers);
+  size_t n_trajectory = new_trajectory.size();
+  std::vector<bool> traj_skip(n_trajectory - 1, false);
+  std::vector<size_t> traj_subs(n_trajectory - 1, 0);
+
+#pragma omp parallel for
+  for (long long i = 0; i < n_trajectory - 1; i++) {
+    double max_deviation = 0;
+    bool intersects = false;
+    for (size_t j = 0; j < new_fingers[i].size(); j++) {
+      double dev = (new_fingers[i + 1][j] - new_fingers[i][j])
+                       .rowwise()
+                       .norm()
+                       .maxCoeff();
+      max_deviation = std::max(max_deviation, dev);
+      Eigen::RowVector3d p_min =
+          new_fingers[i][j].colwise().minCoeff().cwiseMin(
+              new_fingers[i + 1][j].colwise().minCoeff());
+      Eigen::RowVector3d p_max =
+          new_fingers[i][j].colwise().maxCoeff().cwiseMin(
+              new_fingers[i + 1][j].colwise().maxCoeff());
+      p_min.array() -= precision;
+      p_max.array() += precision;
+      intersects = intersects ||
+                   remeshed_mdr.Intersects(Eigen::AlignedBox3d(p_min, p_max));
+    }
+
+    traj_subs[i] = std::max<size_t>(std::ceil(max_deviation / precision), 1);
+    traj_skip[i] = !intersects;
+  }
+
+  double traj_max = 0;
+  for (size_t i = 0; i < n_trajectory - 1; i++) {
+    if (traj_skip[i]) continue;
+    size_t cur_sub = traj_subs[i];
+    size_t iters = cur_sub;
+    if (i == n_trajectory - 2) iters++;
+
+#pragma omp parallel
+    {
+      double t_max = 0;
+
+#pragma omp for
+      for (long long j = 0; j < iters; j++) {
+        double t = (double)j / cur_sub;
+        // std::cout << j << "/" << cur_sub << ": " << t << std::endl;
+        manif::SE3d pose =
+            manif::interpolate(new_trajectory[i], new_trajectory[i + 1], t);
+        Fingers td_fingers = TransformFingers(fingers, pose);
+        t_max = std::max(t_max, ProcessFinger(td_fingers));
+      }
+
+#pragma omp critical
+      traj_max = std::max(traj_max, t_max);
+    }
+  }
+
+  // discretize fingers
+  std::vector<Eigen::Vector3d> d_fingers;
+  for (size_t i = 0; i < fingers.size(); i++) {
+    for (size_t j = 1; j < fingers[i].rows(); j++) {
+      double norm = (fingers[i].row(j) - fingers[i].row(j - 1)).norm();
+      size_t subs = std::ceil(norm / precision);
+      size_t iters = subs;
+      for (size_t k = (j == 1) ? 0 : 1; k <= subs; k++) {
+        double t = (double)k / subs;
+        d_fingers.push_back(fingers[i].row(j - 1) * (1. - t) +
+                            fingers[i].row(j) * t);
+      }
+    }
+  }
+
+  double finger_max = 0;
+
+#pragma omp parallel
+  {
+    double t_max = 0;
+
+#pragma omp for
+    for (long long j = 0; j < d_fingers.size(); j++) {
+      Eigen::Vector3d p0 = new_trajectory[0].act(d_fingers[j]);
+      for (size_t k = 1; k < new_trajectory.size(); k++) {
+        Eigen::Vector3d p1 = new_trajectory[k].act(d_fingers[j]);
         t_max = std::max(t_max, MyCost(p0, p1));
         p0 = p1;
       }
