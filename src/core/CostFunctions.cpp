@@ -395,7 +395,6 @@ double MinDistance(const GripperParams& params,
     size_t iters = cur_sub;
     if (i == n_trajectory - 2) iters++;
 
-#pragma omp parallel
     {
       double t_min = 0;
       Eigen::RowVector3d ds_dp;  // unused
