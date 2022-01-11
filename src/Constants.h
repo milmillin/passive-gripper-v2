@@ -80,6 +80,8 @@ static constexpr double kWrenchReg = 1e-10;
 // zero threshold
 static constexpr double kWrenchNormThresh = 1e-5;
 
+constexpr double kExpandMesh = 0.002; // 2mm
+
 const std::map<std::string, std::string> kTopyConfig = {{"PROB_TYPE", "comp"},
                                                         {"ETA", "0.4"},
                                                         {"DOF_PN", "3"},

@@ -7,6 +7,8 @@
 #include "Initialization.h"
 #include "QualityMetric.h"
 #include "robots/Robots.h"
+#include <igl/voxel_grid.h>
+#include <igl/marching_cubes.h>
 
 namespace psg {
 namespace core {
@@ -45,13 +47,30 @@ static void InitMdrFloor(const Eigen::MatrixXd& V,
   out_mdr.init(RV, RF);
 }
 
-void PassiveGripper::SetMesh(const Eigen::MatrixXd& V,
-                             const Eigen::MatrixXi& F,
-                             bool invalidate) {
-  mdr_.init(V, F);
+void PassiveGripper::GenerateRemesh() {
+  constexpr int kPad = 4;
+  constexpr double kVoxelSize = 0.001;
+  Eigen::RowVector3d p_min = mdr_.minimum.array() - (kVoxelSize * kPad);
+  Eigen::RowVector3d p_max = mdr_.maximum.array() + (kVoxelSize * kPad);
+  Eigen::MatrixXd GV;
+  Eigen::RowVector3i res;
+  std::cerr << "Expanding mesh..." << std::endl;
+  int s = ceil((p_max - p_min).maxCoeff() / kVoxelSize) + kPad * 2;
+  igl::voxel_grid(Eigen::AlignedBox3d(p_min, p_max), s, kPad, GV, res);
+  Eigen::VectorXd S(GV.rows());
+#pragma omp parallel for
+  for (long long i = 0; i < GV.rows(); i++) {
+    double s_;
+    Eigen::RowVector3d c_;
+    S(i) = mdr_.ComputeSignedDistance(GV.row(i), c_, s_);
+  }
+  Eigen::MatrixXd mc_V;
+  Eigen::MatrixXi mc_F;
+  igl::marching_cubes(S, GV, res(0), res(1), res(2), kExpandMesh, mc_V, mc_F);
   Eigen::MatrixXd RV;
   Eigen::MatrixXi RF;
-  if (!Remesh(mdr_.V, mdr_.F, 5, RV, RF)) {
+  std::cerr << "Remeshing..." << std::endl;
+  if (!Remesh(mc_V, mc_F, 5, RV, RF)) {
     std::cerr << "Remesh failed! Defaulted to using original mesh" << std::endl;
   }
   std::cerr << "Remesh: V: " << RV.rows() << std::endl;
@@ -59,6 +78,40 @@ void PassiveGripper::SetMesh(const Eigen::MatrixXd& V,
   mdr_remeshed_.GetSP();
   InitMdrFloor(
       mdr_remeshed_.V, mdr_remeshed_.F, settings_.contact.floor, mdr_contact_);
+}
+
+void PassiveGripper::SetMesh(const Eigen::MatrixXd& V,
+                             const Eigen::MatrixXi& F,
+                             const Eigen::MatrixXd& remesh_V,
+                             const Eigen::MatrixXi& remesh_F,
+                             int remesh_version,
+                             bool invalidate) {
+  mdr_.init(V, F);
+
+  if (remesh_version != kRemeshVersion) {
+    std::cerr << "Wrong remesh version. Expected: " << kRemeshVersion
+              << " Got: " << remesh_version << ". Regenerating." << std::endl;
+    GenerateRemesh();
+  } else {
+    mdr_remeshed_.init(remesh_V, remesh_F);
+    mdr_remeshed_.GetSP();
+    InitMdrFloor(mdr_remeshed_.V,
+                 mdr_remeshed_.F,
+                 settings_.contact.floor,
+                 mdr_contact_);
+  }
+
+  mesh_changed_ = true;
+  mesh_loaded_ = true;
+  if (invalidate) Invalidate();
+}
+
+void PassiveGripper::SetMesh(const Eigen::MatrixXd& V,
+                             const Eigen::MatrixXi& F,
+                             bool invalidate) {
+  mdr_.init(V, F);
+
+  GenerateRemesh();
 
   mesh_changed_ = true;
   mesh_loaded_ = true;
@@ -268,7 +321,6 @@ void PassiveGripper::InvalidateMesh() {
   contact_changed_ = true;
 }
 
-
 void PassiveGripper::InvalidateContactSettings() {
   contact_settings_changed_ = false;
   contact_changed_ = true;
@@ -359,8 +411,9 @@ void PassiveGripper::InvalidateQuality() {
 void PassiveGripper::InvalidateCost() {
   cost_changed_ = false;
   cost_ = ComputeCost3(params_, settings_, mdr_remeshed_, nullptr);
-  min_dist_ = MinDistance(params_, settings_, mdr_);
-  // intersecting_ = Intersects(params_, settings_, mdr_); // TODO: Fails with duplicate trajectory
+  min_dist_ = MinDistance(params_, settings_, mdr_remeshed_);
+  // intersecting_ = Intersects(params_, settings_, mdr_); // TODO: Fails with
+  // duplicate trajectory
   intersecting_ = true;
   InvokeInvalidated(InvalidatedReason::kCost);
 }

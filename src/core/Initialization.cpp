@@ -69,14 +69,17 @@ Eigen::MatrixXd InitializeFinger(const ContactPoint contact_point,
                                  const std::vector<int>& par,
                                  size_t n_finger_joints) {
   Eigen::MatrixXd res(n_finger_joints, 3);
+  Eigen::RowVector3d closest_point;
 
-  size_t fid = mdr.ComputeClosestFacet(contact_point.position);
+  int fid;
+  mdr.ComputeClosestPoint(contact_point.position, closest_point, fid);
+
   size_t vid = -1;
   double bestDist = std::numeric_limits<double>::max();
   double curDist;
   for (int j = 0; j < 3; j++) {
     int v = mdr.F(fid, j);
-    if ((curDist = (contact_point.position - mdr.V.row(v).transpose()).norm() +
+    if ((curDist = (closest_point - mdr.V.row(v)).norm() +
                    dist[v]) < bestDist) {
       bestDist = curDist;
       vid = v;
@@ -84,7 +87,7 @@ Eigen::MatrixXd InitializeFinger(const ContactPoint contact_point,
   }
   std::vector<Eigen::Vector3d> finger;
   std::vector<int> fingerVid;
-  finger.push_back(contact_point.position);
+  finger.push_back(closest_point);
   fingerVid.push_back(-1);
   while (vid != -1) {
     Eigen::Vector3d toPush = mdr.V.row(vid);
@@ -320,7 +323,13 @@ void InitializeContactPointSeeds(const PassiveGripper& psg,
       // filter floor
       if (x.y() <= floor) continue;
       // filter unreachable point
-      if (v_par[mdr_floor.ComputeClosestVertex(x)] == -2) continue;
+      int fid;
+      Eigen::RowVector3d c;
+      mdr_floor.ComputeClosestPoint(x, c, fid);
+      if (abs((x - c).norm() - kExpandMesh) > 5e-4) continue;
+      if (v_par[mdr_floor.F(fid, 0)] == -2) continue; // check one vertex suffice
+
+      /*
       // filter angle
       Eigen::RowVector3d n = mdr.FN.row(out_FI_(i));
       if (n.y() > cos_angle) continue;
@@ -345,6 +354,7 @@ void InitializeContactPointSeeds(const PassiveGripper& psg,
                   w);
       double curvature = u * K(f(0)) + v * K(f(1)) + w * K(f(2));
       if (filter.curvature_radius * curvature > 1) continue;  // curvature > 1/r
+      */
 
       out_FI.push_back(out_FI_(i));
       out_X.push_back(X_.row(i));
@@ -469,8 +479,8 @@ std::vector<ContactPointMetric> InitializeContactPoints(
       // Check Feasiblity: Approach Direction
       Eigen::Affine3d trans;
       // if (!CheckApproachDirection(
-              // contactPoints, kPi / 2 * 8 / 9, 1, 0.1, 1e-12, 100, trans)) {
-        // continue;
+      // contactPoints, kPi / 2 * 8 / 9, 1, 0.1, 1e-12, 100, trans)) {
+      // continue;
       // }
       if (!CheckApproachDirection2(
               contactPoints, 0.01, kDegToRad * 80, mdr.center_of_mass, trans)) {

@@ -36,6 +36,14 @@ class PassiveGripper : public psg::core::serialization::Serializable {
   void ForceInvalidateAll(bool disable_reinit = false);
 
   // Mesh
+  static constexpr int kRemeshVersion = 1;
+  void GenerateRemesh();
+  void SetMesh(const Eigen::MatrixXd& V,
+               const Eigen::MatrixXi& F,
+               const Eigen::MatrixXd& remesh_V,
+               const Eigen::MatrixXi& remesh_F,
+               int remesh_version,
+               bool invalidate = true);
   void SetMesh(const Eigen::MatrixXd& V,
                const Eigen::MatrixXi& F,
                bool invalidate = true);
@@ -169,19 +177,25 @@ class PassiveGripper : public psg::core::serialization::Serializable {
   DECLARE_GETTER(GetRemeshedMDR, mdr_remeshed_)
 
   DECL_SERIALIZE() {
-    constexpr int version = 1;
+    constexpr int version = 2;
     SERIALIZE(version);
     SERIALIZE(GetMDR().V);
     SERIALIZE(GetMDR().F);
     SERIALIZE(GetParams());
     SERIALIZE(GetSettings());
+    SERIALIZE(kRemeshVersion);
+    SERIALIZE(GetRemeshedMDR().V);
+    SERIALIZE(GetRemeshedMDR().F);
   }
 
   DECL_DESERIALIZE() {
     int version;
+    int remesh_version;
     DESERIALIZE(version);
     Eigen::MatrixXd V;
     Eigen::MatrixXi F;
+    Eigen::MatrixXd RV;
+    Eigen::MatrixXi RF;
     GripperParams params;
     GripperSettings settings;
     if (version == 1) {
@@ -190,6 +204,17 @@ class PassiveGripper : public psg::core::serialization::Serializable {
       DESERIALIZE(params);
       DESERIALIZE(settings);
       SetMesh(V, F);
+      SetSettings(settings);
+      SetParams(params);
+    } else if (version == 2) {
+      DESERIALIZE(V);
+      DESERIALIZE(F);
+      DESERIALIZE(params);
+      DESERIALIZE(settings);
+      DESERIALIZE(remesh_version);
+      DESERIALIZE(RV);
+      DESERIALIZE(RF);
+      SetMesh(V, F, RV, RF, remesh_version);
       SetSettings(settings);
       SetParams(params);
     }
