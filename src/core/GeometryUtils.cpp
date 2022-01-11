@@ -5,8 +5,8 @@
 
 #include <CGAL/Polygon_mesh_processing/remesh.h>
 #include <CGAL/Polyhedron_3.h>
-#include <igl/copyleft/cgal/mesh_to_polyhedron.h>
 #include <igl/copyleft/cgal/mesh_boolean.h>
+#include <igl/copyleft/cgal/mesh_to_polyhedron.h>
 #include <igl/copyleft/cgal/polyhedron_to_mesh.h>
 #include <igl/volume.h>
 #include <libqhullcpp/Qhull.h>
@@ -23,116 +23,93 @@
 namespace psg {
 namespace core {
 
-static void AdaptiveSubdivideTrajectoryImpl(
-    const Eigen::MatrixXd& fingers,
-    double flatness,
-    std::list<Eigen::MatrixXd>& l,
-    std::list<Eigen::MatrixXd>::iterator l_p0,
-    std::list<Eigen::MatrixXd>::iterator l_p2,
-    std::list<Pose>& lp,
-    std::list<Pose>::iterator lp_p0,
-    std::list<Pose>::iterator lp_p2) {
-  Pose p1 = (*lp_p0 + *lp_p2) / 2.;
-  Eigen::MatrixXd fingers_p1 =
-      (robots::Forward(p1) * fingers.transpose().colwise().homogeneous())
-          .transpose();
-
-  size_t n_joints = fingers.rows();
-
-  double max_deviation = 0;
-  Eigen::MatrixXd fingers_p02 = (*l_p2 - *l_p0).rowwise().normalized();
-  Eigen::MatrixXd fingers_p01 = (fingers_p1 - *l_p0);
-  for (size_t i = 0; i < n_joints; i++) {
-    Eigen::RowVector3d p02 = fingers_p02.row(i);
-    Eigen::RowVector3d p01 = fingers_p01.row(i);
-    max_deviation = std::max(max_deviation, p01.cross(p02).norm());
-  }
-  if (max_deviation > flatness) {
-    auto l_p1 = l.insert(l_p2, fingers_p1);
-    auto lp_p1 = lp.insert(lp_p2, p1);
-    AdaptiveSubdivideTrajectoryImpl(
-        fingers, flatness, l, l_p0, l_p1, lp, lp_p0, lp_p1);
-    AdaptiveSubdivideTrajectoryImpl(
-        fingers, flatness, l, l_p1, l_p2, lp, lp_p1, lp_p2);
-  }
-}
-
-void TransformFingers(const std::vector<Eigen::MatrixXd>& fingers,
-                      const Eigen::Affine3d& trans,
-                      std::vector<Eigen::MatrixXd>& out_fingers) {
-  out_fingers.resize(fingers.size());
+Fingers TransformFingers(const Fingers& fingers, const Eigen::Affine3d& trans) {
+  Fingers out_fingers(fingers.size());
   for (size_t i = 0; i < fingers.size(); i++) {
     out_fingers[i] =
         (trans * fingers[i].transpose().colwise().homogeneous()).transpose();
+  }
+  return out_fingers;
+}
+
+struct _AdtTrajData {
+  Fingers fingers;
+  Pose pose;
+  size_t traj_idx;
+  double t;
+};
+
+static void AdaptiveSubdivideTrajectoryImpl(
+    const Fingers& fingers,
+    double flatness,
+    std::list<_AdtTrajData>& l,
+    std::list<_AdtTrajData>::iterator l_p0,
+    std::list<_AdtTrajData>::iterator l_p2) {
+  Pose p1 = (l_p0->pose + l_p2->pose) / 2.;
+  Fingers fingers_p1 = TransformFingers(fingers, robots::Forward(p1));
+
+  double t2 = l_p2->t;
+  if (l_p2->traj_idx != l_p0->traj_idx) t2 = 1;
+
+  double max_deviation = 0;
+  for (size_t j = 0; j < fingers_p1.size(); j++) {
+    Eigen::MatrixXd fingers_p02 =
+        (l_p2->fingers[j] - l_p0->fingers[j]).rowwise().normalized();
+    Eigen::MatrixXd fingers_p01 = (fingers_p1[j] - l_p0->fingers[j]);
+    for (size_t i = 0; i < fingers_p02.rows(); i++) {
+      Eigen::RowVector3d p02 = fingers_p02.row(i);
+      Eigen::RowVector3d p01 = fingers_p01.row(i);
+      max_deviation = std::max(max_deviation, p01.cross(p02).norm());
+    }
+  }
+  if (max_deviation > flatness) {
+    auto l_p1 = l.insert(
+        l_p2,
+        _AdtTrajData{fingers_p1, p1, l_p0->traj_idx, (l_p0->t + t2) / 2.});
+    AdaptiveSubdivideTrajectoryImpl(fingers, flatness, l, l_p0, l_p1);
+    AdaptiveSubdivideTrajectoryImpl(fingers, flatness, l, l_p1, l_p2);
   }
 }
 
 void AdaptiveSubdivideTrajectory(
     const Trajectory& trajectory,
-    const std::vector<Eigen::MatrixXd>& fingers,
+    const Fingers& fingers,
     double flatness,
     Trajectory& out_trajectory,
-    std::vector<std::vector<Eigen::MatrixXd>>& out_t_fingers) {
+    std::vector<Fingers>& out_t_fingers,
+    std::vector<std::pair<int, double>>& out_traj_contrib) {
   Eigen::Affine3d finger_trans_inv =
       robots::Forward(trajectory.front()).inverse();
 
-  std::list<Eigen::MatrixXd> l;
+  Fingers fingers0 = TransformFingers(fingers, finger_trans_inv);
 
-  std::list<Pose> lp;
-
-  std::vector<size_t> n_joints_l;
-  size_t n_fingers = fingers.size();
-  size_t n_joints = 0;
-  for (size_t i = 0; i < n_fingers; i++) {
-    size_t cur_joints = fingers[i].rows();
-    n_joints += cur_joints;
-    n_joints_l.push_back(cur_joints);
-  }
-  Eigen::MatrixXd flatten_fingers(n_joints, 3);
-  size_t cur_rows = 0;
-  for (size_t i = 0; i < n_fingers; i++) {
-    flatten_fingers.block(cur_rows, 0, n_joints_l[i], 3) = fingers[i];
-    cur_rows += n_joints_l[i];
-  }
-  flatten_fingers =
-      (finger_trans_inv * flatten_fingers.transpose().colwise().homogeneous())
-          .transpose();
+  std::list<_AdtTrajData> l;
 
   size_t n_keyframes = trajectory.size();
   for (size_t i = 0; i < n_keyframes; i++) {
-    lp.push_back(trajectory[i]);
-    l.push_back((robots::Forward(trajectory[i]) *
-                 flatten_fingers.transpose().colwise().homogeneous())
-                    .transpose());
+    l.push_back(
+        _AdtTrajData{TransformFingers(fingers0, robots::Forward(trajectory[i])),
+                     trajectory[i],
+                     i,
+                     0});
   }
 
-  std::list<Eigen::MatrixXd>::iterator l_p0 = l.begin();
-  std::list<Eigen::MatrixXd>::iterator l_p2 = ++l.begin();
-  std::list<Pose>::iterator lp_p0 = lp.begin();
-  std::list<Pose>::iterator lp_p2 = ++lp.begin();
+  std::list<_AdtTrajData>::iterator l_p0 = l.begin();
+  std::list<_AdtTrajData>::iterator l_p2 = ++l.begin();
   for (size_t i = 1; i < n_keyframes; i++) {
-    AdaptiveSubdivideTrajectoryImpl(
-        flatten_fingers, flatness, l, l_p0, l_p2, lp, lp_p0, lp_p2);
+    AdaptiveSubdivideTrajectoryImpl(fingers0, flatness, l, l_p0, l_p2);
     l_p0 = l_p2;
     l_p2++;
-    lp_p0 = lp_p2;
-    lp_p2++;
   }
-  size_t n_new_keyframes = lp.size();
+  size_t n_new_keyframes = l.size();
   out_trajectory.resize(n_new_keyframes);
   out_t_fingers.resize(n_new_keyframes);
-  std::list<Eigen::MatrixXd>::iterator l_it = l.begin();
-  std::list<Pose>::iterator lp_it = lp.begin();
+  out_traj_contrib.resize(n_new_keyframes);
+  std::list<_AdtTrajData>::iterator l_it = l.begin();
   for (size_t i = 0; i < n_new_keyframes; i++) {
-    out_trajectory[i] = *lp_it;
-    const Eigen::MatrixXd& f = *l_it;
-    out_t_fingers[i].resize(n_joints_l.size());
-    size_t cur_rows = 0;
-    for (size_t j = 0; j < n_joints_l.size(); j++) {
-      out_t_fingers[i][j] = f.block(cur_rows, 0, n_joints_l[j], 3);
-      cur_rows += n_joints_l[j];
-    }
-    lp_it++;
+    out_trajectory[i] = l_it->pose;
+    out_t_fingers[i] = l_it->fingers;
+    out_traj_contrib[i] = {l_it->traj_idx, l_it->t};
     l_it++;
   }
 }
@@ -472,10 +449,10 @@ void CreateCylinderXY(const Eigen::Vector3d& o,
   }
 }
 
-void MergeMesh(const Eigen::MatrixXd &V,
-               const Eigen::MatrixXi &F,
-               Eigen::MatrixXd &out_V,
-               Eigen::MatrixXi &out_F) {
+void MergeMesh(const Eigen::MatrixXd& V,
+               const Eigen::MatrixXi& F,
+               Eigen::MatrixXd& out_V,
+               Eigen::MatrixXi& out_F) {
   struct Submesh {
     Eigen::MatrixXd V;
     Eigen::MatrixXi F;
@@ -497,27 +474,27 @@ void MergeMesh(const Eigen::MatrixXd &V,
     submeshes[unionFind.find(F(f, 0))].face_count++;
   }
   for (Eigen::Index v = 0; v < V.rows(); v++) {
-    auto &vertex_map = submeshes[unionFind.find(v)].vertex_map;
+    auto& vertex_map = submeshes[unionFind.find(v)].vertex_map;
     size_t next_id = vertex_map.size();
     vertex_map[v] = next_id;
   }
 
-  for (auto &item : submeshes) {
-    auto &submesh = item.second;
+  for (auto& item : submeshes) {
+    auto& submesh = item.second;
     submesh.V.resize(submesh.vertex_map.size(), 3);
     submesh.F.resize(submesh.face_count, 3);
   }
 
   // Map vertices and faces information to sub-mesh
   for (Eigen::Index f = 0; f < F.rows(); f++) {
-    auto &submesh = submeshes[unionFind.find(F(f, 0))];
+    auto& submesh = submeshes[unionFind.find(F(f, 0))];
     size_t sub_f = submesh.next_face++;
     for (int i = 0; i < 3; i++) {
       submesh.F(sub_f, i) = submesh.vertex_map[F(f, i)];
     }
   }
   for (Eigen::Index v = 0; v < V.rows(); v++) {
-    auto &submesh = submeshes[unionFind.find(v)];
+    auto& submesh = submeshes[unionFind.find(v)];
     submesh.V.row(submesh.vertex_map[v]) = V.row(v);
   }
 
@@ -526,10 +503,14 @@ void MergeMesh(const Eigen::MatrixXd &V,
   Eigen::MatrixXd VCurrent = it->second.V, VResult;
   Eigen::MatrixXi FCurrent = it->second.F, FResult;
   for (it++; it != submeshes.end(); it++) {
-    auto &submesh = it->second;
-    igl::copyleft::cgal::mesh_boolean(submesh.V, submesh.F, VCurrent, FCurrent,
+    auto& submesh = it->second;
+    igl::copyleft::cgal::mesh_boolean(submesh.V,
+                                      submesh.F,
+                                      VCurrent,
+                                      FCurrent,
                                       igl::MESH_BOOLEAN_TYPE_UNION,
-                                      VResult, FResult);
+                                      VResult,
+                                      FResult);
     VCurrent.swap(VResult);
     FCurrent.swap(FResult);
   }
@@ -537,8 +518,8 @@ void MergeMesh(const Eigen::MatrixXd &V,
   out_F.swap(FCurrent);
 
   int count = 0;
-  for (auto &item : submeshes) {
-    auto &submesh = item.second;
+  for (auto& item : submeshes) {
+    auto& submesh = item.second;
     std::cout << "submesh " << count++ << std::endl;
     std::cout << "  Faces: " << submesh.next_face << std::endl;
     std::cout << "  Vertices: " << submesh.V.rows() << std::endl;

@@ -309,35 +309,257 @@ double ComputeCost(const GripperParams& params,
   return totalCost;
 }
 
-double MinDistanceAtPose(const std::vector<Eigen::MatrixXd>& fingers,
-                         const Eigen::Affine3d& finger_trans_inv,
-                         const MeshDependentResource& mdr,
-                         const GripperSettings& settings,
-                         const Pose& current_pose) {
-  const size_t n_finger_steps = settings.cost.n_finger_steps;
-  const size_t n_finger_joints = settings.finger.n_finger_joints;
-  const size_t n_evals_per_finger = (n_finger_joints - 1) * n_finger_steps + 1;
-  const double finger_step = 1. / n_finger_steps;
+double ComputeCost1(const GripperParams& params,
+                    const GripperSettings& settings,
+                    const MeshDependentResource& mdr,
+                    GripperParams& out_dCost_dParam,
+                    Debugger* const debugger) {
+  constexpr double precision = 0.001;  // 1mm
 
-  double t_min_dist = 0;
-  Eigen::RowVector3d t_dP_ds;  // unused
-  Eigen::Affine3d trans = robots::Forward(current_pose) * finger_trans_inv;
-  for (const auto& finger : fingers) {
-    Eigen::MatrixXd t_finger =
-        (trans * finger.transpose().colwise().homogeneous()).transpose();
-    for (long long jj = 1; jj < n_evals_per_finger; jj++) {
-      long long kk = (jj - 1) % n_finger_steps + 1;
-      long long joint = (jj - 1) / n_finger_steps + 1;
-      double fingerT = kk * finger_step;
-      Eigen::RowVector3d lerpedFinger =
-          t_finger.row(joint - 1) * (1. - fingerT) +
-          t_finger.row(joint) * fingerT;
-      t_min_dist = std::min(
-          t_min_dist,
-          GetDist(lerpedFinger.transpose(), settings.cost, mdr, t_dP_ds));
+  Eigen::Affine3d finger_trans_inv =
+      robots::Forward(params.trajectory.front()).inverse();
+  std::vector<Eigen::MatrixXd> fingers =
+      TransformFingers(params.fingers, finger_trans_inv);
+
+  // discretize fingers
+  struct _Data {
+    Eigen::Vector3d finger;
+    size_t finger_idx;
+    size_t joint_idx;
+    double t;
+    double factor;
+    // finger[finger_idx].row(joint_idx - 1) * (1 - t)
+    // + finger[finger_idx].row(joint_idx) * t
+  };
+
+  // 1/2 -- 1 -- 1 -- 1/2 * length / subs
+
+  std::vector<_Data> d_fingers;
+  for (size_t i = 0; i < fingers.size(); i++) {
+    for (size_t j = 1; j < fingers[i].rows(); j++) {
+      double norm = (fingers[i].row(j) - fingers[i].row(j - 1)).norm();
+      size_t subs = std::max<size_t>(std::ceil(norm / precision), 1);
+      size_t iters = subs;
+      double factor = norm / (subs * 2);
+      if (j == 1) {
+        d_fingers.push_back(_Data{fingers[i].row(j - 1), i, j - 1, 0, 0});
+      }
+      for (size_t k = 1; k <= subs; k++) {
+        double t = (double)k / subs;
+        d_fingers.back().factor += factor;
+        d_fingers.push_back(
+            _Data{fingers[i].row(j - 1) * (1. - t) + fingers[i].row(j) * t,
+                  i,
+                  j - 1,
+                  t,
+                  factor});
+      }
     }
   }
-  return t_min_dist;
+  Eigen::MatrixXd D_fingers(d_fingers.size(), 3);
+#pragma omp parallel for
+  for (long long i = 0; i < d_fingers.size(); i++) {
+    D_fingers.row(i) = d_fingers[i].finger;
+  }
+
+  // discretize time
+  Trajectory new_trajectory;
+  std::vector<std::vector<Eigen::MatrixXd>> new_fingers;
+  std::vector<std::pair<int, double>> traj_contrib;
+  AdaptiveSubdivideTrajectory(params.trajectory,
+                              params.fingers,
+                              precision,
+                              new_trajectory,
+                              new_fingers,
+                              traj_contrib);
+  size_t n_trajectory = new_trajectory.size();
+  std::vector<bool> traj_skip(n_trajectory - 1, false);
+  std::vector<size_t> traj_subs(n_trajectory - 1, 0);
+
+// #pragma omp parallel for
+  for (long long i = 0; i < n_trajectory - 1; i++) {
+    double max_deviation = 0;
+    bool intersects = false;
+    for (size_t j = 0; j < new_fingers[i].size(); j++) {
+      double dev = (new_fingers[i + 1][j] - new_fingers[i][j])
+                       .rowwise()
+                       .norm()
+                       .maxCoeff();
+      max_deviation = std::max(max_deviation, dev);
+      Eigen::RowVector3d p_min =
+          new_fingers[i][j].colwise().minCoeff().cwiseMin(
+              new_fingers[i + 1][j].colwise().minCoeff());
+      Eigen::RowVector3d p_max =
+          new_fingers[i][j].colwise().maxCoeff().cwiseMax(
+              new_fingers[i + 1][j].colwise().maxCoeff());
+      p_min.array() -= precision;
+      p_max.array() += precision;
+      intersects =
+          intersects || mdr.Intersects(Eigen::AlignedBox3d(p_min, p_max));
+
+      if (debugger != nullptr) {
+        for (size_t k = 1; k < new_fingers[i][j].rows(); k++) {
+          debugger->AddEdge(new_fingers[i][j].row(k - 1),
+                            new_fingers[i][j].row(k),
+                            colors::kOrange);                  
+        }      
+      }
+    }
+
+    traj_skip[i] = !intersects;
+    traj_subs[i] =
+        intersects ? std::max<size_t>(std::ceil(max_deviation / precision), 1)
+                   : 1;
+  }
+
+  for (size_t i = 0; i < traj_skip.size(); i++) {
+    std::cout << traj_skip[i];
+  }
+  std::cout << std::endl;
+  for (size_t i = 0; i < traj_skip.size(); i++) {
+    std::cout << traj_subs[i] << " ";  
+  }
+  std::cout << std::endl;
+
+  struct _TrajData {
+    size_t traj_idx;
+    double t;
+    Pose pose;
+
+    double factor;
+    double dFactor_dJointi;
+    size_t jointi_idx;
+  };
+
+  const double ang_velocity = settings.cost.ang_velocity;
+  std::vector<_TrajData> traj_data;
+  for (size_t i = 0; i < n_trajectory - 1; i++) {
+    if (traj_skip[i]) continue;
+    size_t subs = traj_subs[i];
+
+    size_t duration_idx;
+    bool duration_flip;
+    double duration = ComputeDuration(new_trajectory[i],
+                                      new_trajectory[i + 1],
+                                      ang_velocity,
+                                      duration_idx,
+                                      duration_flip);
+
+    double factor = duration / (subs * 2);
+    double dFactor_dJointi = 1. / (subs * 2 * ang_velocity);
+    if (duration_flip) dFactor_dJointi = -dFactor_dJointi;
+
+    size_t traj_idx = traj_contrib[i].first;
+    double t2 = traj_contrib[i + 1].second;
+    if (traj_contrib[i + 1].first != traj_idx) t2 = 1;
+
+    traj_data.push_back(_TrajData{traj_idx,
+                                  traj_contrib[i].second,
+                                  new_trajectory[i],
+                                  0,
+                                  0,
+                                  duration_idx});
+
+    for (size_t j = 1; j <= subs; j++) {
+      double t = (double)j / subs;
+      Pose pose = new_trajectory[i] * (1. - t) + new_trajectory[i + 1] * t;
+
+      traj_data.back().factor += factor;
+      traj_data.back().dFactor_dJointi += dFactor_dJointi;
+      traj_data.push_back(_TrajData{traj_idx,
+                                    traj_contrib[i].second * (1 - t) + t2 * t,
+                                    pose,
+                                    factor,
+                                    dFactor_dJointi,
+                                    duration_idx});
+    }
+  }
+
+  std::cout << "dfinger: " << d_fingers.size() << ", traj_data: " << traj_data.size()
+            << std::endl;
+
+  const size_t n_fingers = params.fingers.size();
+  const size_t n_joints = settings.finger.n_finger_joints;
+
+  // dEval_dDFingers and dEval_dPose assumed to have the right size and zerod
+  auto EvalAtPose =
+      [&D_fingers, &d_fingers, &settings, &mdr, n_fingers, n_joints](
+          const Pose pose,
+          const JacobianFunc& J,
+          Fingers& dEval_dDFingers,
+          Eigen::Matrix<double, 1, kNumDOFs>& dEval_dPose) {
+        auto f = TransformMatrix(D_fingers, robots::Forward(pose));
+        double eval = 0;
+        for (long long k = 0; k < f.rows(); k++) {
+          const auto& data = d_fingers[k];
+          Eigen::RowVector3d dEval_dPos;
+          eval +=
+              data.factor * EvalAt(f.row(k), settings.cost, mdr, dEval_dPos);
+
+          Jacobian dPos_dPose = J(f.row(k));
+          dEval_dPose += data.factor * (dEval_dPos * dPos_dPose);
+          dEval_dDFingers[data.finger_idx].row(data.joint_idx) +=
+              (data.factor * (1 - data.t)) * dEval_dPos;
+          dEval_dDFingers[data.finger_idx].row(data.joint_idx + 1) +=
+              (data.factor * data.t) * dEval_dPos;
+        }
+        return eval;
+      };
+
+  Fingers dCost_dFingers(n_fingers, Eigen::MatrixXd::Zero(n_joints, 3));
+  Trajectory dCost_dTrajectory(params.trajectory.size(), Pose::Zero());
+  double cost = 0;
+
+#pragma omp parallel
+  {
+    Fingers t_dCost_dFingers(n_fingers, Eigen::MatrixXd::Zero(n_joints, 3));
+    Trajectory t_dCost_dTrajectory(params.trajectory.size(), Pose::Zero());
+    double t_cost = 0;
+
+#pragma omp for nowait
+    for (long long i = 0; i < traj_data.size(); i++) {
+      const auto& data = traj_data[i];
+      Eigen::Affine3d trans = robots::Forward(data.pose);
+      Eigen::Matrix3d dDFinger_dFinger = (trans * finger_trans_inv).linear();
+      JacobianFunc J = robots::ComputeJacobian(data.pose);
+      Fingers dEval_dDFingers(n_fingers, Eigen::MatrixXd::Zero(n_joints, 3));
+      Eigen::Matrix<double, 1, kNumDOFs> dEval_dPose;
+      dEval_dPose.setZero();
+      double eval = EvalAtPose(data.pose, J, dEval_dDFingers, dEval_dPose);
+
+      t_cost += data.factor * eval;
+
+      for (size_t j = 0; j < n_fingers; j++) {
+        for (size_t k = 0; k < t_dCost_dFingers[j].rows(); k++) {
+          t_dCost_dFingers[j].row(k) +=
+              data.factor * (dEval_dDFingers[j].row(k) * dDFinger_dFinger);
+        }
+      }
+      t_dCost_dTrajectory[data.traj_idx] +=
+          (data.factor * (1 - data.t)) * dEval_dPose.array();
+      t_dCost_dTrajectory[data.traj_idx + 1] +=
+          (data.factor * data.t) * dEval_dPose.array();
+      t_dCost_dTrajectory[data.traj_idx](data.jointi_idx) -=
+          data.dFactor_dJointi * eval;
+      t_dCost_dTrajectory[data.traj_idx + 1](data.jointi_idx) +=
+          data.dFactor_dJointi * eval;
+    }
+
+#pragma omp critical
+    {
+      cost += t_cost;
+      for (size_t j = 0; j < n_fingers; j++) {
+        dCost_dFingers[j] += t_dCost_dFingers[j];
+      }
+      for (size_t j = 0; j < params.trajectory.size(); j++) {
+        dCost_dTrajectory[j] += t_dCost_dTrajectory[j];
+      }
+    }
+  }
+
+  out_dCost_dParam.fingers = dCost_dFingers;
+  out_dCost_dParam.trajectory = dCost_dTrajectory;
+  return cost;
 }
 
 double MinDistance(const GripperParams& params,
@@ -347,8 +569,8 @@ double MinDistance(const GripperParams& params,
 
   Eigen::Affine3d finger_trans_inv =
       robots::Forward(params.trajectory.front()).inverse();
-  std::vector<Eigen::MatrixXd> fingers;
-  TransformFingers(params.fingers, finger_trans_inv, fingers);
+  std::vector<Eigen::MatrixXd> fingers =
+      TransformFingers(params.fingers, finger_trans_inv);
 
   // discretize fingers
   std::vector<Eigen::Vector3d> d_fingers;
@@ -373,11 +595,13 @@ double MinDistance(const GripperParams& params,
   // discretize time
   Trajectory new_trajectory;
   std::vector<std::vector<Eigen::MatrixXd>> new_fingers;
+  std::vector<std::pair<int, double>> traj_contrib;
   AdaptiveSubdivideTrajectory(params.trajectory,
                               params.fingers,
                               precision,
                               new_trajectory,
-                              new_fingers);
+                              new_fingers,
+                              traj_contrib);
   size_t n_trajectory = new_trajectory.size();
 
   double min_dist = 0;
@@ -432,130 +656,6 @@ double ComputeFloorCost(Eigen::RowVector3d p0,
   return cost + p01.norm();
 }
 
-double ComputeCost2(const GripperParams& params,
-                    const GripperSettings& settings,
-                    const MeshDependentResource& remesh_mdr,
-                    Debugger* const debugger) {
-  const size_t nKeyframes = params.trajectory.size();
-  const size_t nFingers = params.fingers.size();
-  const size_t nFingerJoints = settings.finger.n_finger_joints;
-
-  const size_t nTrajectorySteps = settings.cost.n_trajectory_steps;
-  const size_t nFingerSteps = settings.cost.n_finger_steps;
-  const double angVelocity = settings.cost.ang_velocity;
-  const double trajectoryStep = 1. / nTrajectorySteps;
-  const double fingerStep = 1. / nFingerSteps;
-  const size_t nFrames = (nKeyframes - 1) * nTrajectorySteps + 1;
-
-  if (nKeyframes == 1) return 0;
-
-  std::vector<double> costs(nFrames, 0);
-
-  double floor = settings.cost.floor;
-
-  auto MyCost = [floor, &remesh_mdr](const Eigen::RowVector3d& p0,
-                                     const Eigen::RowVector3d& p1,
-                                     Debugger* const debugger) -> double {
-    // std::cout << "My Cost: " << p0 << "," << p1 << std::endl;
-    return remesh_mdr.ComputeRequiredDistance(p0, p1, debugger) +
-           ComputeFloorCost(p0, p1, floor);
-  };
-
-  Eigen::Affine3d fingerTransInv =
-      robots::Forward(params.trajectory.front()).inverse();
-#pragma omp parallel for
-  for (long long i = 0; i < nFrames; i++) {
-    size_t iKeyframe = i / nTrajectorySteps;
-    size_t trajStep = i % nTrajectorySteps;
-    if (i == nFrames - 1) {
-      iKeyframe = nKeyframes - 2;
-      trajStep = nTrajectorySteps;
-    }
-    double trajT = trajStep * trajectoryStep;
-
-    Pose lKeyframe = params.trajectory[iKeyframe] * (1. - trajT) +
-                     params.trajectory[iKeyframe + 1] * trajT;
-    Eigen::Affine3d curTrans = robots::Forward(lKeyframe) * fingerTransInv;
-    for (size_t j = 0; j < nFingers; j++) {
-      Eigen::MatrixXd tdFingers =
-          (curTrans * params.fingers[j].transpose().colwise().homogeneous())
-              .transpose();
-      for (size_t k = 0; k < nFingerJoints - 1; k++) {
-        costs[i] += MyCost(tdFingers.row(k), tdFingers.row(k + 1), debugger);
-      }
-    }
-  }
-
-  double totalCost = 0;
-#pragma omp parallel for reduction(+ : totalCost)
-  for (long long i = 1; i < nFrames; i++) {
-    size_t iKeyframe = i / nTrajectorySteps;
-    size_t trajStep = i % nTrajectorySteps;
-    if (i == nFrames - 1) {
-      iKeyframe = nKeyframes - 2;
-      trajStep = nTrajectorySteps;
-    }
-    double trajT = trajStep * trajectoryStep;
-
-    Pose lKeyframe = params.trajectory[iKeyframe] * (1. - trajT) +
-                     params.trajectory[iKeyframe + 1] * trajT;
-
-    iKeyframe = (i - 1) / nTrajectorySteps;
-    trajStep = (i - 1) % nTrajectorySteps;
-    double last_trajT = trajStep * trajectoryStep;
-    Pose last_lKeyframe = params.trajectory[iKeyframe] * (1. - last_trajT) +
-                          params.trajectory[iKeyframe + 1] * last_trajT;
-
-    size_t idx;  // unused
-    bool flip;   // unused
-    double duration =
-        ComputeDuration(last_lKeyframe, lKeyframe, angVelocity, idx, flip);
-
-    totalCost += (costs[i - 1] + costs[i]) * duration;
-  }
-  totalCost /= 2.;
-
-  // trajectory wise
-  Trajectory new_trajectory;
-  std::vector<std::vector<Eigen::MatrixXd>> new_t_fingers;
-  AdaptiveSubdivideTrajectory(
-      params.trajectory, params.fingers, 0.001, new_trajectory, new_t_fingers);
-
-  size_t nFingerSubs = (nFingerJoints - 1) * nFingerSteps + 1;
-  size_t nTrajectoryIntv = new_trajectory.size() - 1;
-
-  double t_totalCost = 0;
-#pragma omp parallel for reduction(+ : t_totalCost)
-  for (long long i = 0; i < nTrajectoryIntv; i++) {
-    for (size_t j = 0; j < nFingers; j++) {
-      for (size_t k = 0; k < nFingerSubs; k++) {
-        size_t kJoint = k / nFingerSteps;
-        size_t kfingerStep = k % nFingerSteps;
-        if (k == nFingerSubs - 1) {
-          kJoint = nFingerJoints - 2;
-          kfingerStep = nFingerSteps;
-        }
-        double fingerT = kfingerStep * fingerStep;
-
-        Eigen::RowVector3d p0 =
-            new_t_fingers[i][j].row(kJoint) * (1 - fingerT) +
-            new_t_fingers[i][j].row(kJoint + 1) * fingerT;
-        Eigen::RowVector3d p1 =
-            new_t_fingers[i + 1][j].row(kJoint) * (1 - fingerT) +
-            new_t_fingers[i + 1][j].row(kJoint + 1) * fingerT;
-        double contrib =
-            (params.fingers[j].row(kJoint + 1) - params.fingers[j].row(kJoint))
-                .norm() *
-            fingerStep;
-        if (k == 0 || k == nFingerSubs - 1) contrib /= 2;
-        t_totalCost += MyCost(p0, p1, debugger) * contrib;
-      }
-    }
-  }
-
-  return totalCost + t_totalCost;
-}
-
 double ComputeCost_SP(const GripperParams& params,
                       const GripperSettings& settings,
                       const MeshDependentResource& remeshed_mdr,
@@ -571,8 +671,8 @@ double ComputeCost_SP(const GripperParams& params,
 
   Eigen::Affine3d finger_trans_inv =
       robots::Forward(params.trajectory.front()).inverse();
-  std::vector<Eigen::MatrixXd> fingers;
-  TransformFingers(params.fingers, finger_trans_inv, fingers);
+  std::vector<Eigen::MatrixXd> fingers =
+      TransformFingers(params.fingers, finger_trans_inv);
 
   // Cost between two points
   const double floor = settings.cost.floor;
@@ -595,12 +695,14 @@ double ComputeCost_SP(const GripperParams& params,
   };
 
   Trajectory new_trajectory;
-  std::vector<std::vector<Eigen::MatrixXd>> new_fingers;
+  std::vector<Fingers> new_fingers;
+  std::vector<std::pair<int, double>> traj_contrib;
   AdaptiveSubdivideTrajectory(params.trajectory,
                               params.fingers,
                               precision,
                               new_trajectory,
-                              new_fingers);
+                              new_fingers,
+                              traj_contrib);
   size_t n_trajectory = new_trajectory.size();
   std::vector<bool> traj_skip(n_trajectory - 1, false);
   std::vector<size_t> traj_subs(n_trajectory - 1, 0);
@@ -644,11 +746,10 @@ double ComputeCost_SP(const GripperParams& params,
 
 #pragma omp for
       for (long long j = 0; j < iters; j++) {
-        _SubInfo sub_info;
         double t = (double)j / cur_sub;
         Pose pose = new_trajectory[i] * (1. - t) + new_trajectory[i + 1] * t;
-        TransformFingers(fingers, robots::Forward(pose), sub_info.fingers);
-        t_max = std::max(t_max, ProcessFinger(sub_info.fingers));
+        auto f = TransformFingers(fingers, robots::Forward(pose));
+        t_max = std::max(t_max, ProcessFinger(f));
       }
 
 #pragma omp critical

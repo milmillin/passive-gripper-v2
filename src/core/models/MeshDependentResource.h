@@ -75,7 +75,7 @@ class MeshDependentResource : psg::core::serialization::Serializable {
                                  const Eigen::Vector3d& B,
                                  Debugger* const debugger) const;
 
-  bool Intersects(const Eigen::AlignedBox3d& box) const;
+  bool Intersects(const Eigen::AlignedBox3d box) const;
 
   // Getters
   const Eigen::MatrixXd& GetSP() const;

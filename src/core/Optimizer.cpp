@@ -94,7 +94,7 @@ void Optimizer::Optimize(const PassiveGripper& psg) {
   mdr_.init(mdr);
   settings_ = psg.GetSettings();
 
-  cost_function_ = kCostFunctions[(int)settings_.opt.cost_function];
+  cost_function_ = kCostFunctions[(int)settings_.cost.cost_function];
 
   dimension_ = MyFlattenSize(params_);
   x_.reset(new double[dimension_]);

@@ -23,10 +23,9 @@ struct OptSettings : psg::core::serialization::Serializable {
   double tolerance = 0;
   nlopt_algorithm algorithm = NLOPT_LD_MMA;
   size_t population = 0;
-  CostFunctionEnum cost_function = CostFunctionEnum::kSP;
 
   DECL_SERIALIZE() {
-    constexpr int version = 4;
+    constexpr int version = 3;
     SERIALIZE(version);
     SERIALIZE(max_runtime);
     SERIALIZE(max_iters);
@@ -35,7 +34,6 @@ struct OptSettings : psg::core::serialization::Serializable {
     SERIALIZE(tolerance);
     SERIALIZE(algorithm);
     SERIALIZE(population);
-    SERIALIZE(cost_function);
   }
 
   DECL_DESERIALIZE() {
@@ -74,7 +72,9 @@ struct OptSettings : psg::core::serialization::Serializable {
       DESERIALIZE(tolerance);
       DESERIALIZE(algorithm);
       DESERIALIZE(population);
-      DESERIALIZE(cost_function);
+      int unused;
+      DESERIALIZE(unused);
+    
     }
   }
 };

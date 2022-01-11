@@ -25,22 +25,17 @@ double ComputeCost(const GripperParams& params,
                    GripperParams& out_dCost_dParam,
                    Debugger* const debugger);
 
-double ComputeCost2(const GripperParams& params,
-                    const GripperSettings& settings,
-                    const MeshDependentResource& remeshed_mdr,
-                    Debugger* const debugger);
+double ComputeCost1(const GripperParams& params,
+                   const GripperSettings& settings,
+                   const MeshDependentResource& mdr,
+                   GripperParams& out_dCost_dParam,
+                   Debugger* const debugger);
 
 double ComputeCost_SP(const GripperParams& params,
                       const GripperSettings& settings,
                       const MeshDependentResource& remeshed_mdr,
                       GripperParams& out_dCost_dParam, /* unused*/
                       Debugger* const debugger);
-
-double MinDistanceAtPose(const std::vector<Eigen::MatrixXd>& fingers,
-                         const Eigen::Affine3d& finger_trans_inv,
-                         const MeshDependentResource& mdr,
-                         const GripperSettings& settings,
-                         const Pose& current_pose);
 
 double MinDistance(const GripperParams& params,
                    const GripperSettings& settings,

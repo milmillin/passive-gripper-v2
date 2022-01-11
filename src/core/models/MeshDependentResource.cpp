@@ -254,7 +254,7 @@ static bool TreeIntersectsImpl(const igl::AABB<Eigen::MatrixXd, 3>* tree,
          TreeIntersectsImpl(tree->m_right, box);
 }
 
-bool MeshDependentResource::Intersects(const Eigen::AlignedBox3d& box) const {
+bool MeshDependentResource::Intersects(const Eigen::AlignedBox3d box) const {
   return TreeIntersectsImpl(&tree, box);
 }
 

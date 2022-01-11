@@ -461,12 +461,12 @@ void MainUI::DrawOptimizationPanel() {
       ImGui::EndCombo();
     }
     if (ImGui::BeginCombo("Cost Function",
-                          kCostFunctions[(int)opt_settings.cost_function].name)) {
+                          kCostFunctions[(int)cost_settings.cost_function].name)) {
       for (int i = 0; i < 2; i++) {
-        bool is_selected = (opt_settings.algorithm == i);
+        bool is_selected = ((int)cost_settings.cost_function == i);
         if (ImGui::Selectable(kCostFunctions[i].name, is_selected)) {
-          opt_settings.cost_function = (CostFunctionEnum)i;
-          opt_update = true;
+          cost_settings.cost_function = (CostFunctionEnum)i;
+          cost_update = true;
         }
         if (is_selected) {
           ImGui::SetItemDefaultFocus();
@@ -477,7 +477,7 @@ void MainUI::DrawOptimizationPanel() {
     opt_update |=
         ImGui::InputInt("Population", (int*)&opt_settings.population, 1000);
 
-    cost_update = ImGui::InputDouble("Floor", &cost_settings.floor, 0.001);
+    cost_update |= ImGui::InputDouble("Floor", &cost_settings.floor, 0.001);
     cost_update |= ImGui::InputInt(
         "Finger Subdivision", (int*)&cost_settings.n_finger_steps, 1);
     cost_update |= ImGui::InputInt(
@@ -659,17 +659,23 @@ void MainUI::DrawDebugPanel() {
     if (ImGui::Button("Debug Gradient", ImVec2(w, 0))) {
       DebugGradient(vm_.PSG());
     }
+    if (ImGui::Button("Debug Cost", ImVec2(w, 0))) {
+      Debugger debugger;
+      DebugCost(vm_.PSG(), debugger);
+      VisualizeDebugger(debugger);
+    }
     if (ImGui::Button("Compute Init Params", ImVec2(w, 0))) {
       vm_.ComputeInitParams();
     }
     if (ImGui::Button("Adaptive Subdivide Trajectory", ImVec2(w, 0))) {
       std::vector<std::vector<Eigen::MatrixXd>> t_fingers;
       Trajectory trajectory;
+      std::vector<std::pair<int, double>> contrib;
       AdaptiveSubdivideTrajectory(vm_.PSG().GetTrajectory(),
                                   vm_.PSG().GetFingers(),
                                   0.001,
                                   trajectory,
-                                  t_fingers);
+                                  t_fingers, contrib);
       std::cerr << "New Trajectory: " << trajectory.size() << std::endl;
       vm_.PSG().SetTrajectory(trajectory);
     }

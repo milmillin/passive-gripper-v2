@@ -13,9 +13,7 @@ namespace core {
 
 using namespace models;
 
-void TransformFingers(const std::vector<Eigen::MatrixXd>& fingers,
-                      const Eigen::Affine3d& trans,
-                      std::vector<Eigen::MatrixXd>& out_fingers);
+Fingers TransformFingers(const Fingers& fingers, const Eigen::Affine3d& trans);
 
 inline auto TransformMatrix(const Eigen::MatrixXd& mat,
                             const Eigen::Affine3d& trans) {
@@ -24,10 +22,11 @@ inline auto TransformMatrix(const Eigen::MatrixXd& mat,
 
 void AdaptiveSubdivideTrajectory(
     const Trajectory& trajectory,
-    const std::vector<Eigen::MatrixXd>& fingers,
+    const Fingers& fingers,
     double flatness,
     Trajectory& out_trajectory,
-    std::vector<std::vector<Eigen::MatrixXd>>& out_t_fingers);
+    std::vector<Fingers>& out_t_fingers,
+    std::vector<std::pair<int, double>>& out_traj_contrib);
 
 bool Remesh(const Eigen::MatrixXd& V,
             const Eigen::MatrixXi& F,
@@ -122,10 +121,10 @@ void CreateCylinderXY(const Eigen::Vector3d& o,
                       Eigen::MatrixXi& out_F);
 
 // Merge all disjoint sub-meshes in the mesh if they overlap
-void MergeMesh(const Eigen::MatrixXd &V,
-               const Eigen::MatrixXi &F,
-               Eigen::MatrixXd &out_V,
-               Eigen::MatrixXi &out_F);
+void MergeMesh(const Eigen::MatrixXd& V,
+               const Eigen::MatrixXi& F,
+               Eigen::MatrixXd& out_V,
+               Eigen::MatrixXi& out_F);
 
 // clang-format off
 // Inline mesh of a cube
