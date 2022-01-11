@@ -376,7 +376,7 @@ double ComputeCost1(const GripperParams& params,
   std::vector<bool> traj_skip(n_trajectory - 1, false);
   std::vector<size_t> traj_subs(n_trajectory - 1, 0);
 
-// #pragma omp parallel for
+  // #pragma omp parallel for
   for (long long i = 0; i < n_trajectory - 1; i++) {
     double max_deviation = 0;
     bool intersects = false;
@@ -401,8 +401,8 @@ double ComputeCost1(const GripperParams& params,
         for (size_t k = 1; k < new_fingers[i][j].rows(); k++) {
           debugger->AddEdge(new_fingers[i][j].row(k - 1),
                             new_fingers[i][j].row(k),
-                            colors::kOrange);                  
-        }      
+                            colors::kOrange);
+        }
       }
     }
 
@@ -417,7 +417,7 @@ double ComputeCost1(const GripperParams& params,
   }
   std::cout << std::endl;
   for (size_t i = 0; i < traj_skip.size(); i++) {
-    std::cout << traj_subs[i] << " ";  
+    std::cout << traj_subs[i] << " ";
   }
   std::cout << std::endl;
 
@@ -475,8 +475,8 @@ double ComputeCost1(const GripperParams& params,
     }
   }
 
-  std::cout << "dfinger: " << d_fingers.size() << ", traj_data: " << traj_data.size()
-            << std::endl;
+  std::cout << "dfinger: " << d_fingers.size()
+            << ", traj_data: " << traj_data.size() << std::endl;
 
   const size_t n_fingers = params.fingers.size();
   const size_t n_joints = settings.finger.n_finger_joints;
@@ -620,23 +620,20 @@ double MinDistance(const GripperParams& params,
     size_t iters = cur_sub;
     if (i == n_trajectory - 2) iters++;
 
-#pragma omp parallel
-    {
-      double t_min = 0;
-      Eigen::RowVector3d ds_dp;  // unused
-
-      for (size_t j = 0; j < iters; j++) {
-        double t = (double)j / cur_sub;
-        Pose pose = new_trajectory[i] * (1. - t) + new_trajectory[i + 1] * t;
-        auto f = TransformMatrix(D_fingers, robots::Forward(pose));
-#pragma omp for
+    for (size_t j = 0; j < iters; j++) {
+      double t = (double)j / cur_sub;
+      Pose pose = new_trajectory[i] * (1. - t) + new_trajectory[i + 1] * t;
+      Eigen::MatrixXd f = TransformMatrix(D_fingers, robots::Forward(pose));
+// #pragma omp parallel
+      {
+        double t_min = 0;
+        Eigen::RowVector3d ds_dp;  // unused// #pragma omp for nowait
         for (long long k = 0; k < f.rows(); k++) {
           t_min = std::min(t_min, GetDist(f.row(k), settings.cost, mdr, ds_dp));
         }
+// #pragma omp critical
+        min_dist = std::min(min_dist, t_min);
       }
-
-#pragma omp critical
-      min_dist = std::min(min_dist, t_min);
     }
   }
   return min_dist;
@@ -707,7 +704,7 @@ double ComputeCost_SP(const GripperParams& params,
   std::vector<bool> traj_skip(n_trajectory - 1, false);
   std::vector<size_t> traj_subs(n_trajectory - 1, 0);
 
-#pragma omp parallel for
+  // #pragma omp parallel for
   for (long long i = 0; i < n_trajectory - 1; i++) {
     double max_deviation = 0;
     bool intersects = false;
