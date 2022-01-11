@@ -5,6 +5,8 @@
 #include <igl/writeSTL.h>
 #include <iostream>
 
+#include <igl/marching_cubes.h>
+#include <igl/voxel_grid.h>
 #include "../core/CostFunctions.h"
 #include "../core/Debug.h"
 #include "../core/GeometryUtils.h"
@@ -273,8 +275,8 @@ void MainUI::DrawContactPointPanel() {
     ImGui::InputInt("# Candidates", (int*)&cp_num_candidates, 1000);
     ImGui::InputInt("# Seeds", (int*)&cp_num_seeds, 1000);
     if (ImGui::Button("Generate Candidates", ImVec2(w, 0))) {
-      contact_point_candidates_ =
-          InitializeContactPoints(vm_.PSG(), cp_filter, cp_num_candidates, cp_num_seeds);
+      contact_point_candidates_ = InitializeContactPoints(
+          vm_.PSG(), cp_filter, cp_num_candidates, cp_num_seeds);
     }
     ImGui::Separator();
     size_t k = std::min((size_t)10, contact_point_candidates_.size());
@@ -450,6 +452,20 @@ void MainUI::DrawOptimizationPanel() {
         bool is_selected = (opt_settings.algorithm == i);
         if (ImGui::Selectable(labels::kAlgorithms[i], is_selected)) {
           opt_settings.algorithm = (nlopt_algorithm)i;
+          opt_update = true;
+        }
+        if (is_selected) {
+          ImGui::SetItemDefaultFocus();
+        }
+      }
+      ImGui::EndCombo();
+    }
+    if (ImGui::BeginCombo("Cost Function",
+                          kCostFunctions[(int)opt_settings.cost_function].name)) {
+      for (int i = 0; i < 2; i++) {
+        bool is_selected = (opt_settings.algorithm == i);
+        if (ImGui::Selectable(kCostFunctions[i].name, is_selected)) {
+          opt_settings.cost_function = (CostFunctionEnum)i;
           opt_update = true;
         }
         if (is_selected) {
@@ -657,13 +673,43 @@ void MainUI::DrawDebugPanel() {
       std::cerr << "New Trajectory: " << trajectory.size() << std::endl;
       vm_.PSG().SetTrajectory(trajectory);
     }
+    if (ImGui::Button("Debug Expand Mesh", ImVec2(w, 0))) {
+      Eigen::RowVector3d p_min = vm_.PSG().GetMDR().minimum.array() - 0.004;
+      Eigen::RowVector3d p_max = vm_.PSG().GetMDR().maximum.array() + 0.004;
+      Eigen::MatrixXd GV;
+      Eigen::RowVector3i res;
+      int s = ceil((p_max - p_min).maxCoeff() / 0.001) + 8;
+      igl::voxel_grid(Eigen::AlignedBox3d(p_min, p_max), s, 4, GV, res);
+      Eigen::VectorXd S(GV.rows());
+#pragma omp parallel for
+      for (long long i = 0; i < GV.rows(); i++) {
+        double s_;
+        Eigen::RowVector3d c_;
+        S(i) = vm_.PSG().GetMDR().ComputeSignedDistance(GV.row(i), c_, s_);
+      }
+      Eigen::MatrixXd mc_V;
+      Eigen::MatrixXi mc_F;
+      igl::marching_cubes(S, GV, res(0), res(1), res(2), 0.002, mc_V, mc_F);
+      Eigen::MatrixXd RV;
+      Eigen::MatrixXi RF;
+      if (!Remesh(mc_V, mc_F, 5, RV, RF)) {
+        std::cerr << "Remesh failed! Defaulted to using original mesh"
+                  << std::endl;
+      }
+      std::cerr << "Remesh: V: " << RV.rows() << std::endl;
+      auto& layer = GetLayer(Layer::kDebug);
+      layer.clear();
+      layer.set_mesh(RV, RF);
+    }
     if (ImGui::Button("Debug SP Cost", ImVec2(w, 0))) {
       Debugger debugger;
       MeshDependentResource mdr;
-      ComputeCost3(vm_.PSG().GetParams(),
-                   vm_.PSG().GetSettings(),
-                   vm_.PSG().GetRemeshedMDR(),
-                   &debugger);
+      GripperParams dCost_dParam;
+      ComputeCost_SP(vm_.PSG().GetParams(),
+                     vm_.PSG().GetSettings(),
+                     vm_.PSG().GetRemeshedMDR(),
+                     dCost_dParam,
+                     &debugger);
       VisualizeDebugger(debugger);
     }
     if (ImGui::Button("Debug CP Seeds", ImVec2(w, 0))) {
@@ -675,6 +721,7 @@ void MainUI::DrawDebugPanel() {
         P.row(i) = X[i];
       }
       auto& layer = GetLayer(Layer::kDebug);
+      layer.clear();
       layer.set_points(P, colors::kBlue);
       layer.point_size = 5;
     }
@@ -1370,6 +1417,7 @@ void MainUI::VisualizeDebugger(const Debugger& debugger) {
   Eigen::MatrixXi E;
   Eigen::MatrixXd C;
   debugger.Get(P, E, C);
+  layer.clear();
   layer.set_edges(P, E, C);
   layer.show_lines = true;
   layer.line_width = 5;

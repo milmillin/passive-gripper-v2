@@ -22,17 +22,19 @@ double EvalAt(const Eigen::Vector3d& p,
 double ComputeCost(const GripperParams& params,
                    const GripperSettings& settings,
                    const MeshDependentResource& mdr,
-                   GripperParams& out_dCost_dParam);
+                   GripperParams& out_dCost_dParam,
+                   Debugger* const debugger);
 
 double ComputeCost2(const GripperParams& params,
                     const GripperSettings& settings,
                     const MeshDependentResource& remeshed_mdr,
-                    Debugger *const debugger);
-
-double ComputeCost3(const GripperParams& params,
-                    const GripperSettings& settings,
-                    const MeshDependentResource& remeshed_mdr,
                     Debugger* const debugger);
+
+double ComputeCost_SP(const GripperParams& params,
+                      const GripperSettings& settings,
+                      const MeshDependentResource& remeshed_mdr,
+                      GripperParams& out_dCost_dParam, /* unused*/
+                      Debugger* const debugger);
 
 double MinDistanceAtPose(const std::vector<Eigen::MatrixXd>& fingers,
                          const Eigen::Affine3d& finger_trans_inv,
@@ -47,6 +49,26 @@ double MinDistance(const GripperParams& params,
 bool Intersects(const GripperParams& params,
                 const GripperSettings& settings,
                 const MeshDependentResource& mdr);
+
+typedef double (*CostFunction)(const GripperParams&,
+                               const GripperSettings&,
+                               const MeshDependentResource&,
+                               GripperParams&,
+                               Debugger* const);
+
+struct CostFunctionItem {
+  const char* name;
+  CostFunction cost_function;
+  CostFunctionEnum cost_enum;
+  bool has_grad;
+};
+
+const CostFunctionItem const kCostFunctions[] = {
+    CostFunctionItem{"Gradient-Based",
+                     &ComputeCost,
+                     CostFunctionEnum::kGradientBased,
+                     true},
+    CostFunctionItem{"SP", &ComputeCost_SP, CostFunctionEnum::kSP, false}};
 
 }  // namespace core
 }  // namespace psg

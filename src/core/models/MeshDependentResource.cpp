@@ -6,9 +6,9 @@
 #include <igl/per_edge_normals.h>
 #include <igl/per_face_normals.h>
 #include <igl/per_vertex_normals.h>
+#include <igl/principal_curvature.h>
 #include <igl/signed_distance.h>
 #include "../GeometryUtils.h"
-#include <igl/principal_curvature.h>
 
 namespace psg {
 namespace core {
@@ -109,7 +109,8 @@ void MeshDependentResource::init_curvature() const {
   std::lock_guard<std::mutex> lock(curvature_mutex_);
   if (curvature_valid_) return;
 
-  // https://github.com/libigl/libigl/blob/main/tutorial/202_GaussianCurvature/main.cpp
+  //
+https://github.com/libigl/libigl/blob/main/tutorial/202_GaussianCurvature/main.cpp
   /*
   Eigen::VectorXd K;
   // Compute integral of Gaussian curvature
@@ -242,6 +243,19 @@ double MeshDependentResource::ComputeRequiredDistance(
     }
   }
   return totalDis;
+}
+
+static bool TreeIntersectsImpl(const igl::AABB<Eigen::MatrixXd, 3>* tree,
+                               const Eigen::AlignedBox3d& box) {
+  bool intersects = tree->m_box.intersects(box);
+  if (!intersects) return false;
+  if (tree->is_leaf()) return intersects;
+  return TreeIntersectsImpl(tree->m_left, box) ||
+         TreeIntersectsImpl(tree->m_right, box);
+}
+
+bool MeshDependentResource::Intersects(const Eigen::AlignedBox3d& box) const {
+  return TreeIntersectsImpl(&tree, box);
 }
 
 // Getters

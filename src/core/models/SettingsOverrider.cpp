@@ -6,8 +6,8 @@
 #include <string>
 #include <vector>
 
-#include "../PassiveGripper.h"
 #include "../../utils.h"
+#include "../PassiveGripper.h"
 
 namespace psg {
 namespace core {
@@ -33,6 +33,23 @@ void SettingsOverrider::Load(std::string fn) {
   }
 }
 
+std::vector<std::string> Split(const std::string& s, char del = ';') {
+  std::vector<std::string> result;
+  std::string tmp = "";
+
+  for (char c : s) {
+    if (c == del) {
+      result.push_back(tmp);
+      tmp.clear();
+    } else {
+      tmp.push_back(c);    
+    }
+  }
+  result.push_back(tmp);
+
+  return result;
+}
+
 void SettingsOverrider::Apply(psg::core::PassiveGripper& psg) const {
   bool tmp_reinit_fingers = psg.reinit_fingers;
   bool tmp_reinit_trajectory = psg.reinit_trajectory;
@@ -48,40 +65,65 @@ void SettingsOverrider::Apply(psg::core::PassiveGripper& psg) const {
   bool cost_settings_changed = false;
   bool contact_settings_changed = false;
 
-  for (const auto& kv : mp) {
-    if (kv.first == "algorithm") {
-      opt_settings.algorithm = (nlopt_algorithm)std::stoi(kv.second);
-      opt_changed = true;
-    } else if (kv.first == "tolerance") {
-      opt_settings.tolerance = std::stod(kv.second);
-      opt_changed = true;
-    } else if (kv.first == "population") {
-      opt_settings.population = std::stoull(kv.second);
-      opt_changed = true;
-    } else if (kv.first == "max_runtime") {
-      opt_settings.max_runtime = std::stod(kv.second);
-      opt_changed = true;
-    } else if (kv.first == "max_iters") {
-      opt_settings.max_iters = std::stoull(kv.second);
-      opt_changed = true;
-    } else if (kv.first == "vol_frac") {
-      topo_opt_settings.vol_frac = std::stod(kv.second);
-      topo_opt_changed = true;
-    } else if (kv.first == "topo_res") {
-      topo_opt_settings.topo_res = std::stod(kv.second);
-      topo_opt_changed = true;
-    } else if (kv.first == "neg_vol_res") {
-      topo_opt_settings.neg_vol_res = std::stod(kv.second);
-      topo_opt_changed = true;
-    } else if (kv.first == "cost.floor") {
-      cost_settings.floor = std::stod(kv.second);
-      cost_settings_changed = true;
-    } else if (kv.first == "contact.floor") {
-      contact_settings.floor = std::stod(kv.second);
-      contact_settings_changed = true;
+  auto Contains = [this](const std::string& key, std::string& out_val) -> bool {
+    auto it = mp.find(key);
+    if (it == mp.end()) return false;
+    out_val = it->second;
+    return true;
+  };
+
+  std::string value;
+  if (Contains("algorithm", value)) {
+    opt_settings.algorithm = (nlopt_algorithm)std::stoi(value);
+    opt_changed = true;
+  }
+  if (Contains("tolerance", value)) {
+    opt_settings.tolerance = (nlopt_algorithm)std::stoi(value);
+    opt_changed = true;
+  }
+  if (Contains("population", value)) {
+    opt_settings.population = std::stoull(value);
+    opt_changed = true;
+  }
+  if (Contains("max_runtime", value)) {
+    opt_settings.max_runtime = std::stod(value);
+    opt_changed = true;
+  }
+  if (Contains("max_iters", value)) {
+    opt_settings.max_iters = std::stoull(value);
+    opt_changed = true;
+  }
+  if (Contains("trajectory_wiggle", value)) {
+    auto vec = Split(value);
+    if (vec.size() != kNumDOFs) {
+      Error() << "trajectory_wiggle does not contain " << kNumDOFs
+              << " elements" << std::endl;
     } else {
-      Error() << "Unknown settings: " << kv.first << std::endl;    
+      for (size_t i = 0; i < kNumDOFs; i++) {
+        opt_settings.trajectory_wiggle(i) = kDegToRad * std::stod(vec[i]);      
+      }    
+      opt_changed = true;
     }
+  }
+  if (Contains("vol_frac", value)) {
+    topo_opt_settings.vol_frac = std::stod(value);
+    topo_opt_changed = true;
+  }
+  if (Contains("topo_res", value)) {
+    topo_opt_settings.topo_res = std::stod(value);
+    topo_opt_changed = true;
+  }
+  if (Contains("neg_vol_res", value)) {
+    topo_opt_settings.neg_vol_res = std::stod(value);
+    topo_opt_changed = true;
+  }
+  if (Contains("cost.floor", value)) {
+    cost_settings.floor = std::stod(value);
+    cost_settings_changed = true;
+  }
+  if (Contains("contact.floor", value)) {
+    contact_settings.floor = std::stod(value);
+    contact_settings_changed = true;
   }
 
   if (opt_changed) psg.SetOptSettings(opt_settings);
