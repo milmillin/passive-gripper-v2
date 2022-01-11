@@ -63,7 +63,7 @@ struct CostFunctionItem {
   bool has_grad;
 };
 
-const CostFunctionItem const kCostFunctions[] = {
+const CostFunctionItem kCostFunctions[] = {
     CostFunctionItem{"Gradient-Based",
                      &ComputeCost,
                      CostFunctionEnum::kGradientBased,
