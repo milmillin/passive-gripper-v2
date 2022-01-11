@@ -631,6 +631,7 @@ double ComputeCost3(const GripperParams& params,
 
   double traj_max = 0;
   for (size_t i = 0; i < n_trajectory - 1; i++) {
+    if (traj_skip[i]) continue;
     size_t cur_sub = traj_subs[i];
     size_t iters = cur_sub;
     if (i == n_trajectory - 2) iters++;
@@ -707,7 +708,7 @@ bool Intersects(const GripperParams& params,
   const size_t nFingerJoints = settings.finger.n_finger_joints;
   const size_t nFrames = (nKeyframes - 1) * nTrajectorySteps + 1;
 
-  if (params.trajectory.size() <= 1llu) return false;
+  if (params.fingers.size() == 0 || params.trajectory.size() <= 1llu) return false;
 
   std::vector<Eigen::MatrixXd> sv_V(
       nFingers, Eigen::MatrixXd(nFingerJoints * nFrames, 3));
