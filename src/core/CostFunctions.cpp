@@ -615,7 +615,7 @@ double MinDistance(const GripperParams& params,
                        .maxCoeff();
       max_deviation = std::max(max_deviation, dev);
     }
-    size_t cur_sub = std::ceil(max_deviation / precision);
+    size_t cur_sub = std::max<size_t>(std::ceil(max_deviation / precision), 1);
 
     size_t iters = cur_sub;
     if (i == n_trajectory - 2) iters++;
@@ -624,14 +624,15 @@ double MinDistance(const GripperParams& params,
       double t = (double)j / cur_sub;
       Pose pose = new_trajectory[i] * (1. - t) + new_trajectory[i + 1] * t;
       Eigen::MatrixXd f = TransformMatrix(D_fingers, robots::Forward(pose));
-// #pragma omp parallel
+#pragma omp parallel
       {
         double t_min = 0;
-        Eigen::RowVector3d ds_dp;  // unused// #pragma omp for nowait
+        Eigen::RowVector3d ds_dp;  // unused#pragma omp for nowait
         for (long long k = 0; k < f.rows(); k++) {
           t_min = std::min(t_min, GetDist(f.row(k), settings.cost, mdr, ds_dp));
+
         }
-// #pragma omp critical
+#pragma omp critical
         min_dist = std::min(min_dist, t_min);
       }
     }
