@@ -460,6 +460,20 @@ void MainUI::DrawOptimizationPanel() {
       }
       ImGui::EndCombo();
     }
+    if (ImGui::BeginCombo("Cost Function",
+                          kCostFunctions[(int)opt_settings.cost_function].name)) {
+      for (int i = 0; i < 2; i++) {
+        bool is_selected = (opt_settings.algorithm == i);
+        if (ImGui::Selectable(kCostFunctions[i].name, is_selected)) {
+          opt_settings.cost_function = (CostFunctionEnum)i;
+          opt_update = true;
+        }
+        if (is_selected) {
+          ImGui::SetItemDefaultFocus();
+        }
+      }
+      ImGui::EndCombo();
+    }
     opt_update |=
         ImGui::InputInt("Population", (int*)&opt_settings.population, 1000);
 
@@ -690,10 +704,12 @@ void MainUI::DrawDebugPanel() {
     if (ImGui::Button("Debug SP Cost", ImVec2(w, 0))) {
       Debugger debugger;
       MeshDependentResource mdr;
-      ComputeCost3(vm_.PSG().GetParams(),
-                   vm_.PSG().GetSettings(),
-                   vm_.PSG().GetRemeshedMDR(),
-                   &debugger);
+      GripperParams dCost_dParam;
+      ComputeCost_SP(vm_.PSG().GetParams(),
+                     vm_.PSG().GetSettings(),
+                     vm_.PSG().GetRemeshedMDR(),
+                     dCost_dParam,
+                     &debugger);
       VisualizeDebugger(debugger);
     }
     if (ImGui::Button("Debug CP Seeds", ImVec2(w, 0))) {

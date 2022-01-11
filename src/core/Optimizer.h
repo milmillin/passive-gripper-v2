@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "PassiveGripper.h"
+#include "CostFunctions.h"
 
 namespace psg {
 namespace core {
@@ -65,6 +66,8 @@ class Optimizer {
   mutable std::mutex g_min_x_mutex_;
 
   std::chrono::time_point<std::chrono::high_resolution_clock> start_time_;
+
+  CostFunctionItem cost_function_;
 };
 
 }  // namespace core

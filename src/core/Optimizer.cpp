@@ -1,7 +1,5 @@
 #include "Optimizer.h"
 
-#include "CostFunctions.h"
-
 namespace psg {
 namespace core {
 
@@ -95,6 +93,9 @@ void Optimizer::Optimize(const PassiveGripper& psg) {
   const auto& mdr = psg.GetRemeshedMDR();
   mdr_.init(mdr);
   settings_ = psg.GetSettings();
+
+  cost_function_ = kCostFunctions[(int)settings_.opt.cost_function];
+
   dimension_ = MyFlattenSize(params_);
   x_.reset(new double[dimension_]);
   lb_.reset(new double[dimension_]);
@@ -180,14 +181,17 @@ double Optimizer::ComputeCostInternal(unsigned n,
                                       const double* x,
                                       double* grad) {
   MyUnflatten(params_, x);
-  // GripperParams dCost_dParam;
-  double cost = ComputeCost3(params_, settings_, mdr_, nullptr);
+  GripperParams dCost_dParam;
+  double cost = cost_function_.cost_function(
+      params_, settings_, mdr_, dCost_dParam, nullptr);
   if (grad != nullptr) {
-    // MyFlattenGrad(dCost_dParam, grad);
-    // for (unsigned i = 0; i < n; i++) {
-    // std::cout << grad[i] << "\n";
-    // }
-    // std::cout << "-----" << std::endl;
+    if (cost_function_.has_grad) {
+      MyFlattenGrad(dCost_dParam, grad);
+    } else if (n_iters_ == 0) {
+      std::cerr << "Error: Using gradient-based optimizer on a non-gradient "
+                   "cost function"
+                << std::endl;
+    }
   }
   n_iters_++;
   if (cost < t_min_cost_) {

@@ -87,7 +87,8 @@ double ComputeDuration(const Pose& p1,
 double ComputeCost(const GripperParams& params,
                    const GripperSettings& settings,
                    const MeshDependentResource& mdr,
-                   GripperParams& out_dCost_dParam) {
+                   GripperParams& out_dCost_dParam,
+                   Debugger* const debugger) {
   const size_t nTrajectorySteps = settings.cost.n_trajectory_steps;
   const long long nFingerSteps = settings.cost.n_finger_steps;
   const double angVelocity = settings.cost.ang_velocity;
@@ -555,10 +556,11 @@ double ComputeCost2(const GripperParams& params,
   return totalCost + t_totalCost;
 }
 
-double ComputeCost3(const GripperParams& params,
-                    const GripperSettings& settings,
-                    const MeshDependentResource& remeshed_mdr,
-                    Debugger* const debugger) {
+double ComputeCost_SP(const GripperParams& params,
+                      const GripperSettings& settings,
+                      const MeshDependentResource& remeshed_mdr,
+                      GripperParams& out_dCost_dParam,
+                      Debugger* const debugger) {
   constexpr double precision = 0.001;  // 1mm
 
   struct _SubInfo {
@@ -708,7 +710,8 @@ bool Intersects(const GripperParams& params,
   const size_t nFingerJoints = settings.finger.n_finger_joints;
   const size_t nFrames = (nKeyframes - 1) * nTrajectorySteps + 1;
 
-  if (params.fingers.size() == 0 || params.trajectory.size() <= 1llu) return false;
+  if (params.fingers.size() == 0 || params.trajectory.size() <= 1llu)
+    return false;
 
   std::vector<Eigen::MatrixXd> sv_V(
       nFingers, Eigen::MatrixXd(nFingerJoints * nFrames, 3));

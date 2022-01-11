@@ -173,6 +173,8 @@ const char* const kAlgorithms[] = {
     "NLOPT_GN_AGS"};
 }
 
+enum class CostFunctionEnum : int { kGradientBased = 0, kSP = 1 };
+
 namespace colors {
 const Eigen::RowVector3d kPurple = Eigen::RowVector3d(219, 76, 178) / 255;
 const Eigen::RowVector3d kOrange = Eigen::RowVector3d(239, 126, 50) / 255;

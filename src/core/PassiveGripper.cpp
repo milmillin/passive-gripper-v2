@@ -2,13 +2,13 @@
 
 #include <igl/copyleft/cgal/mesh_boolean.h>
 
+#include <igl/marching_cubes.h>
+#include <igl/voxel_grid.h>
 #include "CostFunctions.h"
 #include "GeometryUtils.h"
 #include "Initialization.h"
 #include "QualityMetric.h"
 #include "robots/Robots.h"
-#include <igl/voxel_grid.h>
-#include <igl/marching_cubes.h>
 
 namespace psg {
 namespace core {
@@ -410,7 +410,8 @@ void PassiveGripper::InvalidateQuality() {
 
 void PassiveGripper::InvalidateCost() {
   cost_changed_ = false;
-  cost_ = ComputeCost3(params_, settings_, mdr_remeshed_, nullptr);
+  cost_ = kCostFunctions[(int)settings_.opt.cost_function].cost_function(
+      params_, settings_, mdr_remeshed_, dCost_dParam_, nullptr);
   min_dist_ = MinDistance(params_, settings_, mdr_remeshed_);
   // intersecting_ = Intersects(params_, settings_, mdr_); // TODO: Fails with
   // duplicate trajectory
