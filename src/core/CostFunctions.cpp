@@ -618,7 +618,7 @@ double ComputeCost_SP(const GripperParams& params,
           new_fingers[i][j].colwise().minCoeff().cwiseMin(
               new_fingers[i + 1][j].colwise().minCoeff());
       Eigen::RowVector3d p_max =
-          new_fingers[i][j].colwise().maxCoeff().cwiseMin(
+          new_fingers[i][j].colwise().maxCoeff().cwiseMax(
               new_fingers[i + 1][j].colwise().maxCoeff());
       p_min.array() -= precision;
       p_max.array() += precision;
