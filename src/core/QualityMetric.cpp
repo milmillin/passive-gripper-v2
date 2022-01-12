@@ -226,11 +226,11 @@ static real lossFn(const std::vector<Vector3real>& positions,
   real loss = 0;
   for (size_t i = 0; i < n; i++) {
     Vector3real v = trans + rot.cross(positions[i] - center);
-    real x = std::max<real>(maxCos - v.normalized().dot(normals[i]), 0);
-    real y = std::max<real>(0.001 - v.norm(), 0);
-    loss += x * x + y * y;
-    // loss += std::max<real>(maxCos - v.dot(normals[i]), 0) +
-    // std::max<real>(v.norm() - maxV, 0);
+    // real x = std::max<real>(maxCos - v.normalized().dot(normals[i]), 0);
+    // real y = std::max<real>(0.001 - v.norm(), 0);
+    // loss += x * x + y * y;
+    loss += std::max<real>(maxCos - v.dot(normals[i]), 0) +
+    std::max<real>(v.norm() - maxV, 0);
   }
   return loss;
 }

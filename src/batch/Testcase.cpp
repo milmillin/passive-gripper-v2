@@ -50,6 +50,18 @@ void ProcessFrom(std::string raw_fn,
   Log() << "> Loaded " << psg_fn << std::endl;
 
   stgo.Apply(psg);
+
+  try {
+    psg::core::models::SettingsOverrider stgo;
+    std::string stgo_fn = raw_fn + ".stgo";
+    stgo.Load(stgo_fn);
+    stgo.Apply(psg);
+    Log() << "> Loaded " << stgo_fn << std::endl;
+  } catch (std::invalid_argument const&) {
+    ;  // Doesn't contain override file
+  }
+
+
   psg::core::Optimizer optimizer;
 
   Log() << psg.GetOptSettings() << std::endl;

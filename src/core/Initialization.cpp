@@ -425,7 +425,7 @@ std::vector<ContactPointMetric> InitializeContactPoints(
 
         // Check tolerance
         neighbors.push_back(
-            neighborInfo.GetNeighbors(contactPoints[i], mdr.V, mdr.F, 0.01));
+            neighborInfo.GetNeighbors(contactPoints[i], mdr.V, mdr.F, 0.001));
       }
 
       // Check Feasibility: Minimum Wrench
@@ -433,7 +433,7 @@ std::vector<ContactPointMetric> InitializeContactPoints(
       std::vector<ContactPoint> contact_cones;
       double partialMinWrench = 0;
       int sample;
-      for (sample = 0; sample < 20; sample++) {
+      for (sample = 0; sample < 1; sample++) {
         std::vector<ContactPoint> sample_contact_cones;
         sample_contact_cones.reserve(3 * settings.cone_res);
         for (size_t i = 0; i < 3; i++) {
@@ -478,14 +478,12 @@ std::vector<ContactPointMetric> InitializeContactPoints(
 
       // Check Feasiblity: Approach Direction
       Eigen::Affine3d trans;
-      // if (!CheckApproachDirection(
-      // contactPoints, kPi / 2 * 8 / 9, 1, 0.1, 1e-12, 100, trans)) {
-      // continue;
-      // }
-      if (!CheckApproachDirection2(
-              contactPoints, 0.01, kDegToRad * 80, mdr.center_of_mass, trans)) {
+      if (!CheckApproachDirection(
+              contactPoints, kPi / 2 * 8 / 9, 1, 0.01, 1e-12, 500, trans)) {
+        // std::cout << "Failed due to approach direction" << std::endl;
         continue;
       }
+      // std::cout << "Success" << std::endl;
       double minWrench = ComputeMinWrenchQP(contact_cones, mdr.center_of_mass);
 
       ContactPointMetric candidate;
@@ -514,7 +512,7 @@ std::vector<ContactPointMetric> InitializeContactPoints(
             prelim.end(),
             [](const ContactPointMetric& a, const ContactPointMetric& b) {
               if (a.finger_distance == b.finger_distance)
-                return a.partial_min_wrench < b.partial_min_wrench;
+                return a.partial_min_wrench > b.partial_min_wrench;
               return a.finger_distance < b.finger_distance;
             });
 
