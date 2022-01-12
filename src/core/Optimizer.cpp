@@ -90,6 +90,7 @@ void Optimizer::Optimize(const PassiveGripper& psg) {
   Cancel();
   params_ = psg.GetParams();
   params_proto_ = psg.GetParams();
+  init_params_ = psg.GetParams();
   const auto& mdr = psg.GetRemeshedMDR();
   mdr_.init(mdr);
   settings_ = psg.GetSettings();
@@ -132,7 +133,6 @@ void Optimizer::Optimize(const PassiveGripper& psg) {
   optimize_future_ = std::async(std::launch::async, [&] {
     double minf; /* minimum objective value, upon return */
     nlopt_result result = nlopt_optimize(opt_, x_.get(), &minf);
-    MyUnflatten(params_, x_.get());
     is_running_ = false;
     return result;
   });
@@ -146,7 +146,6 @@ void Optimizer::Resume() {
   optimize_future_ = std::async(std::launch::async, [&] {
     double minf; /* minimum objective value, upon return */
     nlopt_result result = nlopt_optimize(opt_, x_.get(), &minf);
-    MyUnflatten(params_, x_.get());
     is_running_ = false;
     return result;
   });
@@ -183,7 +182,7 @@ double Optimizer::ComputeCostInternal(unsigned n,
   MyUnflatten(params_, x);
   GripperParams dCost_dParam;
   double cost = cost_function_.cost_function(
-      params_, settings_, mdr_, dCost_dParam, nullptr);
+      params_, init_params_, settings_, mdr_, dCost_dParam, nullptr);
   if (grad != nullptr) {
     if (cost_function_.has_grad) {
       MyFlattenGrad(dCost_dParam, grad);

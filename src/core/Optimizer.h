@@ -47,6 +47,7 @@ class Optimizer {
   int dimension_;
 
   GripperParams params_;
+  GripperParams init_params_;
   GripperParams params_proto_;
   MeshDependentResource mdr_;
   GripperSettings settings_;

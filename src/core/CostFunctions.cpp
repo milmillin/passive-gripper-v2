@@ -85,6 +85,7 @@ double ComputeDuration(const Pose& p1,
 }
 
 double ComputeCost(const GripperParams& params,
+                   const GripperParams& init_params,
                    const GripperSettings& settings,
                    const MeshDependentResource& mdr,
                    GripperParams& out_dCost_dParam,
@@ -310,6 +311,7 @@ double ComputeCost(const GripperParams& params,
 }
 
 double ComputeCost1(const GripperParams& params,
+                    const GripperParams& init_params,
                     const GripperSettings& settings,
                     const MeshDependentResource& mdr,
                     GripperParams& out_dCost_dParam,
@@ -627,10 +629,10 @@ double MinDistance(const GripperParams& params,
 #pragma omp parallel
       {
         double t_min = 0;
-        Eigen::RowVector3d ds_dp;  // unused#pragma omp for nowait
+        Eigen::RowVector3d ds_dp;  // unused
+#pragma omp for nowait
         for (long long k = 0; k < f.rows(); k++) {
           t_min = std::min(t_min, GetDist(f.row(k), settings.cost, mdr, ds_dp));
-
         }
 #pragma omp critical
         min_dist = std::min(min_dist, t_min);
@@ -655,6 +657,7 @@ double ComputeFloorCost(Eigen::RowVector3d p0,
 }
 
 double ComputeCost_SP(const GripperParams& params,
+                      const GripperParams& init_params,
                       const GripperSettings& settings,
                       const MeshDependentResource& remeshed_mdr,
                       GripperParams& out_dCost_dParam,
@@ -795,7 +798,15 @@ double ComputeCost_SP(const GripperParams& params,
     finger_max = std::max(finger_max, t_max);
   }
 
-  return traj_max + finger_max;
+  // L2 regularization term
+  double traj_reg = 0;
+  for (size_t i = 1; i < params.trajectory.size() - 1; i++) {
+    traj_reg += (params.trajectory[i] - init_params.trajectory[i])
+                    .matrix()
+                    .squaredNorm();
+  }
+
+  return traj_max + finger_max + settings.cost.regularization * traj_reg;
 }
 
 bool Intersects(const GripperParams& params,

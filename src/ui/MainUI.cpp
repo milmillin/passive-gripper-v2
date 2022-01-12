@@ -712,6 +712,7 @@ void MainUI::DrawDebugPanel() {
       MeshDependentResource mdr;
       GripperParams dCost_dParam;
       ComputeCost_SP(vm_.PSG().GetParams(),
+                     vm_.PSG().GetParams(),
                      vm_.PSG().GetSettings(),
                      vm_.PSG().GetRemeshedMDR(),
                      dCost_dParam,

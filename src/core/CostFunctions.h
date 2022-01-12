@@ -20,18 +20,21 @@ double EvalAt(const Eigen::Vector3d& p,
               Eigen::RowVector3d& out_dc_dp);
 
 double ComputeCost(const GripperParams& params,
+                   const GripperParams& init_params,
                    const GripperSettings& settings,
                    const MeshDependentResource& mdr,
                    GripperParams& out_dCost_dParam,
                    Debugger* const debugger);
 
 double ComputeCost1(const GripperParams& params,
-                   const GripperSettings& settings,
-                   const MeshDependentResource& mdr,
-                   GripperParams& out_dCost_dParam,
-                   Debugger* const debugger);
+                    const GripperParams& init_params,
+                    const GripperSettings& settings,
+                    const MeshDependentResource& mdr,
+                    GripperParams& out_dCost_dParam,
+                    Debugger* const debugger);
 
 double ComputeCost_SP(const GripperParams& params,
+                      const GripperParams& init_params,
                       const GripperSettings& settings,
                       const MeshDependentResource& remeshed_mdr,
                       GripperParams& out_dCost_dParam, /* unused*/
@@ -46,6 +49,7 @@ bool Intersects(const GripperParams& params,
                 const MeshDependentResource& mdr);
 
 typedef double (*CostFunction)(const GripperParams&,
+                               const GripperParams&,
                                const GripperSettings&,
                                const MeshDependentResource&,
                                GripperParams&,
