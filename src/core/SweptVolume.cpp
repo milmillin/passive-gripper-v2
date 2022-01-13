@@ -47,7 +47,7 @@ static void SweptVolumeImpl(const Eigen::MatrixXd& V,
                             bool flipped,
                             const double eps,
                             const int num_seeds) {
-  const double iso = 0.001;
+  const double iso = 0.0005;
 
   auto sgn = [](double val) -> double {
     return (double)((double(0) < val) - (val < double(0)));
