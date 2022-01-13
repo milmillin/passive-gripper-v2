@@ -141,3 +141,6 @@ target_link_libraries(psg-cp-gen core)
 
 add_executable(psg-psg-gen "src/psg-gen/main.cpp")
 target_link_libraries(psg-psg-gen core igl::core)
+
+add_executable(psg-proc "src/psg-proc/main.cpp")
+target_link_libraries(psg-proc core igl::core)
