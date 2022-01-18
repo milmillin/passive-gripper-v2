@@ -739,6 +739,19 @@ void MainUI::DrawDebugPanel() {
     ImGui::InputDouble(
         "Filter Curvature Radius", &cp_filter.curvature_radius, 0.001);
     MyInputDoubleConvert("Filter Angle", &cp_filter.angle, kRadToDeg, 1);
+    if (ImGui::Button("Dump CSV", ImVec2(w, 0))) {
+      std::string filename = igl::file_dialog_save();
+      if (!filename.empty()) {
+        std::ofstream traj_csv_file(filename);
+        const psg::Trajectory& traj = vm_.PSG().GetTrajectory();
+        for (int i = traj.size() - 1; i >= 0; i--) {
+          for (int j = 0; j < psg::kNumDOFs; j++) {
+            traj_csv_file << std::setprecision(15) << traj[i](j) << ",";
+          }
+          traj_csv_file << std::endl;
+        }
+      }
+    }
   }
   ImGui::PopID();
 }
