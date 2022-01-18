@@ -18,13 +18,12 @@
 namespace psg {
 namespace core {
 
-std::vector<Eigen::Vector3i> GetForbiddenVoxels(
-    const Eigen::MatrixXd& V,
-    const Eigen::MatrixXi& F,
-    const Eigen::Vector3d& lb,
-    const Eigen::Vector3d& ub,
-    double res,
-    Eigen::Vector3i& out_range) {
+std::vector<Eigen::Vector3i> GetForbiddenVoxels(const Eigen::MatrixXd& V,
+                                                const Eigen::MatrixXi& F,
+                                                const Eigen::Vector3d& lb,
+                                                const Eigen::Vector3d& ub,
+                                                double res,
+                                                Eigen::Vector3i& out_range) {
   // Holes
   std::vector<Eigen::Vector2d> h_centers;
   std::vector<double> h_radius2;
@@ -155,8 +154,8 @@ static Eigen::Vector3i ClosestEmptySpace(
   int d = 0;
   while (true) {
     for (int dx = -d; dx <= d; dx++) {
-      for (int dy = -d; dy < d; dy++) {
-        for (int dz = -d; dz < d; dz++) {
+      for (int dy = -d; dy <= d; dy++) {
+        for (int dz = -d; dz <= d; dz++) {
           Eigen::Vector3i newP = p + Eigen::Vector3i(dx, dy, dz);
           if (!VoxelValid(newP, range)) continue;
           int index = VoxelToElemIndex(newP, range);
@@ -199,7 +198,8 @@ static void WriteToFile(std::string fileName,
 void GenerateTopyConfig(const PassiveGripper& psg,
                         const Eigen::MatrixXd& neg_V,
                         const Eigen::MatrixXi& neg_F,
-                        const std::string& filename) {
+                        const std::string& filename,
+                        Debugger* debugger) {
   Eigen::Vector3d csv_lb;
   Eigen::Vector3d csv_ub;
   InitializeConservativeBound(psg, csv_lb, csv_ub);
@@ -217,6 +217,13 @@ void GenerateTopyConfig(const PassiveGripper& psg,
       GetForbiddenVoxels(neg_V, neg_F, lb, ub, res, range);
   std::vector<int> forbidden_indices =
       ConvertToElemIndices(forbidden_voxels, range);
+
+  if (debugger != nullptr) {
+    for (const auto& v : forbidden_voxels) {
+      debugger->AddCube(NodeToPoint(v, lb, res),
+                        Eigen::Vector3d::Constant(res));
+    }
+  }
 
   std::vector<Eigen::Vector3i> attachment_voxels;
   double radius = psg.GetTopoOptSettings().attachment_size / 2;
@@ -247,6 +254,13 @@ void GenerateTopyConfig(const PassiveGripper& psg,
         PointToVoxel(finger_trans_inv * point.position, lb, res),
         forbidden_indices,
         range));
+    if (debugger != nullptr) {
+      debugger->AddEdge(
+          VoxelToPoint(contact_voxels.back(), lb, res),
+          VoxelToPoint(contact_voxels.back(), lb, res) + 0.02 * point.normal,
+          colors::kRed);    
+      debugger->AddPoint(finger_trans_inv * point.position, colors::kPurple);
+    }
   }
   std::vector<int> contact_indices =
       ConvertToNodeIndices(contact_voxels, range);

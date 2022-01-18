@@ -120,7 +120,7 @@ int main(int argc, char** argv) {
     Eigen::MatrixXd neg_V;
     Eigen::MatrixXi neg_F;
     NegativeSweptVolumePSG(psg, neg_V, neg_F);
-    GenerateTopyConfig(psg, neg_V, neg_F, tpd_out_fn);
+    GenerateTopyConfig(psg, neg_V, neg_F, tpd_out_fn, nullptr);
     Log() << ">> Done: TPD file written to " << tpd_out_fn << std::endl;
   }
 

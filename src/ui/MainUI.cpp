@@ -528,9 +528,11 @@ void MainUI::DrawTopoOptPanel() {
     if (ImGui::Button("Generate Topy Config", ImVec2(w, 0))) {
       std::string filename = igl::file_dialog_save();
       if (!filename.empty()) {
+        Debugger debugger;
         vm_.ComputeNegativeVolume();
         GenerateTopyConfig(
-            vm_.PSG(), vm_.GetNegVolV(), vm_.GetNegVolF(), filename);
+            vm_.PSG(), vm_.GetNegVolV(), vm_.GetNegVolF(), filename, &debugger);
+        VisualizeDebugger(debugger);
       }
     }
     if (ImGui::Button("Load Result Bin", ImVec2(w, 0))) {
@@ -1423,11 +1425,21 @@ void MainUI::VisualizeDebugger(const Debugger& debugger) {
   Eigen::MatrixXd P;
   Eigen::MatrixXi E;
   Eigen::MatrixXd C;
-  debugger.Get(P, E, C);
+  Eigen::MatrixXd V;
+  Eigen::MatrixXi VE;
+  Eigen::MatrixXd PP;
+  Eigen::MatrixXd PC;
+  debugger.GetEdges(P, E, C);
+  debugger.GetMesh(V, VE);
+  debugger.GetPoints(PP, PC);
   layer.clear();
   layer.set_edges(P, E, C);
   layer.show_lines = true;
   layer.line_width = 5;
+  layer.set_mesh(V, VE);
+  layer.face_based = true;
+  layer.set_points(PP, PC);
+  layer.point_size = 9;
 }
 
 inline bool MainUI::IsGuizmoVisible() {
