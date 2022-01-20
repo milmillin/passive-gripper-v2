@@ -248,6 +248,8 @@ void MainUI::DrawContactPointPanel() {
         ImGui::InputInt("Cone Resolution", (int*)&contact_settings.cone_res);
     contact_update |= ImGui::InputDouble(
         "Contact Floor", &contact_settings.floor, 0.001, 0.001);
+    contact_update |= MyInputDoubleConvert(
+        "Max Angle", &contact_settings.max_angle, kRadToDeg, 0.001);
     finger_update |= ImGui::InputInt("Finger Joints",
                                      (int*)&finger_settings.n_finger_joints);
     if (finger_update) vm_.PSG().SetFingerSettings(finger_settings);
@@ -279,7 +281,7 @@ void MainUI::DrawContactPointPanel() {
           vm_.PSG(), cp_filter, cp_num_candidates, cp_num_seeds);
     }
     ImGui::Separator();
-    size_t k = std::min((size_t)10, contact_point_candidates_.size());
+    size_t k = std::min((size_t)30, contact_point_candidates_.size());
     ImGui::PushID("CPC");
     for (size_t i = 0; i < k; i++) {
       ImGui::PushID(std::to_string(i).c_str());
@@ -287,6 +289,7 @@ void MainUI::DrawContactPointPanel() {
         const ContactPointMetric& cp = contact_point_candidates_[i];
         // vm_.PSG().reinit_trajectory = false;
         vm_.PSG().SetContactPoints(cp.contact_points);
+        std::cout << i << "-th candidate selected" << std::endl;
         // vm_.PSG().ClearKeyframe();
 
         // std::vector<Pose> candidates;
@@ -299,7 +302,8 @@ void MainUI::DrawContactPointPanel() {
         // }
       }
       ImGui::SameLine();
-      ImGui::Text("dist: %d mw: %.4e, pmw: %.4e",
+      ImGui::Text("(%d) dist: %d mw: %.4e, pmw: %.4e",
+                  i,
                   contact_point_candidates_[i].finger_distance,
                   contact_point_candidates_[i].min_wrench,
                   contact_point_candidates_[i].partial_min_wrench);
@@ -460,8 +464,9 @@ void MainUI::DrawOptimizationPanel() {
       }
       ImGui::EndCombo();
     }
-    if (ImGui::BeginCombo("Cost Function",
-                          kCostFunctions[(int)cost_settings.cost_function].name)) {
+    if (ImGui::BeginCombo(
+            "Cost Function",
+            kCostFunctions[(int)cost_settings.cost_function].name)) {
       for (int i = 0; i < 2; i++) {
         bool is_selected = ((int)cost_settings.cost_function == i);
         if (ImGui::Selectable(kCostFunctions[i].name, is_selected)) {
@@ -677,7 +682,8 @@ void MainUI::DrawDebugPanel() {
                                   vm_.PSG().GetFingers(),
                                   0.001,
                                   trajectory,
-                                  t_fingers, contrib);
+                                  t_fingers,
+                                  contrib);
       std::cerr << "New Trajectory: " << trajectory.size() << std::endl;
       vm_.PSG().SetTrajectory(trajectory);
     }
