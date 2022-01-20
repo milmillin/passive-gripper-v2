@@ -125,6 +125,10 @@ void SettingsOverrider::Apply(psg::core::PassiveGripper& psg) const {
     contact_settings.floor = std::stod(value);
     contact_settings_changed = true;
   }
+  if (Contains("contact.max_angle", value)) {
+    contact_settings.max_angle = kDegToRad * std::stod(value);
+    contact_settings_changed = true;
+  }
 
   if (opt_changed) psg.SetOptSettings(opt_settings);
   if (topo_opt_changed) psg.SetTopoOptSettings(topo_opt_settings);

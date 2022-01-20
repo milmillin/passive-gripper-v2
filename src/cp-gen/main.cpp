@@ -1,4 +1,5 @@
 #include <omp.h>
+#include <chrono>
 #include <cstring>
 #include <fstream>
 #include <iostream>
@@ -32,9 +33,16 @@ int main(int argc, char** argv) {
   size_t n_candidates = 3000;
   psg::core::models::ContactPointFilter cp_filter_1;
 
+  auto start_time = std::chrono::high_resolution_clock::now();
   auto cps = psg::core::InitializeContactPoints(
       psg, cp_filter_1, n_candidates, n_seeds);
+  auto stop_time = std::chrono::high_resolution_clock::now();
+  long long duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+                           stop_time - start_time)
+                           .count();
+
   Log() << cps.size() << " candidates generated" << std::endl;
+  Log() << "Contact Point Generation took " << duration << " ms." << std::endl;
 
   std::string cp_fn = argv[2];
   std::ofstream cp_f(cp_fn, std::ios::out | std::ios::binary);
@@ -44,5 +52,7 @@ int main(int argc, char** argv) {
   }
   psg::core::serialization::Serialize(cps, cp_f);
   Log() << "Contact point candidate written to: " << cp_fn << std::endl;
+
+  Out() << psg_fn << "," << duration << "," << cps.size() << std::endl;
   return 0;
 }

@@ -9,6 +9,7 @@
 
 #include <autodiff/forward/real.hpp>
 #include <autodiff/forward/real/eigen.hpp>
+#include "../utils.h"
 
 namespace psg {
 namespace core {
@@ -79,8 +80,8 @@ Eigen::MatrixXd InitializeFinger(const ContactPoint contact_point,
   double curDist;
   for (int j = 0; j < 3; j++) {
     int v = mdr.F(fid, j);
-    if ((curDist = (closest_point - mdr.V.row(v)).norm() +
-                   dist[v]) < bestDist) {
+    if ((curDist = (closest_point - mdr.V.row(v)).norm() + dist[v]) <
+        bestDist) {
       bestDist = curDist;
       vid = v;
     }
@@ -327,7 +328,8 @@ void InitializeContactPointSeeds(const PassiveGripper& psg,
       Eigen::RowVector3d c;
       mdr_floor.ComputeClosestPoint(x, c, fid);
       if (abs((x - c).norm() - kExpandMesh) > 5e-4) continue;
-      if (v_par[mdr_floor.F(fid, 0)] == -2) continue; // check one vertex suffice
+      if (v_par[mdr_floor.F(fid, 0)] == -2)
+        continue;  // check one vertex suffice
 
       /*
       // filter angle
@@ -360,7 +362,7 @@ void InitializeContactPointSeeds(const PassiveGripper& psg,
       out_X.push_back(X_.row(i));
     }
   }
-  std::cout << "Num seeds: " << out_X.size() << std::endl;
+  Log() << "Num seeds: " << out_X.size() << std::endl;
 }
 
 std::vector<ContactPointMetric> InitializeContactPoints(
@@ -386,13 +388,13 @@ std::vector<ContactPointMetric> InitializeContactPoints(
   size_t total_iters = 0;
 
   // To be used for tolerance check
-  std::cout << "Building neighbor info" << std::endl;
+  Log() << "Building neighbor info" << std::endl;
   NeighborInfo neighborInfo(mdr.F);
-  std::cout << "Done building neighbor info" << std::endl;
+  Log() << "Done building neighbor info" << std::endl;
 
-  std::cout << "Building distance field" << std::endl;
+  Log() << "Building distance field" << std::endl;
   DiscreteDistanceField distanceField(mdr.V, mdr.F, 50, effector_pos);
-  std::cout << "Done building distance field" << std::endl;
+  Log() << "Done building distance field" << std::endl;
 #pragma omp parallel
   {
     size_t iters = 0;
@@ -479,7 +481,7 @@ std::vector<ContactPointMetric> InitializeContactPoints(
       // Check Feasiblity: Approach Direction
       Eigen::Affine3d trans;
       if (!CheckApproachDirection(
-              contactPoints, kPi / 2 * 8 / 9, 1, 0.01, 1e-12, 500, trans)) {
+              contactPoints, settings.max_angle, 1, 0.01, 1e-12, 500, trans)) {
         // std::cout << "Failed due to approach direction" << std::endl;
         continue;
       }
@@ -497,15 +499,15 @@ std::vector<ContactPointMetric> InitializeContactPoints(
       {
         prelim.push_back(candidate);
         if (prelim.size() % 500 == 0)
-          std::cout << "prelim prog: " << prelim.size() << "/" << num_candidates
-                    << std::endl;
+          Log() << ">> prelim prog: " << prelim.size() << "/" << num_candidates
+                << std::endl;
       }
     }
   }
 
   if (prelim.size() < num_candidates) {
-    std::cout << "low success rate. exit early. got: " << prelim.size()
-              << " expected: " << num_candidates << std::endl;
+    Error() << "low success rate. exit early. got: " << prelim.size()
+            << " expected: " << num_candidates << std::endl;
   }
 
   std::sort(prelim.begin(),
