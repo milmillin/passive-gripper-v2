@@ -3,10 +3,12 @@
 #include <igl/opengl/glfw/imgui/ImGuiMenu.h>
 #include <igl/opengl/glfw/imgui/ImGuizmoPlugin.h>
 
-#include "Layer.h"
-#include "ViewModel.h"
+#include "../core/Debugger.h"
 #include "../core/Optimizer.h"
 #include "../core/models/ContactPointMetric.h"
+#include "../core/models/ContactPointFilter.h"
+#include "Layer.h"
+#include "ViewModel.h"
 
 namespace psg {
 namespace ui {
@@ -68,6 +70,7 @@ class MainUI : public igl::opengl::glfw::imgui::ImGuiMenu {
   // Button Callback
   void OnLoadMeshClicked();
   void OnSaveMeshClicked();
+  void OnMergeMeshClicked();
   void OnLoadPSGClicked();
   void OnSavePSGClicked();
   void OnAlignCameraCenter();
@@ -87,13 +90,18 @@ class MainUI : public igl::opengl::glfw::imgui::ImGuiMenu {
   void OnNegVolInvalidated();
   void OnGripperInvalidated();
   void OnGradientInvalidated();
+  void OnContactFloorInvalidated();
+
+  // Debug
+  void VisualizeDebugger(const Debugger& debugger);
+  ContactPointFilter cp_filter;
 
   // Robot Viz
   bool robot_viz_ = false;
 
   // Contact Point Candidates
   size_t cp_num_seeds = 1000;
-  size_t cp_num_candidates = 10000;
+  size_t cp_num_candidates = 1000;
   std::vector<ContactPointMetric> contact_point_candidates_;
 
   // Keyframe

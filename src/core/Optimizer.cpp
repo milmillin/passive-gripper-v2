@@ -1,7 +1,5 @@
 #include "Optimizer.h"
 
-#include "CostFunctions.h"
-
 namespace psg {
 namespace core {
 
@@ -55,7 +53,6 @@ void MyFlattenGrad(const GripperParams& meta, double* x) {
       *(x++) = keyframe[j];
     }
   }
-
 }
 
 // x -> meta
@@ -93,9 +90,13 @@ void Optimizer::Optimize(const PassiveGripper& psg) {
   Cancel();
   params_ = psg.GetParams();
   params_proto_ = psg.GetParams();
-  const auto& mdr = psg.GetMDR();
-  mdr_.init(mdr.V, mdr.F);
+  init_params_ = psg.GetParams();
+  const auto& mdr = psg.GetRemeshedMDR();
+  mdr_.init(mdr);
   settings_ = psg.GetSettings();
+
+  cost_function_ = kCostFunctions[(int)settings_.cost.cost_function];
+
   dimension_ = MyFlattenSize(params_);
   x_.reset(new double[dimension_]);
   lb_.reset(new double[dimension_]);
@@ -132,7 +133,6 @@ void Optimizer::Optimize(const PassiveGripper& psg) {
   optimize_future_ = std::async(std::launch::async, [&] {
     double minf; /* minimum objective value, upon return */
     nlopt_result result = nlopt_optimize(opt_, x_.get(), &minf);
-    MyUnflatten(params_, x_.get());
     is_running_ = false;
     return result;
   });
@@ -146,7 +146,6 @@ void Optimizer::Resume() {
   optimize_future_ = std::async(std::launch::async, [&] {
     double minf; /* minimum objective value, upon return */
     nlopt_result result = nlopt_optimize(opt_, x_.get(), &minf);
-    MyUnflatten(params_, x_.get());
     is_running_ = false;
     return result;
   });
@@ -177,16 +176,21 @@ const GripperParams& Optimizer::GetCurrentParams() {
   MyUnflatten(params_proto_, g_min_x_.get());
   return params_proto_;
 }
-double Optimizer::ComputeCostInternal(unsigned n, const double* x, double* grad) {
+double Optimizer::ComputeCostInternal(unsigned n,
+                                      const double* x,
+                                      double* grad) {
   MyUnflatten(params_, x);
   GripperParams dCost_dParam;
-  double cost = ComputeCost(params_, settings_, mdr_, dCost_dParam);
+  double cost = cost_function_.cost_function(
+      params_, init_params_, settings_, mdr_, dCost_dParam, nullptr);
   if (grad != nullptr) {
-    MyFlattenGrad(dCost_dParam, grad);
-    // for (unsigned i = 0; i < n; i++) {
-      // std::cout << grad[i] << "\n";    
-    // }
-    // std::cout << "-----" << std::endl;
+    if (cost_function_.has_grad) {
+      MyFlattenGrad(dCost_dParam, grad);
+    } else if (n_iters_ == 0) {
+      std::cerr << "Error: Using gradient-based optimizer on a non-gradient "
+                   "cost function"
+                << std::endl;
+    }
   }
   n_iters_++;
   if (cost < t_min_cost_) {

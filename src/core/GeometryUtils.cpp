@@ -1,21 +1,122 @@
 #include "GeometryUtils.h"
 
+#include <unordered_map>
+#include <unordered_set>
+
 #include <CGAL/Polygon_mesh_processing/remesh.h>
 #include <CGAL/Polyhedron_3.h>
-#include <igl/volume.h>
+#include <igl/copyleft/cgal/mesh_boolean.h>
 #include <igl/copyleft/cgal/mesh_to_polyhedron.h>
 #include <igl/copyleft/cgal/polyhedron_to_mesh.h>
+#include <igl/volume.h>
 #include <libqhullcpp/Qhull.h>
 #include <libqhullcpp/QhullFacetList.h>
 #include <libqhullcpp/QhullPoint.h>
 #include <libqhullcpp/QhullVertexSet.h>
 #include <libqhullcpp/RboxPoints.h>
+#include <list>
+
+#include "robots/Robots.h"
+
+#include "UnionFind.h"
 
 namespace psg {
 namespace core {
 
+Fingers TransformFingers(const Fingers& fingers, const Eigen::Affine3d& trans) {
+  Fingers out_fingers(fingers.size());
+  for (size_t i = 0; i < fingers.size(); i++) {
+    out_fingers[i] =
+        (trans * fingers[i].transpose().colwise().homogeneous()).transpose();
+  }
+  return out_fingers;
+}
+
+struct _AdtTrajData {
+  Fingers fingers;
+  Pose pose;
+  size_t traj_idx;
+  double t;
+};
+
+static void AdaptiveSubdivideTrajectoryImpl(
+    const Fingers& fingers,
+    double flatness,
+    std::list<_AdtTrajData>& l,
+    std::list<_AdtTrajData>::iterator l_p0,
+    std::list<_AdtTrajData>::iterator l_p2) {
+  Pose p1 = (l_p0->pose + l_p2->pose) / 2.;
+  Fingers fingers_p1 = TransformFingers(fingers, robots::Forward(p1));
+
+  double t2 = l_p2->t;
+  if (l_p2->traj_idx != l_p0->traj_idx) t2 = 1;
+
+  double max_deviation = 0;
+  for (size_t j = 0; j < fingers_p1.size(); j++) {
+    Eigen::MatrixXd fingers_p02 =
+        (l_p2->fingers[j] - l_p0->fingers[j]).rowwise().normalized();
+    Eigen::MatrixXd fingers_p01 = (fingers_p1[j] - l_p0->fingers[j]);
+    for (size_t i = 0; i < fingers_p02.rows(); i++) {
+      Eigen::RowVector3d p02 = fingers_p02.row(i);
+      Eigen::RowVector3d p01 = fingers_p01.row(i);
+      max_deviation = std::max(max_deviation, p01.cross(p02).norm());
+    }
+  }
+  if (max_deviation > flatness) {
+    auto l_p1 = l.insert(
+        l_p2,
+        _AdtTrajData{fingers_p1, p1, l_p0->traj_idx, (l_p0->t + t2) / 2.});
+    AdaptiveSubdivideTrajectoryImpl(fingers, flatness, l, l_p0, l_p1);
+    AdaptiveSubdivideTrajectoryImpl(fingers, flatness, l, l_p1, l_p2);
+  }
+}
+
+void AdaptiveSubdivideTrajectory(
+    const Trajectory& trajectory,
+    const Fingers& fingers,
+    double flatness,
+    Trajectory& out_trajectory,
+    std::vector<Fingers>& out_t_fingers,
+    std::vector<std::pair<int, double>>& out_traj_contrib) {
+  Eigen::Affine3d finger_trans_inv =
+      robots::Forward(trajectory.front()).inverse();
+
+  Fingers fingers0 = TransformFingers(fingers, finger_trans_inv);
+
+  std::list<_AdtTrajData> l;
+
+  size_t n_keyframes = trajectory.size();
+  for (size_t i = 0; i < n_keyframes; i++) {
+    l.push_back(
+        _AdtTrajData{TransformFingers(fingers0, robots::Forward(trajectory[i])),
+                     trajectory[i],
+                     i,
+                     0});
+  }
+
+  std::list<_AdtTrajData>::iterator l_p0 = l.begin();
+  std::list<_AdtTrajData>::iterator l_p2 = ++l.begin();
+  for (size_t i = 1; i < n_keyframes; i++) {
+    AdaptiveSubdivideTrajectoryImpl(fingers0, flatness, l, l_p0, l_p2);
+    l_p0 = l_p2;
+    l_p2++;
+  }
+  size_t n_new_keyframes = l.size();
+  out_trajectory.resize(n_new_keyframes);
+  out_t_fingers.resize(n_new_keyframes);
+  out_traj_contrib.resize(n_new_keyframes);
+  std::list<_AdtTrajData>::iterator l_it = l.begin();
+  for (size_t i = 0; i < n_new_keyframes; i++) {
+    out_trajectory[i] = l_it->pose;
+    out_t_fingers[i] = l_it->fingers;
+    out_traj_contrib[i] = {l_it->traj_idx, l_it->t};
+    l_it++;
+  }
+}
+
 bool Remesh(const Eigen::MatrixXd& V,
             const Eigen::MatrixXi& F,
+            size_t n_iters,
             Eigen::MatrixXd& out_V,
             Eigen::MatrixXi& out_F) {
   typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
@@ -24,10 +125,46 @@ bool Remesh(const Eigen::MatrixXd& V,
   namespace PMP = CGAL::Polygon_mesh_processing;
 
   Mesh mesh;
-  igl::copyleft::cgal::mesh_to_polyhedron(V, F, mesh);
-  PMP::isotropic_remeshing(
-      faces(mesh), 0.003, mesh, PMP::parameters::number_of_iterations(1));
+  if (!igl::copyleft::cgal::mesh_to_polyhedron(V, F, mesh)) {
+    out_V = V;
+    out_F = F;
+    return false;
+  }
+  Eigen::RowVector3d p_min = V.colwise().minCoeff();
+  Eigen::RowVector3d p_max = V.colwise().maxCoeff();
+  Eigen::RowVector3d p_range = p_max - p_min;
+
+  double r_max = p_range.maxCoeff();
+  double edge_len = std::clamp(r_max * 0.02, 0.0005, 0.003);
+
+  std::cout << "edge_len: " << edge_len << std::endl;
+
+  PMP::isotropic_remeshing(faces(mesh),
+                           edge_len,
+                           mesh,
+                           PMP::parameters::number_of_iterations(n_iters));
   igl::copyleft::cgal::polyhedron_to_mesh(mesh, out_V, out_F);
+  return true;
+}
+
+void Barycentric(const Eigen::Vector3d& p,
+                 const Eigen::Vector3d& a,
+                 const Eigen::Vector3d& b,
+                 const Eigen::Vector3d& c,
+                 double& out_u,
+                 double& out_v,
+                 double& out_w) {
+  // https://gamedev.stackexchange.com/questions/23743/whats-the-most-efficient-way-to-find-barycentric-coordinates
+  Eigen::Vector3d v0 = b - a, v1 = c - a, v2 = p - a;
+  float d00 = v0.dot(v0);
+  float d01 = v0.dot(v1);
+  float d11 = v1.dot(v1);
+  float d20 = v2.dot(v0);
+  float d21 = v2.dot(v1);
+  float denom = d00 * d11 - d01 * d01;
+  out_v = (d11 * d20 - d01 * d21) / denom;
+  out_w = (d00 * d21 - d01 * d20) / denom;
+  out_u = 1. - out_v - out_w;
 }
 
 bool ComputeConvexHull(const Eigen::MatrixXd& points,
@@ -172,10 +309,80 @@ double Volume(const Eigen::MatrixXd& V, const Eigen::MatrixXi& F) {
   return std::abs(vol.sum());
 }
 
+Eigen::Vector3d CenterOfMass(const Eigen::MatrixXd& V,
+                             const Eigen::MatrixXi& F) {
+  // volume-weighted average of COM of tets
+  double volume = 0;
+  Eigen::RowVector3d center(0, 0, 0);
+  for (size_t i = 0; i < F.rows(); i++) {
+    Eigen::RowVector3d a = V.row(F(i, 0));
+    Eigen::RowVector3d b = V.row(F(i, 1));
+    Eigen::RowVector3d c = V.row(F(i, 2));
+    double tet_volume = -a.dot(b.cross(c)) / 6.;
+    Eigen::RowVector3d tet_center = (a + b + c) / 4.;
+    center += tet_volume * tet_center;
+    volume += tet_volume;
+  }
+  return center.transpose() / volume;
+}
+
 Eigen::MatrixXd CreateCubeV(const Eigen::Vector3d& lb,
                             const Eigen::Vector3d& ub) {
   auto R = cube_V.array().rowwise() * (ub - lb).transpose().array();
   return R.array().rowwise() + lb.transpose().array();
+}
+
+void ComputeConnectivityFrom(const MeshDependentResource& mdr,
+                             const Eigen::Vector3d& from,
+                             std::vector<double>& out_dist,
+                             std::vector<int>& out_par) {
+  struct VertexInfo {
+    int id;
+    double dist;
+    bool operator<(const VertexInfo& r) const { return dist > r.dist; }
+  };
+  struct EdgeInfo {
+    int id;
+    double dist;
+  };
+  std::vector<double> dist(mdr.V.rows(), std::numeric_limits<double>::max());
+  std::vector<int> par(mdr.V.rows(), -2);
+  std::vector<std::vector<EdgeInfo>> edges(mdr.V.rows());
+  std::priority_queue<VertexInfo> q;
+
+  Eigen::RowVector3f effector_pos_f = from.transpose().cast<float>();
+  for (size_t i = 0; i < mdr.V.rows(); i++) {
+    Eigen::RowVector3d direction = mdr.V.row(i) - from.transpose();
+    igl::Hit hit;
+    direction -= direction.normalized() * 1e-7;
+    if (!mdr.intersector.intersectSegment(
+            effector_pos_f, direction.cast<float>(), hit)) {
+      dist[i] = (mdr.V.row(i) - from.transpose()).norm();
+      par[i] = -1;
+      q.push(VertexInfo{(int)i, dist[i]});
+    }
+  }
+  for (size_t i = 0; i < mdr.F.rows(); i++) {
+    for (int iu = 0; iu < 3; iu++) {
+      int u = mdr.F(i, iu);
+      int v = mdr.F(i, (iu + 1) % 3);
+      edges[u].push_back(EdgeInfo{v, (mdr.V.row(v) - mdr.V.row(u)).norm()});
+    }
+  }
+  while (!q.empty()) {
+    VertexInfo now = q.top();
+    q.pop();
+    double nextDist;
+    for (const auto& next : edges[now.id]) {
+      if ((nextDist = dist[now.id] + next.dist) < dist[next.id]) {
+        dist[next.id] = nextDist;
+        par[next.id] = now.id;
+        q.push(VertexInfo{next.id, nextDist});
+      }
+    }
+  }
+  out_dist = dist;
+  out_par = par;
 }
 
 void CreateSpheres(const Eigen::MatrixXd& P,
@@ -239,6 +446,83 @@ void CreateCylinderXY(const Eigen::Vector3d& o,
   for (int i = 2; i < res; i++) {
     out_F.row(2 * res + i - 2) << 0, i, i - 1;
     out_F.row(2 * res + res - 4 + i) << res, res + i - 1, res + i;
+  }
+}
+
+void MergeMesh(const Eigen::MatrixXd& V,
+               const Eigen::MatrixXi& F,
+               Eigen::MatrixXd& out_V,
+               Eigen::MatrixXi& out_F) {
+  struct Submesh {
+    Eigen::MatrixXd V;
+    Eigen::MatrixXi F;
+    size_t face_count = 0;
+    size_t next_face = 0;
+    std::unordered_map<size_t, size_t> vertex_map;
+  };
+  std::unordered_map<size_t, Submesh> submeshes;
+  UnionFind unionFind(V.rows());
+
+  // Find sub-mesh that are linked by faces
+  for (Eigen::Index f = 0; f < F.rows(); f++) {
+    unionFind.merge(F(f, 0), F(f, 1));
+    unionFind.merge(F(f, 1), F(f, 2));
+  }
+
+  // Assign vertices and faces for sub-mesh
+  for (Eigen::Index f = 0; f < F.rows(); f++) {
+    submeshes[unionFind.find(F(f, 0))].face_count++;
+  }
+  for (Eigen::Index v = 0; v < V.rows(); v++) {
+    auto& vertex_map = submeshes[unionFind.find(v)].vertex_map;
+    size_t next_id = vertex_map.size();
+    vertex_map[v] = next_id;
+  }
+
+  for (auto& item : submeshes) {
+    auto& submesh = item.second;
+    submesh.V.resize(submesh.vertex_map.size(), 3);
+    submesh.F.resize(submesh.face_count, 3);
+  }
+
+  // Map vertices and faces information to sub-mesh
+  for (Eigen::Index f = 0; f < F.rows(); f++) {
+    auto& submesh = submeshes[unionFind.find(F(f, 0))];
+    size_t sub_f = submesh.next_face++;
+    for (int i = 0; i < 3; i++) {
+      submesh.F(sub_f, i) = submesh.vertex_map[F(f, i)];
+    }
+  }
+  for (Eigen::Index v = 0; v < V.rows(); v++) {
+    auto& submesh = submeshes[unionFind.find(v)];
+    submesh.V.row(submesh.vertex_map[v]) = V.row(v);
+  }
+
+  // Merge all sub-mesh
+  auto it = submeshes.begin();
+  Eigen::MatrixXd VCurrent = it->second.V, VResult;
+  Eigen::MatrixXi FCurrent = it->second.F, FResult;
+  for (it++; it != submeshes.end(); it++) {
+    auto& submesh = it->second;
+    igl::copyleft::cgal::mesh_boolean(submesh.V,
+                                      submesh.F,
+                                      VCurrent,
+                                      FCurrent,
+                                      igl::MESH_BOOLEAN_TYPE_UNION,
+                                      VResult,
+                                      FResult);
+    VCurrent.swap(VResult);
+    FCurrent.swap(FResult);
+  }
+  out_V.swap(VCurrent);
+  out_F.swap(FCurrent);
+
+  int count = 0;
+  for (auto& item : submeshes) {
+    auto& submesh = item.second;
+    std::cout << "submesh " << count++ << std::endl;
+    std::cout << "  Faces: " << submesh.next_face << std::endl;
+    std::cout << "  Vertices: " << submesh.V.rows() << std::endl;
   }
 }
 

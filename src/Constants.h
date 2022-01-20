@@ -63,6 +63,7 @@ const Eigen::Vector3d kUrdfAxis[6] = {
 
 typedef Eigen::Array<double, kNumDOFs, 1> Pose;
 typedef std::vector<Pose> Trajectory;
+typedef std::vector<Eigen::MatrixXd> Fingers;
 
 // Jacobian 3x6 matrix [dpos/dtheta_0 | ... | dpos/dtheta_5]
 typedef Eigen::Matrix<double, 3, kNumDOFs> Jacobian;
@@ -78,6 +79,8 @@ const Pose kInitPose =
 static constexpr double kWrenchReg = 1e-10;
 // zero threshold
 static constexpr double kWrenchNormThresh = 1e-5;
+
+constexpr double kExpandMesh = 0.002; // 2mm
 
 const std::map<std::string, std::string> kTopyConfig = {{"PROB_TYPE", "comp"},
                                                         {"ETA", "0.4"},
@@ -169,6 +172,8 @@ const char* const kAlgorithms[] = {
 
     "NLOPT_GN_AGS"};
 }
+
+enum class CostFunctionEnum : int { kGradientBased = 0, kSP = 1 };
 
 namespace colors {
 const Eigen::RowVector3d kPurple = Eigen::RowVector3d(219, 76, 178) / 255;

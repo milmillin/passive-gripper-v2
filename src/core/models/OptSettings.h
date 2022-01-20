@@ -13,16 +13,16 @@ struct OptSettings : psg::core::serialization::Serializable {
   double max_runtime = 0;  // seconds
   size_t max_iters = 10000;
   double finger_wiggle = 0.01;
-  Pose trajectory_wiggle = (Pose() << 4. * kDegToRad,
-                            4. * kDegToRad,
-                            4. * kDegToRad,
-                            8. * kDegToRad,
-                            15. * kDegToRad,
-                            15. * kDegToRad)
+  Pose trajectory_wiggle = (Pose() << 5. * kDegToRad,
+                            5. * kDegToRad,
+                            5. * kDegToRad,
+                            10. * kDegToRad,
+                            25. * kDegToRad,
+                            90. * kDegToRad)
                                .finished();
-  double tolerance = 1e-4;
-  nlopt_algorithm algorithm = NLOPT_GN_DIRECT;
-  size_t population = 20000;
+  double tolerance = 0;
+  nlopt_algorithm algorithm = NLOPT_LD_MMA;
+  size_t population = 0;
 
   DECL_SERIALIZE() {
     constexpr int version = 3;
@@ -64,6 +64,17 @@ struct OptSettings : psg::core::serialization::Serializable {
       DESERIALIZE(tolerance);
       DESERIALIZE(algorithm);
       DESERIALIZE(population);
+    } else if (version == 4) {
+      DESERIALIZE(max_runtime);
+      DESERIALIZE(max_iters);
+      DESERIALIZE(finger_wiggle);
+      DESERIALIZE(trajectory_wiggle);
+      DESERIALIZE(tolerance);
+      DESERIALIZE(algorithm);
+      DESERIALIZE(population);
+      int unused;
+      DESERIALIZE(unused);
+    
     }
   }
 };

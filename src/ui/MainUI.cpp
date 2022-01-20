@@ -5,6 +5,8 @@
 #include <igl/writeSTL.h>
 #include <iostream>
 
+#include <igl/marching_cubes.h>
+#include <igl/voxel_grid.h>
 #include "../core/CostFunctions.h"
 #include "../core/Debug.h"
 #include "../core/GeometryUtils.h"
@@ -45,6 +47,15 @@ void MainUI::init(igl::opengl::glfw::Viewer* viewer_) {
   axisLayer.line_width = 2;
 
   GetLayer(Layer::kSweptSurface).show_lines = false;
+
+  auto& floorLayer = GetLayer(Layer::kFloor);
+  floorLayer.set_mesh(plane_V * 10, plane_F);
+  floorLayer.uniform_colors((Eigen::Vector3d)Eigen::Vector3d::Constant(0.5),
+                            Eigen::Vector3d::Constant(0.75),
+                            Eigen::Vector3d::Ones());
+  floorLayer.show_lines = false;
+  floorLayer.set_visible(false, -1);
+  GetLayer(Layer::kContactFloor).set_visible(false, -1);
 }
 
 inline bool MainUI::pre_draw() {
@@ -127,6 +138,9 @@ void MainUI::draw_viewer_menu() {
   ImGui::SameLine();
   if (ImGui::Button("Save Mesh", ImVec2((w - p) / 2, 0))) {
     OnSaveMeshClicked();
+  }
+  if (ImGui::Button("Merge mesh", ImVec2(w, 0))) {
+    OnMergeMeshClicked();
   }
   ImGui::Checkbox("Millimeter", &is_millimeter_);
   ImGui::Checkbox("Swap YZ", &is_swap_yz_);
@@ -232,6 +246,8 @@ void MainUI::DrawContactPointPanel() {
         "Friction Coeff", &contact_settings.friction, 0.1, 0.5);
     contact_update |=
         ImGui::InputInt("Cone Resolution", (int*)&contact_settings.cone_res);
+    contact_update |= ImGui::InputDouble(
+        "Contact Floor", &contact_settings.floor, 0.001, 0.001);
     finger_update |= ImGui::InputInt("Finger Joints",
                                      (int*)&finger_settings.n_finger_joints);
     if (finger_update) vm_.PSG().SetFingerSettings(finger_settings);
@@ -259,11 +275,8 @@ void MainUI::DrawContactPointPanel() {
     ImGui::InputInt("# Candidates", (int*)&cp_num_candidates, 1000);
     ImGui::InputInt("# Seeds", (int*)&cp_num_seeds, 1000);
     if (ImGui::Button("Generate Candidates", ImVec2(w, 0))) {
-      contact_point_candidates_ =
-          InitializeContactPoints(vm_.PSG().GetMDR(),
-                                  vm_.PSG().GetSettings(),
-                                  cp_num_candidates,
-                                  cp_num_seeds);
+      contact_point_candidates_ = InitializeContactPoints(
+          vm_.PSG(), cp_filter, cp_num_candidates, cp_num_seeds);
     }
     ImGui::Separator();
     size_t k = std::min((size_t)10, contact_point_candidates_.size());
@@ -271,10 +284,23 @@ void MainUI::DrawContactPointPanel() {
     for (size_t i = 0; i < k; i++) {
       ImGui::PushID(std::to_string(i).c_str());
       if (ImGui::Button("Select")) {
-        vm_.PSG().SetContactPoints(contact_point_candidates_[i].contact_points);
+        const ContactPointMetric& cp = contact_point_candidates_[i];
+        // vm_.PSG().reinit_trajectory = false;
+        vm_.PSG().SetContactPoints(cp.contact_points);
+        // vm_.PSG().ClearKeyframe();
+
+        // std::vector<Pose> candidates;
+        // size_t best_i;
+        // if (robots::BestInverse(cp.trans * robots::Forward(kInitPose),
+        // kInitPose,
+        // candidates,
+        // best_i)) {
+        // vm_.PSG().AddKeyframe(FixAngles(kInitPose, candidates[best_i]));
+        // }
       }
       ImGui::SameLine();
-      ImGui::Text("mw: %.4e, pmw: %.4e",
+      ImGui::Text("dist: %d mw: %.4e, pmw: %.4e",
+                  contact_point_candidates_[i].finger_distance,
                   contact_point_candidates_[i].min_wrench,
                   contact_point_candidates_[i].partial_min_wrench);
       ImGui::PopID();
@@ -313,7 +339,7 @@ void MainUI::DrawTransformPanel() {
     if (ImGui::Button("Remesh##a", ImVec2(w, 0))) {
       Eigen::MatrixXd V;
       Eigen::MatrixXi F;
-      Remesh(vm_.PSG().GetMeshV(), vm_.PSG().GetMeshF(), V, F);
+      Remesh(vm_.PSG().GetMeshV(), vm_.PSG().GetMeshF(), 1, V, F);
       vm_.SetMesh(V, F);
     }
   }
@@ -416,6 +442,8 @@ void MainUI::DrawOptimizationPanel() {
     opt_update |=
         ImGui::InputDouble("Max Runtime (s)", &opt_settings.max_runtime, 1);
     opt_update |=
+        ImGui::InputInt("Max Iters", (int*)&opt_settings.max_iters, 1);
+    opt_update |=
         ImGui::InputDouble("Tolerance", &opt_settings.tolerance, 0.0001);
 
     if (ImGui::BeginCombo("Algorithm",
@@ -432,10 +460,28 @@ void MainUI::DrawOptimizationPanel() {
       }
       ImGui::EndCombo();
     }
+    if (ImGui::BeginCombo("Cost Function",
+                          kCostFunctions[(int)cost_settings.cost_function].name)) {
+      for (int i = 0; i < 2; i++) {
+        bool is_selected = ((int)cost_settings.cost_function == i);
+        if (ImGui::Selectable(kCostFunctions[i].name, is_selected)) {
+          cost_settings.cost_function = (CostFunctionEnum)i;
+          cost_update = true;
+        }
+        if (is_selected) {
+          ImGui::SetItemDefaultFocus();
+        }
+      }
+      ImGui::EndCombo();
+    }
     opt_update |=
         ImGui::InputInt("Population", (int*)&opt_settings.population, 1000);
 
-    cost_update = ImGui::InputDouble("Floor", &cost_settings.floor, 0.001);
+    cost_update |= ImGui::InputDouble("Floor", &cost_settings.floor, 0.001);
+    cost_update |= ImGui::InputInt(
+        "Finger Subdivision", (int*)&cost_settings.n_finger_steps, 1);
+    cost_update |= ImGui::InputInt(
+        "Trajectory Subdivision", (int*)&cost_settings.n_trajectory_steps, 1);
     if (opt_update) vm_.PSG().SetOptSettings(opt_settings);
     if (cost_update) vm_.PSG().SetCostSettings(cost_settings);
     if (ImGui::Button("Optimize", ImVec2(w, 0))) {
@@ -482,9 +528,11 @@ void MainUI::DrawTopoOptPanel() {
     if (ImGui::Button("Generate Topy Config", ImVec2(w, 0))) {
       std::string filename = igl::file_dialog_save();
       if (!filename.empty()) {
+        Debugger debugger;
         vm_.ComputeNegativeVolume();
         GenerateTopyConfig(
-            vm_.PSG(), vm_.GetNegVolV(), vm_.GetNegVolF(), filename);
+            vm_.PSG(), vm_.GetNegVolV(), vm_.GetNegVolF(), filename, &debugger);
+        VisualizeDebugger(debugger);
       }
     }
     if (ImGui::Button("Load Result Bin", ImVec2(w, 0))) {
@@ -534,6 +582,11 @@ void MainUI::DrawViewPanel() {
     DrawLayerOptions(Layer::kGripper, "Gripper");
     DrawLayerOptions(Layer::kInitFingers, "Init Finger");
     DrawLayerOptions(Layer::kInitTrajectory, "Init Trajectory");
+    DrawLayerOptions(Layer::kFloor, "Floor");
+    DrawLayerOptions(Layer::kContactFloor, "Contact Floor");
+    DrawLayerOptions(Layer::kGradient, "Gradient");
+    DrawLayerOptions(Layer::kDebug, "Debug");
+    DrawLayerOptions(Layer::kRemesh, "Remesh");
     ImGui::PopID();
   }
 }
@@ -608,8 +661,96 @@ void MainUI::DrawDebugPanel() {
     if (ImGui::Button("Debug Gradient", ImVec2(w, 0))) {
       DebugGradient(vm_.PSG());
     }
+    if (ImGui::Button("Debug Cost", ImVec2(w, 0))) {
+      Debugger debugger;
+      DebugCost(vm_.PSG(), debugger);
+      VisualizeDebugger(debugger);
+    }
     if (ImGui::Button("Compute Init Params", ImVec2(w, 0))) {
       vm_.ComputeInitParams();
+    }
+    if (ImGui::Button("Adaptive Subdivide Trajectory", ImVec2(w, 0))) {
+      std::vector<std::vector<Eigen::MatrixXd>> t_fingers;
+      Trajectory trajectory;
+      std::vector<std::pair<int, double>> contrib;
+      AdaptiveSubdivideTrajectory(vm_.PSG().GetTrajectory(),
+                                  vm_.PSG().GetFingers(),
+                                  0.001,
+                                  trajectory,
+                                  t_fingers, contrib);
+      std::cerr << "New Trajectory: " << trajectory.size() << std::endl;
+      vm_.PSG().SetTrajectory(trajectory);
+    }
+    if (ImGui::Button("Debug Expand Mesh", ImVec2(w, 0))) {
+      Eigen::RowVector3d p_min = vm_.PSG().GetMDR().minimum.array() - 0.004;
+      Eigen::RowVector3d p_max = vm_.PSG().GetMDR().maximum.array() + 0.004;
+      Eigen::MatrixXd GV;
+      Eigen::RowVector3i res;
+      int s = ceil((p_max - p_min).maxCoeff() / 0.001) + 8;
+      igl::voxel_grid(Eigen::AlignedBox3d(p_min, p_max), s, 4, GV, res);
+      Eigen::VectorXd S(GV.rows());
+#pragma omp parallel for
+      for (long long i = 0; i < GV.rows(); i++) {
+        double s_;
+        Eigen::RowVector3d c_;
+        S(i) = vm_.PSG().GetMDR().ComputeSignedDistance(GV.row(i), c_, s_);
+      }
+      Eigen::MatrixXd mc_V;
+      Eigen::MatrixXi mc_F;
+      igl::marching_cubes(S, GV, res(0), res(1), res(2), 0.002, mc_V, mc_F);
+      Eigen::MatrixXd RV;
+      Eigen::MatrixXi RF;
+      if (!Remesh(mc_V, mc_F, 5, RV, RF)) {
+        std::cerr << "Remesh failed! Defaulted to using original mesh"
+                  << std::endl;
+      }
+      std::cerr << "Remesh: V: " << RV.rows() << std::endl;
+      auto& layer = GetLayer(Layer::kDebug);
+      layer.clear();
+      layer.set_mesh(RV, RF);
+    }
+    if (ImGui::Button("Debug SP Cost", ImVec2(w, 0))) {
+      Debugger debugger;
+      MeshDependentResource mdr;
+      GripperParams dCost_dParam;
+      ComputeCost_SP(vm_.PSG().GetParams(),
+                     vm_.PSG().GetParams(),
+                     vm_.PSG().GetSettings(),
+                     vm_.PSG().GetRemeshedMDR(),
+                     dCost_dParam,
+                     &debugger);
+      VisualizeDebugger(debugger);
+    }
+    if (ImGui::Button("Debug CP Seeds", ImVec2(w, 0))) {
+      std::vector<int> FI;
+      std::vector<Eigen::Vector3d> X;
+      InitializeContactPointSeeds(vm_.PSG(), cp_num_seeds, cp_filter, FI, X);
+      Eigen::MatrixXd P(X.size(), 3);
+      for (size_t i = 0; i < X.size(); i++) {
+        P.row(i) = X[i];
+      }
+      auto& layer = GetLayer(Layer::kDebug);
+      layer.clear();
+      layer.set_points(P, colors::kBlue);
+      layer.point_size = 5;
+    }
+    ImGui::InputInt("# Seeds", (int*)&cp_num_seeds, 1000);
+    ImGui::InputDouble("Filter Hole", &cp_filter.hole, 0.001);
+    ImGui::InputDouble(
+        "Filter Curvature Radius", &cp_filter.curvature_radius, 0.001);
+    MyInputDoubleConvert("Filter Angle", &cp_filter.angle, kRadToDeg, 1);
+    if (ImGui::Button("Dump CSV", ImVec2(w, 0))) {
+      std::string filename = igl::file_dialog_save();
+      if (!filename.empty()) {
+        std::ofstream traj_csv_file(filename);
+        const psg::Trajectory& traj = vm_.PSG().GetTrajectory();
+        for (int i = traj.size() - 1; i >= 0; i--) {
+          for (int j = 0; j < psg::kNumDOFs; j++) {
+            traj_csv_file << std::setprecision(15) << traj[i](j) << ",";
+          }
+          traj_csv_file << std::endl;
+        }
+      }
     }
   }
   ImGui::PopID();
@@ -687,7 +828,7 @@ void MainUI::OnLoadMeshClicked() {
   }
   if (is_swap_yz_) {
     SV.col(1).swap(SV.col(2));
-    SF.col(1).swap(SF.col(2));
+    SV.col(0) *= -1;
   }
 
   SV_ = SV;
@@ -712,9 +853,24 @@ void MainUI::OnSaveMeshClicked() {
     return;
   }
 
-
   igl::writeSTL(filename, SV_, SF_, igl::FileEncoding::Binary);
   std::cout << "Mesh saved to " << filename << std::endl;
+}
+
+void MainUI::OnMergeMeshClicked() {
+  if (SV_.rows() == 0) {
+    std::cout << "Warning: mesh is empty" << std::endl;
+    return;
+  }
+
+  Eigen::MatrixXd SV;
+  Eigen::MatrixXi SF;
+  MergeMesh(SV_, SF_, SV, SF);
+
+  SV_.swap(SV);
+  SF_.swap(SF);
+  vm_.SetMesh(SV_, SF_);
+  optimizer_.Reset();
 }
 
 void MainUI::OnLoadPSGClicked() {
@@ -743,6 +899,14 @@ void MainUI::OnLoadPSGClicked() {
     std::cout << stl_fn << " gripper stl loaded!" << std::endl;
   }
   OnAlignCameraCenter();
+
+  // Try load contact points
+  std::string cpx_fn = filename.substr(0, last_dot) + ".cpx";
+  std::ifstream cpx_file(cpx_fn, std::ios::in | std::ios::binary);
+  if (cpx_file.good()) {
+    contact_point_candidates_.clear();
+    psg::core::serialization::Deserialize(contact_point_candidates_, cpx_file);
+  }
 }
 
 void MainUI::OnSavePSGClicked() {
@@ -823,6 +987,9 @@ void MainUI::OnLayerInvalidated(Layer layer) {
     case Layer::kGradient:
       OnGradientInvalidated();
       break;
+    case Layer::kContactFloor:
+      OnContactFloorInvalidated();
+      break;
   }
 }
 
@@ -836,6 +1003,13 @@ void MainUI::OnMeshInvalidated() {
   meshLayer.uniform_colors((colors::kGold * 0.3).transpose(),
                            (Eigen::Vector3d)colors::kGold.transpose(),
                            Eigen::Vector3d::Zero());
+  auto& remeshLayer = GetLayer(Layer::kRemesh);
+  remeshLayer.clear();
+  remeshLayer.set_mesh(vm_.PSG().GetRemeshedMDR().V,
+                       vm_.PSG().GetRemeshedMDR().F);
+  remeshLayer.uniform_colors((colors::kGold * 0.3).transpose(),
+                             (Eigen::Vector3d)colors::kGold.transpose(),
+                             Eigen::Vector3d::Zero());
 }
 
 void MainUI::OnCenterOfMassInvalidated() {
@@ -1198,8 +1372,8 @@ void MainUI::OnGripperInvalidated() {
   if (vm_.GetGripperV().size() != 0)
     layer.set_mesh((robots::Forward(vm_.GetCurrentPose()) *
                     vm_.GetGripperV().transpose().colwise().homogeneous())
-                      .transpose(),
-                  vm_.GetGripperF());
+                       .transpose(),
+                   vm_.GetGripperF());
   layer.set_colors(colors::kBrown);
 }
 
@@ -1246,6 +1420,39 @@ void MainUI::OnGradientInvalidated() {
 
   layer.set_edges(V, E, Eigen::RowVector3d(0.8, 0.4, 0));
   layer.line_width = 2;
+}
+
+void MainUI::OnContactFloorInvalidated() {
+  auto& layer = GetLayer(Layer::kContactFloor);
+  Eigen::MatrixXd V = plane_V * 3;
+  V.col(1).array() += vm_.PSG().GetContactSettings().floor;
+  layer.set_mesh(V, plane_F);
+  layer.show_lines = false;
+  layer.uniform_colors((Eigen::Vector3d)Eigen::Vector3d::Constant(0.5),
+                       colors::kBlue.transpose(),
+                       colors::kWhite.transpose());
+}
+
+void MainUI::VisualizeDebugger(const Debugger& debugger) {
+  auto& layer = GetLayer(Layer::kDebug);
+  Eigen::MatrixXd P;
+  Eigen::MatrixXi E;
+  Eigen::MatrixXd C;
+  Eigen::MatrixXd V;
+  Eigen::MatrixXi VE;
+  Eigen::MatrixXd PP;
+  Eigen::MatrixXd PC;
+  debugger.GetEdges(P, E, C);
+  debugger.GetMesh(V, VE);
+  debugger.GetPoints(PP, PC);
+  layer.clear();
+  layer.set_edges(P, E, C);
+  layer.show_lines = true;
+  layer.line_width = 5;
+  layer.set_mesh(V, VE);
+  layer.face_based = true;
+  layer.set_points(PP, PC);
+  layer.point_size = 9;
 }
 
 inline bool MainUI::IsGuizmoVisible() {

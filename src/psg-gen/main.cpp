@@ -1,15 +1,15 @@
+#include <igl/readSTL.h>
+#include <Eigen/Core>
 #include <fstream>
 #include <iostream>
 #include <string>
 #include <vector>
-#include <igl/readSTL.h>
-#include <Eigen/Core>
 
-#include "../core/PassiveGripper.h"
-#include "../core/Initialization.h"
-#include "../utils.h"
-#include "../core/models/SettingsOverrider.h"
 #include <igl/remove_duplicate_vertices.h>
+#include "../core/Initialization.h"
+#include "../core/PassiveGripper.h"
+#include "../core/models/SettingsOverrider.h"
+#include "../utils.h"
 
 int main(int argc, char** argv) {
   if (argc < 3) {
@@ -49,10 +49,14 @@ int main(int argc, char** argv) {
   psg.SetMesh(SV2, SF);
 
   if (argc >= 4) {
-    std::string stgo_fn = argv[3];  
+    std::string stgo_fn = argv[3];
     psg::core::models::SettingsOverrider stgo;
-    stgo.Load(stgo_fn);
-    stgo.Apply(psg);
+    try {
+      stgo.Load(stgo_fn);
+      stgo.Apply(psg);
+    } catch (const std::exception& e) {
+      Error() << e.what() << std::endl;
+    }
   }
 
   psg.Serialize(psg_f);

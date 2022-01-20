@@ -2,8 +2,12 @@
 
 #include <CGAL/QP_functions.h>
 #include <CGAL/QP_models.h>
+#include <utility>
 
 #include "GeometryUtils.h"
+
+#include <autodiff/forward/real.hpp>
+#include <autodiff/forward/real/eigen.hpp>
 
 // #ifdef CGAL_USE_GMP
 // #include <CGAL/Gmpzf.h>
@@ -204,6 +208,268 @@ double ComputePartialMinWrenchQP(const std::vector<ContactPoint>& contactCones,
       return std::numeric_limits<double>::max();
   }
   return 0.0;
+}
+
+using autodiff::real;
+using autodiff::Vector3real;
+
+static real lossFn(const std::vector<Vector3real>& positions,
+                   const std::vector<Vector3real>& normals,
+                   Vector3real& trans,
+                   Vector3real& rot,
+                   Vector3real& center,
+                   double maxCos,
+                   double maxV) {
+  assert(positions.size() == normals.size());
+  auto n = positions.size();
+
+  real loss = 0;
+  for (size_t i = 0; i < n; i++) {
+    Vector3real v = trans + rot.cross(positions[i] - center);
+    // real x = std::max<real>(maxCos - v.normalized().dot(normals[i]), 0);
+    // real y = std::max<real>(0.001 - v.norm(), 0);
+    // loss += x * x + y * y;
+    loss += std::max<real>(maxCos - v.dot(normals[i]), 0) +
+    std::max<real>(v.norm() - maxV, 0);
+  }
+  return loss;
+}
+
+bool CheckApproachDirection(const std::vector<ContactPoint>& contactPoints,
+                            double maxAngle,
+                            double maxV,
+                            double learningRate,
+                            double threshold,
+                            int max_iterations,
+                            Eigen::Affine3d& out_trans) {
+  using autodiff::at;
+  using autodiff::gradient;
+  using autodiff::Matrix3real;
+  using autodiff::wrt;
+
+  Vector3real trans = Vector3real::Zero();
+  Vector3real rot = Vector3real::Zero();
+  Vector3real center = Vector3real::Zero();
+
+  std::vector<Vector3real> positions;
+  std::vector<Vector3real> normals;
+  for (const auto& cp : contactPoints) {
+    positions.push_back(cp.position);
+    normals.push_back(cp.normal.normalized());
+  }
+
+  double maxCos = std::cos(maxAngle);
+
+  real loss;
+  for (int i = 0; i < max_iterations; ++i) {
+    Eigen::VectorXd grad =
+        gradient(lossFn,
+                 wrt(trans, rot, center),
+                 at(positions, normals, trans, rot, center, maxCos, maxV),
+                 loss);
+    grad *= learningRate;
+
+    if (loss < threshold) {
+      Eigen::Vector3d rotd = rot.cast<double>();
+      Eigen::Vector3d transd = trans.cast<double>();
+      Eigen::Vector3d centerd = center.cast<double>();
+      double theta = rotd.norm();
+      out_trans = Eigen::Translation3d(transd + centerd) *
+                  Eigen::AngleAxisd(theta, rotd / theta) *
+                  Eigen::Translation3d(-centerd);
+      return true;
+    }
+
+    trans -= grad.block(0, 0, 3, 1);
+    rot -= grad.block(3, 0, 3, 1);
+    center -= grad.block(6, 0, 3, 1);
+  }
+  // std::cout << "failed: " << loss << std::endl;
+  return false;
+}
+
+static real LossFn2(const std::vector<Vector3real>& positions,
+                    const std::vector<Vector3real>& normals,
+                    Vector3real& trans,
+                    Vector3real& rot,
+                    Vector3real& center,
+                    real away_dist) {
+  assert(positions.size() == normals.size());
+  size_t n = positions.size();
+
+  real loss = 0;
+  for (size_t i = 0; i < n; i++) {
+    Vector3real v = trans + rot.cross(positions[i] - center);
+    // real x = std::max<real>(away_dist - v.norm(), 0);
+    // real y = std::max<real>(max_cos - v.normalized().dot(normals[i]), 0);
+    // real y = std::max<real>(v.norm() - limit, 0);
+    real x = std::max<real>(away_dist - v.dot(normals[i]), 0);
+    loss += x * x;
+  }
+  return loss;
+}
+
+bool CheckApproachDirection2(const std::vector<ContactPoint>& contact_points,
+                             double away_dist,
+                             double max_angle,
+                             const Eigen::Vector3d& center_of_mass,
+                             Eigen::Affine3d& out_trans) {
+  using autodiff::at;
+  using autodiff::gradient;
+  using autodiff::Matrix3real;
+  using autodiff::wrt;
+
+  constexpr double learningRate = 0.1;
+
+
+  Vector3real trans = Vector3real::Zero();
+  for (size_t i = 0; i < contact_points.size(); i++) {
+    trans += contact_points[i].normal;
+  }
+  trans /= contact_points.size();
+
+  Vector3real rot = Vector3real::Zero();
+  Vector3real center = center_of_mass.cast<real>();
+
+  std::vector<Vector3real> positions;
+  std::vector<Vector3real> normals;
+  for (const auto& cp : contact_points) {
+    positions.push_back(cp.position);
+    normals.push_back(cp.normal.normalized());
+    trans += cp.normal;
+  }
+  trans /= contact_points.size();
+
+  double max_cos = cos(max_angle);
+
+  real loss;
+  for (int i = 0; i < 10000; ++i) {
+    Eigen::VectorXd grad =
+        gradient(LossFn2,
+                 wrt(trans, rot, center),
+                 at(positions, normals, trans, rot, center, away_dist),
+                 loss);
+    grad *= learningRate;
+
+    if (loss < 1e-12) {
+      // std::cout << i << " loss: " << loss << std::endl;
+
+      Eigen::Vector3d rotd = rot.cast<double>();
+      Eigen::Vector3d transd = trans.cast<double>();
+      Eigen::Vector3d centerd = center.cast<double>();
+
+      double maxv = 0;
+      for (size_t j = 0; j < positions.size(); j++) {
+        Eigen::Vector3d v =
+            transd + rotd.cross(contact_points[j].position - centerd);
+        maxv = std::max(v.norm(), maxv);
+      }
+
+      // std::cout << maxv << std::endl;
+
+      double factor = away_dist / maxv;
+
+      transd *= factor;
+      rotd *= factor;
+
+      double theta = rotd.norm();
+
+      out_trans = Eigen::Translation3d(transd + centerd) *
+                  Eigen::AngleAxisd(theta, rotd / theta) *
+                  Eigen::Translation3d(-centerd);
+      return true;
+    }
+
+    trans -= grad.block(0, 0, 3, 1);
+    rot -= grad.block(3, 0, 3, 1);
+    center -= grad.block(6, 0, 3, 1);
+  }
+  // std::cout << "failed: " << loss << std::endl;
+  return false;
+}
+
+struct pair_hash {
+  template <class T1, class T2>
+  std::size_t operator()(const std::pair<T1, T2>& pair) const {
+    return (std::hash<T1>()(pair.first) << 1) ^ std::hash<T2>()(pair.second);
+  }
+};
+
+static inline std::pair<int, int> makeEdge(int a, int b) {
+  if (a < b) {
+    return std::pair<int, int>(a, b);
+  } else {
+    return std::pair<int, int>(b, a);
+  }
+}
+
+NeighborInfo::NeighborInfo(const Eigen::MatrixXi& F) {
+  std::unordered_map<std::pair<int, int>, std::unordered_set<int>, pair_hash>
+      edge_to_face;
+  for (int row = 0; row < F.rows(); row++) {
+    edge_to_face[makeEdge(F(row, 0), F(row, 1))].insert(row);
+    edge_to_face[makeEdge(F(row, 1), F(row, 2))].insert(row);
+    edge_to_face[makeEdge(F(row, 2), F(row, 0))].insert(row);
+  }
+
+  neighbor.clear();
+  for (const auto& item : edge_to_face) {
+    for (int face1 : item.second) {
+      for (int face2 : item.second) {
+        if (face1 != face2) {
+          neighbor[face1].insert(face2);
+          neighbor[face2].insert(face1);
+        }
+      }
+    }
+  }
+}
+
+std::vector<int> NeighborInfo::GetNeighbors(const ContactPoint& contact_point,
+                                            const Eigen::MatrixXd& V,
+                                            const Eigen::MatrixXi& F,
+                                            double tolerance) const {
+  std::unordered_set<int> visited;
+  std::vector<int> current;
+  std::vector<int> result;
+  current.push_back(contact_point.fid);
+  visited.insert(contact_point.fid);
+  result.push_back(contact_point.fid);
+  tolerance = tolerance * tolerance;
+  while (current.size() > 0) {
+    int face = *current.rbegin();
+    current.pop_back();
+    if (visited.find(face) != visited.end()) {
+      continue;
+    }
+
+    bool valid = false;
+    for (int i = 0; i < 3; i++) {
+      valid = valid || ((V.row(F(face, i)).transpose() - contact_point.position)
+                            .squaredNorm() < tolerance);
+    }
+
+    result.push_back(face);
+
+    for (int next : neighbor.at(face)) {
+      if (visited.find(next) == visited.end()) {
+        visited.insert(next);
+        current.push_back(next);
+      }
+    }
+  }
+  return result;
+}
+
+int GetFingerDistance(const DiscreteDistanceField& distanceField,
+                      const std::vector<ContactPoint>& contact_points) {
+  int max_distance = 0;
+  for (auto& contact_point : contact_points) {
+    // std::cout << distanceField.getVoxel(contact_point.position) << std::endl;
+    max_distance =
+        std::max(max_distance, distanceField.getVoxel(contact_point.position));
+  }
+  return max_distance;
 }
 
 }  // namespace core
