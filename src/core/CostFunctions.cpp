@@ -642,6 +642,95 @@ double MinDistance(const GripperParams& params,
   return min_dist;
 }
 
+struct _SegState {
+  bool is_first;
+  bool is_in;
+  size_t last_pos_vid;
+  double last_pos_vid_dis;
+  Eigen::Vector3d last_pos;  // last intersection entering the mesh
+};
+
+#define soft_assert(x) \
+  if (!(x)) fprintf(stderr, "Assertion Error: " #x "" __FILE__ ":%d", __LINE__)
+
+static double ComputeCollisionPenaltySegment(const Eigen::Vector3d& A,
+                                             const Eigen::Vector3d& B,
+                                             const MeshDependentResource& mdr,
+                                             _SegState& state,
+                                             Debugger* const debugger) {
+  const Eigen::MatrixXd& SP_ = mdr.GetSP();
+  const Eigen::MatrixXi& SP_par_ = mdr.GetSPPar();
+  Eigen::RowVector3d dir = B - A;
+  double norm = dir.norm();
+  if (norm < 1e-12 || isnan(norm)) return 0;
+  dir /= norm;
+  // std::cout << dir << std::endl;
+  std::vector<igl::Hit> hits;
+  int num_rays;
+  mdr.intersector.intersectRay(
+      A.cast<float>(), dir.cast<float>(), hits, num_rays);
+  bool is_A_in = hits.size() % 2 == 1;
+
+  if (state.is_first) {
+    state.is_in = is_A_in;
+  }
+
+  double total_dis = 0;
+  for (const auto& hit : hits) {
+    if (hit.t >= norm) break;
+    Eigen::RowVector3d P = A.transpose() + dir * hit.t;
+
+    // find closest vertex for P
+    size_t vid = -1;
+    double best_dist = std::numeric_limits<double>::max();
+    for (size_t i = 0; i < 3; i++) {
+      int u = mdr.F(hit.id, i);
+      double d = (P - mdr.V.row(u)).squaredNorm();
+      if (d < best_dist) {
+        best_dist = d;
+        vid = u;
+      }
+    }
+    best_dist = sqrt(best_dist);
+
+    if (state.is_in) {
+      // --|P
+      if (state.is_first) {
+        // A ----| P
+        total_dis += (P - A.transpose()).norm();
+      } else {
+        // state.last_pos |----| P
+        soft_assert(state.last_pos_vid != -1llu);
+
+        total_dis += state.last_pos_vid_dis + SP_(state.last_pos_vid, vid) +
+                     best_dist + (P.transpose() - state.last_pos).norm();
+      }
+      state.last_pos_vid = -1llu;
+    } else {
+      // P|--
+      state.last_pos = P;
+      state.last_pos_vid = vid;
+      state.last_pos_vid_dis = best_dist;
+    }
+    state.is_in = !state.is_in;
+    state.is_first = false;
+  }
+
+  if (state.is_in) {
+    // |-- B
+    if (state.is_first) {
+      // | A --- B |
+      total_dis += (B - A).norm();
+    } else {
+      // state.last_pos |--- B
+      soft_assert(state.last_pos_vid != -1llu);
+      total_dis += (B - state.last_pos).norm();
+    }
+  }
+
+  return total_dis;
+}
+
 double ComputeFloorCost(Eigen::RowVector3d p0,
                         Eigen::RowVector3d p1,
                         double floor) {
@@ -677,19 +766,22 @@ double ComputeCost_SP(const GripperParams& params,
 
   // Cost between two points
   const double floor = settings.cost.floor;
-  auto MyCost = [floor, debugger, &remeshed_mdr](
-                    const Eigen::RowVector3d& p0,
-                    const Eigen::RowVector3d& p1) -> double {
-    return remeshed_mdr.ComputeRequiredDistance(p0, p1, debugger) +
+  auto MyCost = [floor, debugger, &remeshed_mdr](const Eigen::RowVector3d& p0,
+                                                 const Eigen::RowVector3d& p1,
+                                                 _SegState& state) -> double {
+    return ComputeCollisionPenaltySegment(
+               p0, p1, remeshed_mdr, state, debugger) +
            ComputeFloorCost(p0, p1, floor);
   };
 
   // discretize time
   auto ProcessFinger = [&MyCost](const Fingers& fingers) -> double {
     double cost = 0;
+    _SegState state;
     for (size_t i = 0; i < fingers.size(); i++) {
+      state.is_first = true;
       for (size_t j = 0; j < fingers[i].rows() - 1; j++) {
-        cost += MyCost(fingers[i].row(j), fingers[i].row(j + 1));
+        cost += MyCost(fingers[i].row(j), fingers[i].row(j + 1), state);
       }
     }
     return cost;
@@ -783,15 +875,19 @@ double ComputeCost_SP(const GripperParams& params,
 #pragma omp parallel
   {
     double t_max = 0;
+    _SegState state;
 
 #pragma omp for
     for (long long j = 0; j < d_fingers.size(); j++) {
       Eigen::Vector3d p0 = new_trans[0] * d_fingers[j];
+      state.is_first = true;
+      double cur_cost = 0;
       for (size_t k = 1; k < new_trajectory.size(); k++) {
         Eigen::Vector3d p1 = new_trans[k] * d_fingers[j];
-        t_max = std::max(t_max, MyCost(p0, p1));
+        cur_cost += MyCost(p0, p1, state);
         p0 = p1;
       }
+      t_max = std::max(t_max, cur_cost);
     }
 
 #pragma omp critical
