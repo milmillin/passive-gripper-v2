@@ -61,7 +61,6 @@ void ProcessFrom(std::string raw_fn,
     ;  // Doesn't contain override file
   }
 
-
   psg::core::Optimizer optimizer;
 
   Log() << psg.GetOptSettings() << std::endl;
@@ -132,6 +131,23 @@ void ProcessFrom(std::string raw_fn,
     }
     Log() << "> Done: Optimized gripper written to " << psg_out_fn << std::endl;
 
+    std::string csv_out_fn = out_fn + ".csv";
+    {
+      std::ofstream traj_csv_file(csv_out_fn);
+      if (!traj_csv_file.is_open()) {
+        Error() << "> Cannot open out file " << csv_out_fn << std::endl;
+      } else {
+        const psg::Trajectory& traj = psg.GetTrajectory();
+        for (int i = traj.size() - 1; i >= 0; i--) {
+          for (int j = 0; j < psg::kNumDOFs; j++) {
+            traj_csv_file << std::setprecision(15) << traj[i](j) << ",";
+          }
+          traj_csv_file << std::endl;
+        }
+      }
+    }
+    Log() << ">> Done: Trajectory dumped to " << csv_out_fn << std::endl;
+
     Result res{wopath_fn,
                i,
                out_raw_fn,
@@ -157,8 +173,7 @@ void ProcessFrom(std::string raw_fn,
       Eigen::MatrixXi r_F;
       Eigen::MatrixXd gripper_V;
       Eigen::MatrixXi gripper_F;
-      Log() << "> Loading Result Bin " << bin_fn
-            << std::endl;
+      Log() << "> Loading Result Bin " << bin_fn << std::endl;
       if (!psg::core::LoadResultBin(psg, bin_fn, r_V, r_F)) {
         Error() << ">> Error loading result bin" << std::endl;
         Error() << ">> Skipping" << std::endl;
