@@ -264,8 +264,14 @@ Trajectory InitializeTrajectory1(const std::vector<Eigen::MatrixXd>& fingers,
   }
   n /= fingers.size();
 
-  constexpr double min_y = -0.05;
   Eigen::Affine3d init_trans = robots::Forward(init_pose);
+  Eigen::Affine3d finger_trans_inv = init_trans.inverse();
+  double min_y = -0.05;
+  for (size_t i = 0; i < fingers.size(); i++) {
+    min_y = std::min(
+        min_y,
+        TransformMatrix(fingers[i], finger_trans_inv).colwise().minCoeff()(1));
+  }
   Eigen::Affine3d end_trans = Eigen::Translation3d(n) * init_trans;
   end_trans.translation().y() =
       std::max(end_trans.translation().y(), -min_y + 0.003);
