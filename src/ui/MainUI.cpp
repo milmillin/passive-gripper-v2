@@ -277,8 +277,17 @@ void MainUI::DrawContactPointPanel() {
     ImGui::InputInt("# Candidates", (int*)&cp_num_candidates, 1000);
     ImGui::InputInt("# Seeds", (int*)&cp_num_seeds, 1000);
     if (ImGui::Button("Generate Candidates", ImVec2(w, 0))) {
+      auto start_time = std::chrono::high_resolution_clock::now();
       contact_point_candidates_ = InitializeContactPoints(
           vm_.PSG(), cp_filter, cp_num_candidates, cp_num_seeds);
+      auto stop_time = std::chrono::high_resolution_clock::now();
+      long long duration =
+          std::chrono::duration_cast<std::chrono::milliseconds>(stop_time -
+                                                                start_time)
+              .count();
+      std::cout << "Candidate Generation took " << duration << " ms."
+                << std::endl;
+      std::cout << "Got " << contact_point_candidates_.size() << " candidates.";
     }
     ImGui::Separator();
     size_t k = std::min((size_t)30, contact_point_candidates_.size());
