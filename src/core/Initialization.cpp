@@ -299,6 +299,11 @@ void InitializeContactPointSeeds(const PassiveGripper& psg,
   const MeshDependentResource& mdr = psg.GetMDR();
   double floor = psg.GetContactSettings().floor;
 
+  // Hack for topkey
+  const Eigen::Vector3d center = (mdr.minimum + mdr.maximum) / 2.;
+  double radius = mdr.size.x() / 2. - 0.006;
+  double radius2 = radius * radius;
+
   Eigen::Vector3d effector_pos =
       robots::Forward(psg.GetParams().trajectory.front()).translation();
 
@@ -330,6 +335,11 @@ void InitializeContactPointSeeds(const PassiveGripper& psg,
       if (abs((x - c).norm() - kExpandMesh) > 5e-4) continue;
       if (v_par[mdr_floor.F(fid, 0)] == -2)
         continue;  // check one vertex suffice
+
+      // filter topkey
+      Eigen::Vector3d dcenter = x.transpose() - center;
+      Eigen::Vector2d dcenter_xz(dcenter.x(), dcenter.z());
+      if (dcenter_xz.squaredNorm() > radius2) continue;
 
       /*
       // filter angle
@@ -370,6 +380,8 @@ std::vector<ContactPointMetric> InitializeContactPoints(
     const ContactPointFilter& filter,
     size_t num_candidates,
     size_t num_seeds) {
+  constexpr size_t kNumContacts = 3;
+
   const MeshDependentResource& mdr = psg.GetMDR();
   const ContactSettings& settings = psg.GetContactSettings();
   Eigen::Vector3d effector_pos =
@@ -393,7 +405,7 @@ std::vector<ContactPointMetric> InitializeContactPoints(
   Log() << "Done building neighbor info" << std::endl;
 
   Log() << "Building distance field" << std::endl;
-  DiscreteDistanceField distanceField(mdr.V, mdr.F, 50, effector_pos);
+  DiscreteDistanceField distanceField(mdr.V, mdr.F, 100, effector_pos);
   Log() << "Done building distance field" << std::endl;
 #pragma omp parallel
   {
@@ -415,12 +427,24 @@ std::vector<ContactPointMetric> InitializeContactPoints(
       if (!toContinue) break;
 
       // Random 3 contact points
-      int pids[3] = {dist(gen), dist(gen), dist(gen)};
-      if (pids[0] == pids[1] || pids[1] == pids[2] || pids[0] == pids[2])
-        continue;
+      int pids[kNumContacts];
+      pids[0] = dist(gen);
+      for (size_t i = 1; i < kNumContacts; i++) {
+        while (true) {
+          pids[i] = dist(gen);
+          bool work = true;
+          for (size_t j = 0; j < i; j++) {
+            if (pids[i] == pids[j]) {
+              work = false;            
+              break;
+            }
+          }
+          if (work) break;
+        }
+      }
       std::vector<ContactPoint> contactPoints(3);
       std::vector<std::vector<int>> neighbors;
-      for (int i = 0; i < 3; i++) {
+      for (int i = 0; i < kNumContacts; i++) {
         contactPoints[i].position = X[pids[i]];
         contactPoints[i].normal = mdr.FN.row(FI[pids[i]]);
         contactPoints[i].fid = FI[pids[i]];
@@ -462,7 +486,7 @@ std::vector<ContactPointMetric> InitializeContactPoints(
         }
 
         // Prepare next sample
-        for (size_t i = 0; i < 3; i++) {
+        for (size_t i = 0; i < kNumContacts; i++) {
           std::uniform_int_distribution<> dist(0, neighbors[i].size() - 1);
           int fid = neighbors[i][dist(gen)];
           contactPoints[i].normal = mdr.FN.row(fid);
@@ -474,7 +498,7 @@ std::vector<ContactPointMetric> InitializeContactPoints(
         continue;
       }
 
-      for (int i = 0; i < 3; i++) {
+      for (int i = 0; i < kNumContacts; i++) {
         contactPoints[i].normal = mdr.FN.row(contactPoints[i].fid);
       }
 
