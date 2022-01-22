@@ -67,8 +67,8 @@ struct NeighborInfo {
                                 double tolerance) const;
 };
 
-int GetFingerDistance(const DiscreteDistanceField& distanceField,
-                      const std::vector<ContactPoint>& contact_points);
+double GetFingerDistance(const DiscreteDistanceField& distanceField,
+                         const std::vector<ContactPoint>& contact_points);
 
 }  // namespace core
 }  // namespace psg

@@ -500,7 +500,7 @@ std::vector<ContactPointMetric> InitializeContactPoints(
       candidate.min_wrench = minWrench;
       candidate.trans = trans;
       candidate.finger_distance =
-          GetFingerDistance(distanceField, contactPoints);
+          round(GetFingerDistance(distanceField, contactPoints));
 #pragma omp critical
       {
         prelim.push_back(candidate);

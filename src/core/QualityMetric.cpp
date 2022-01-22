@@ -230,7 +230,7 @@ static real lossFn(const std::vector<Vector3real>& positions,
     // real y = std::max<real>(0.001 - v.norm(), 0);
     // loss += x * x + y * y;
     loss += std::max<real>(maxCos - v.dot(normals[i]), 0) +
-    std::max<real>(v.norm() - maxV, 0);
+            std::max<real>(v.norm() - maxV, 0);
   }
   return loss;
 }
@@ -320,7 +320,6 @@ bool CheckApproachDirection2(const std::vector<ContactPoint>& contact_points,
   using autodiff::wrt;
 
   constexpr double learningRate = 0.1;
-
 
   Vector3real trans = Vector3real::Zero();
   for (size_t i = 0; i < contact_points.size(); i++) {
@@ -461,9 +460,9 @@ std::vector<int> NeighborInfo::GetNeighbors(const ContactPoint& contact_point,
   return result;
 }
 
-int GetFingerDistance(const DiscreteDistanceField& distanceField,
-                      const std::vector<ContactPoint>& contact_points) {
-  int max_distance = 0;
+double GetFingerDistance(const DiscreteDistanceField& distanceField,
+                         const std::vector<ContactPoint>& contact_points) {
+  double max_distance = 0;
   for (auto& contact_point : contact_points) {
     // std::cout << distanceField.getVoxel(contact_point.position) << std::endl;
     max_distance =
