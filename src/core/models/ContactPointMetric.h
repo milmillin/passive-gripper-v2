@@ -14,11 +14,11 @@ struct ContactPointMetric : psg::core::serialization::Serializable {
   std::vector<ContactPoint> contact_points;
   double min_wrench;
   double partial_min_wrench;
-  int finger_distance;
+  double finger_distance;
   Eigen::Affine3d trans;
 
   DECL_SERIALIZE() {
-    constexpr int version = 2;
+    constexpr int version = 3;
     SERIALIZE(version);
     SERIALIZE(contact_points);
     SERIALIZE(min_wrench);
@@ -34,7 +34,11 @@ struct ContactPointMetric : psg::core::serialization::Serializable {
       DESERIALIZE(min_wrench);
       DESERIALIZE(partial_min_wrench);
     }
-    if (version >= 2) {
+    if (version == 2) {
+      int dis;
+      DESERIALIZE(dis);
+      finger_distance = dis;
+    } else if (version > 2) {
       DESERIALIZE(finger_distance);
     }
   }
