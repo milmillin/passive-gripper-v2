@@ -894,6 +894,18 @@ double ComputeCost_SP(const GripperParams& params,
     finger_max = std::max(finger_max, t_max);
   }
 
+  // Robot floor collision
+  double robot_floor = 0;
+  double max_penetration = 0;
+  constexpr double robot_floor_sig = 1000;
+  constexpr double robot_clearance = 0.05;
+  for (const auto& trans : new_trans) {
+    max_penetration =
+        std::max(max_penetration,
+                 std::max(0., robot_clearance - trans.translation()(1)));
+  }
+  robot_floor = max_penetration;
+
   // L2 regularization term
   double traj_reg = 0;
   for (size_t i = 1; i < params.trajectory.size() - 1; i++) {
@@ -902,7 +914,8 @@ double ComputeCost_SP(const GripperParams& params,
                     .squaredNorm();
   }
 
-  return traj_max + finger_max + settings.cost.regularization * traj_reg;
+  return traj_max + finger_max + robot_floor_sig * robot_floor +
+         settings.cost.regularization * traj_reg;
 }
 
 bool Intersects(const GripperParams& params,
