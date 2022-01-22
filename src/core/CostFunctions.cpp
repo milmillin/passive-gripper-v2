@@ -775,6 +775,7 @@ double ComputeCost_SP(const GripperParams& params,
   };
 
   // discretize time
+  /*
   auto ProcessFinger = [&MyCost](const Fingers& fingers) -> double {
     double cost = 0;
     _SegState state;
@@ -786,6 +787,7 @@ double ComputeCost_SP(const GripperParams& params,
     }
     return cost;
   };
+  */
 
   Trajectory new_trajectory;
   std::vector<Fingers> new_fingers;
@@ -796,6 +798,7 @@ double ComputeCost_SP(const GripperParams& params,
                               new_trajectory,
                               new_fingers,
                               traj_contrib);
+  /*
   size_t n_trajectory = new_trajectory.size();
   std::vector<bool> traj_skip(n_trajectory - 1, false);
   std::vector<size_t> traj_subs(n_trajectory - 1, 0);
@@ -849,6 +852,7 @@ double ComputeCost_SP(const GripperParams& params,
       traj_max = std::max(traj_max, t_max);
     }
   }
+  */
 
   // discretize fingers
   std::vector<Eigen::Vector3d> d_fingers;
@@ -914,7 +918,7 @@ double ComputeCost_SP(const GripperParams& params,
                     .squaredNorm();
   }
 
-  return traj_max + finger_max + robot_floor_sig * robot_floor +
+  return finger_max + robot_floor_sig * robot_floor +
          settings.cost.regularization * traj_reg;
 }
 
