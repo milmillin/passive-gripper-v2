@@ -449,6 +449,38 @@ void CreateCylinderXY(const Eigen::Vector3d& o,
   }
 }
 
+void CreateCylinder(const Eigen::Vector3d& a,
+                    const Eigen::Vector3d& b,
+                    double r,
+                    int res,
+                    Eigen::MatrixXd& out_V,
+                    Eigen::MatrixXi& out_F) {
+  out_V.resize(res * 2, 3);
+  out_F.resize(res * 2 + (res - 2) * 2, 3);
+
+  Eigen::Vector3d B;
+  Eigen::Vector3d T;
+  GetPerp((b - a).normalized(), B, T);
+
+  B *= r;
+  T *= r;
+
+  for (int i = 0; i < res; i++) {
+    double ang = (2. * kPi * i) / res;
+    out_V.row(i) = a + cos(ang) * B + sin(ang) * T;
+    out_V.row(res + i) = b + cos(ang) * B + sin(ang) * T;
+  }
+
+  for (int i = 0; i < res; i++) {
+    out_F.row(i * 2) << i, ((i + 1) % res) + res, i + res;
+    out_F.row(i * 2 + 1) << i, (i + 1) % res, ((i + 1) % res) + res;
+  }
+  for (int i = 2; i < res; i++) {
+    out_F.row(2 * res + i - 2) << 0, i, i - 1;
+    out_F.row(2 * res + res - 4 + i) << res, res + i - 1, res + i;
+  }
+}
+
 void MergeMesh(const Eigen::MatrixXd& V,
                const Eigen::MatrixXi& F,
                Eigen::MatrixXd& out_V,

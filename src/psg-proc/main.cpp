@@ -53,6 +53,9 @@ int main(int argc, char** argv) {
   bool dump_traj_set = false;
   std::string out_traj_csv_fn;
 
+  // --dump-viz
+  bool dump_viz = false;
+
   for (int i = 2; i < argc; i++) {
     std::string arg = argv[i];
     if (arg == "-s") {
@@ -72,6 +75,8 @@ int main(int argc, char** argv) {
       dump_traj_set = true;
       out_traj_csv_fn = argv[i + 1];
       i++;
+    } else if (arg == "--dump-viz") {
+      dump_viz = true;
     } else {
       Error() << "Unknown option " << arg << std::endl;
     }
@@ -137,6 +142,51 @@ int main(int argc, char** argv) {
       }
     }
     Log() << ">> Done: Trajectory dumped to " << out_traj_csv_fn << std::endl;
+  }
+  if (dump_viz) {
+    Log() << "> Dumping Viz" << std::endl;
+    Eigen::MatrixXd V;
+    Eigen::MatrixXi F;
+    psg.GetMesh(V, F);
+    igl::writeSTL(raw_fn + "_mesh.stl", V, F, igl::FileEncoding::Binary);
+    Log() << ">> Mesh Dumped to " << raw_fn + "_mesh.stl" << std::endl;
+
+    psg::Fingers finger = psg.GetFingers();
+    std::vector<Eigen::MatrixXd> finger_V;
+    std::vector<Eigen::MatrixXi> finger_F;
+    for (size_t i = 0; i < finger.size(); i++) {
+      for (size_t j = 0; j < finger[i].rows(); j++) {
+        Eigen::MatrixXd V_;
+        Eigen::MatrixXi F_;
+        psg::core::CreateSpheres(finger[i].row(j), 0.005, 10, V_, F_);      
+        finger_V.push_back(V_);
+        finger_F.push_back(F_);
+        if (j > 0) {
+          psg::core::CreateCylinder(
+              finger[i].row(j - 1), finger[i].row(j), 0.002, 5, V_, F_);
+          finger_V.push_back(V_);
+          finger_F.push_back(F_);
+        }
+      }
+    }
+    size_t n_V = 0;
+    size_t n_F = 0;
+    for (size_t i = 0; i < finger_V.size(); i++) {
+      n_V += finger_V[i].rows();
+      n_F += finger_F[i].rows();
+    }
+    Eigen::MatrixXd V2(n_V, 3);
+    Eigen::MatrixXi F2(n_F, 3);
+    size_t cur_V = 0;
+    size_t cur_F = 0;
+    for (size_t i = 0; i < finger_V.size(); i++) {
+      V2.block(cur_V, 0, finger_V[i].rows(), 3) = finger_V[i];
+      F2.block(cur_F, 0, finger_F[i].rows(), 3) = finger_F[i].array() + (int)cur_V;    
+      cur_V += finger_V[i].rows();
+      cur_F += finger_F[i].rows();
+    }
+    igl::writeSTL(raw_fn + "_fingers.stl", V2, F2, igl::FileEncoding::Binary);
+    Log() << ">> Fingers Dumped to " << raw_fn + "_fingers.stl" << std::endl;
   }
 
   Log() << "All jobs done" << std::endl;
