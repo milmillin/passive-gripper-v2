@@ -12,6 +12,7 @@
 #include "../core/Initialization.h"
 #include "../core/Optimizer.h"
 #include "../core/PassiveGripper.h"
+#include "../core/QualityMetric.h"
 #include "../core/SweptVolume.h"
 #include "../core/TopoOpt.h"
 #include "../core/serialization/Serialization.h"
@@ -96,6 +97,7 @@ void ProcessFrom(std::string raw_fn,
     if (failed) out_raw_fn = "__failed-" + out_raw_fn;
     std::string out_fn = output_dir + '/' + out_raw_fn;
 
+    double traj_complexity = 0;
     double pi_volume = -1.;
     double volume = -1.;
     Eigen::MatrixXd neg_V;
@@ -111,12 +113,18 @@ void ProcessFrom(std::string raw_fn,
       Log() << ">> Done: TPD file written to " << tpd_out_fn << std::endl;
 
       // Compute negative volume
+      /*
       Log() << "> Computing PI Volume" << std::endl;
       Eigen::MatrixXd pi_neg_V;
       Eigen::MatrixXi pi_neg_F;
       PiNegativeSweptVolumePSG(psg, pi_neg_V, pi_neg_F);
       pi_volume = psg::core::Volume(pi_neg_V, pi_neg_F);
       Log() << ">> Done" << std::endl;
+      */
+
+      Log() << "> Computing Traj Complexity" << std::endl;
+      traj_complexity = psg::core::GetTrajectoryComplexity(psg.GetTrajectory());
+      Log() << "> Done" << std::endl;
     }
 
     std::string psg_out_fn = out_fn + ".psg";
@@ -160,7 +168,7 @@ void ProcessFrom(std::string raw_fn,
                psg.GetMinDist(),
                psg.GetIntersecting(),
                volume,
-               pi_volume,
+               traj_complexity,
                duration.count()};
     Out() << res << std::endl;
     if (!failed) need--;
