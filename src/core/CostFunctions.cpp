@@ -907,15 +907,17 @@ double ComputeCost_SP(const GripperParams& params,
   robot_floor = max_penetration;
 
   // L2 regularization term
+  /*
   double traj_reg = 0;
   for (size_t i = 1; i < params.trajectory.size() - 1; i++) {
     traj_reg += (params.trajectory[i] - init_params.trajectory[i])
                     .matrix()
                     .squaredNorm();
   }
+  */
 
-  return traj_max + finger_max + robot_floor_sig * robot_floor +
-         settings.cost.regularization * traj_reg;
+  return traj_max + finger_max + robot_floor_sig * robot_floor;
+         // settings.cost.regularization * traj_reg;
 }
 
 bool Intersects(const GripperParams& params,
