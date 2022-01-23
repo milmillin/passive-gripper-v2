@@ -472,5 +472,13 @@ int GetFingerDistance(const DiscreteDistanceField& distanceField,
   return max_distance;
 }
 
+double GetTrajectoryComplexity(const Trajectory& trajectory) {
+  double sum = 0;
+  for (size_t i = 1; i < trajectory.size(); i++) {
+    sum += (trajectory[i] - trajectory[i - 1]).cwiseAbs().sum();  
+  }
+  return sum;
+}
+
 }  // namespace core
 }  // namespace psg

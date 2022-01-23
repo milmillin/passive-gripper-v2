@@ -70,5 +70,7 @@ struct NeighborInfo {
 int GetFingerDistance(const DiscreteDistanceField& distanceField,
                       const std::vector<ContactPoint>& contact_points);
 
+double GetTrajectoryComplexity(const Trajectory& trajectory);
+
 }  // namespace core
 }  // namespace psg

@@ -6,15 +6,21 @@
 #include <string>
 #include <vector>
 
+#include <boost/process.hpp>
+
 #include <igl/writeSTL.h>
 #include "../Constants.h"
+#include "../batch/Result.h"
 #include "../core/GeometryUtils.h"
+#include "../core/Optimizer.h"
+#include "../core/QualityMetric.h"
 #include "../core/SweptVolume.h"
 #include "../core/TopoOpt.h"
 #include "../core/models/SettingsOverrider.h"
 #include "../utils.h"
 
 namespace fs = std::filesystem;
+namespace bp = boost::process;
 
 void Usage(char* argv0) {
   Error() << "Usage: " << argv0
@@ -36,9 +42,21 @@ int main(int argc, char** argv) {
   std::string raw_fn = psg_fn.substr(0, lastdot);
   std::string ckpt_fn = raw_fn + ".ckpt";
 
+  size_t lastslash = std::min(raw_fn.rfind('\\'), raw_fn.rfind('/'));
+  std::string wopath_fn = raw_fn;
+  if (lastslash != std::string::npos) wopath_fn = raw_fn.substr(lastslash + 1);
+
   // -s
   bool stgo_set = false;
   std::string stgo_fn;
+
+  // --opt outpsg
+  bool opt_set = false;
+  std::string out_psg_fn;
+
+  // --opt-hook hook
+  bool opt_hook_set = false;
+  std::string hook;
 
   // --refine
   bool refine_set = false;
@@ -61,6 +79,14 @@ int main(int argc, char** argv) {
     if (arg == "-s") {
       stgo_set = true;
       stgo_fn = argv[i + 1];
+      i++;
+    } else if (arg == "--opt") {
+      opt_set = true;
+      out_psg_fn = argv[i + 1];
+      i++;
+    } else if (arg == "--opt-hook") {
+      opt_hook_set = true;
+      hook = argv[i + 1];
       i++;
     } else if (arg == "--refine") {
       refine_set = true;
@@ -95,7 +121,91 @@ int main(int argc, char** argv) {
     stgo.Load(stgo_fn);
     stgo.Apply(psg);
   }
+  if (opt_set) {
+    psg::core::Optimizer optimizer;
+    Log() << "> Optimizing" << std::endl;
+    Log() << psg.GetOptSettings() << std::endl;
+    Log() << psg.GetTopoOptSettings() << std::endl;
+    psg.reinit_trajectory = true;
+    auto cp = psg.GetContactPoints();
+    psg.SetContactPoints(cp);
+    if (cp.size() == 0) {
+      Error() << "No contact points in PSG" << std::endl;
+      goto opt_done;
+    }
 
+    auto start_time = std::chrono::high_resolution_clock::now();
+    optimizer.Optimize(psg);
+    optimizer.Wait();
+    auto stop_time = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+        stop_time - start_time);
+    Log() << "> Optimization took " << duration.count() << " ms." << std::endl;
+
+    psg.SetParams(optimizer.GetCurrentParams());
+    bool failed = psg.GetMinDist() < -1e-5;
+
+    Result r{wopath_fn,
+             0,
+             wopath_fn,
+             failed,
+             psg.GetIsForceClosure(),
+             psg.GetIsPartialClosure(),
+             psg.GetMinWrench(),
+             psg.GetPartialMinWrench(),
+             psg.GetCost(),
+             psg.GetMinDist(),
+             psg.GetIntersecting(),
+             psg::core::GetTrajectoryComplexity(
+                 psg.GetTrajectory()),  // volume field
+             -1,
+             duration.count()};
+    Out() << r << std::endl;
+
+    std::string psg_out_fn = out_psg_fn;
+    {
+      std::ofstream psg_out_f(psg_out_fn, std::ios::out | std::ios::binary);
+      if (!psg_out_f.is_open()) {
+        Error() << "> Cannot open out file " << psg_out_fn << std::endl;
+        Error() << ">> Skipping" << std::endl;
+        goto opt_done;
+      }
+      psg.Serialize(psg_out_f);
+      Log() << "> Done: Optimized gripper written to " << psg_out_fn
+            << std::endl;
+    }
+    if (opt_hook_set) {
+      bp::ipstream out;
+      bp::child c(hook,
+                  bp::std_out > out,
+                  r.out_fn,
+                  psg::kBoolStr[!r.failed],
+                  r.name,
+                  std::to_string(r.cp_idx),
+                  psg::kBoolStr[r.force_closure],
+                  psg::kBoolStr[r.partial_force_closure],
+                  ToString(r.min_wrench),
+                  ToString(r.partial_min_wrench),
+                  ToString(r.cost),
+                  ToString(r.min_dist),
+                  psg::kBoolStr[r.intersecting],
+                  ToString(r.volume),
+                  ToString(r.pi_volume),
+                  std::to_string(r.duration),
+                  ".");
+      char a[1024];
+      auto& out_s = Log() << "[child proc]" << std::endl;
+      while (out.read(a, 1024)) {
+        int read = out.gcount();
+        for (int i = 0; i < read; i++) {
+          out_s << a[i];
+        }
+      }
+      out_s << std::endl;
+      c.wait();
+    }
+  }
+opt_done:
   if (refine_set) {
     Log() << "> Refining mesh.." << std::endl;
     Eigen::MatrixXd bin_V;
@@ -117,7 +227,6 @@ int main(int argc, char** argv) {
     igl::writeSTL(out_stl_fn, gripper_V, gripper_F, igl::FileEncoding::Binary);
     Log() << "> Gripper STL written to " << out_stl_fn << std::endl;
   }
-
   if (gen_tpd_set) {
     Log() << "> Generating TPD file" << std::endl;
     std::string tpd_out_fn = out_tpd_fn + ".tpd";
@@ -128,7 +237,6 @@ int main(int argc, char** argv) {
     GenerateTopyConfig(psg, neg_V, neg_F, tpd_out_fn, nullptr);
     Log() << ">> Done: TPD file written to " << tpd_out_fn << std::endl;
   }
-
   if (dump_traj_set) {
     Log() << "> Dumping trajectory" << std::endl;
     {
@@ -158,7 +266,7 @@ int main(int argc, char** argv) {
       for (size_t j = 0; j < finger[i].rows(); j++) {
         Eigen::MatrixXd V_;
         Eigen::MatrixXi F_;
-        psg::core::CreateSpheres(finger[i].row(j), 0.005, 10, V_, F_);      
+        psg::core::CreateSpheres(finger[i].row(j), 0.005, 10, V_, F_);
         finger_V.push_back(V_);
         finger_F.push_back(F_);
         if (j > 0) {
@@ -181,7 +289,8 @@ int main(int argc, char** argv) {
     size_t cur_F = 0;
     for (size_t i = 0; i < finger_V.size(); i++) {
       V2.block(cur_V, 0, finger_V[i].rows(), 3) = finger_V[i];
-      F2.block(cur_F, 0, finger_F[i].rows(), 3) = finger_F[i].array() + (int)cur_V;    
+      F2.block(cur_F, 0, finger_F[i].rows(), 3) =
+          finger_F[i].array() + (int)cur_V;
       cur_V += finger_V[i].rows();
       cur_F += finger_F[i].rows();
     }
