@@ -658,8 +658,8 @@ static double ComputeCollisionPenaltySegment(const Eigen::Vector3d& A,
                                              const MeshDependentResource& mdr,
                                              _SegState& state,
                                              Debugger* const debugger) {
-  const Eigen::MatrixXd& SP_ = mdr.GetSP();
-  const Eigen::MatrixXi& SP_par_ = mdr.GetSPPar();
+  // const Eigen::MatrixXd& SP_ = mdr.GetSP();
+  // const Eigen::MatrixXi& SP_par_ = mdr.GetSPPar();
   Eigen::RowVector3d dir = B - A;
   double norm = dir.norm();
   if (norm < 1e-12 || isnan(norm)) return 0;
@@ -702,8 +702,9 @@ static double ComputeCollisionPenaltySegment(const Eigen::Vector3d& A,
         // state.last_pos |----| P
         soft_assert(state.last_pos_vid != -1llu);
 
-        total_dis += state.last_pos_vid_dis + SP_(state.last_pos_vid, vid) +
-                     best_dist + (P.transpose() - state.last_pos).norm();
+        // total_dis += state.last_pos_vid_dis + SP_(state.last_pos_vid, vid) +
+                     // best_dist + (P.transpose() - state.last_pos).norm();
+        total_dis += (P.transpose() - state.last_pos).norm();
       }
       state.last_pos_vid = -1llu;
     } else {
