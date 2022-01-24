@@ -481,6 +481,34 @@ void CreateCylinder(const Eigen::Vector3d& a,
   }
 }
 
+void CreateCone(const Eigen::Vector3d& O,
+                const Eigen::Vector3d& N,
+                double r,
+                double h,
+                int res,
+                Eigen::MatrixXd& out_V,
+                Eigen::MatrixXi& out_F) {
+  out_V.resize(res + 1, 3);
+  out_F.resize(res + res - 2, 3);
+  out_V.row(0) = O;
+
+  Eigen::Vector3d B;
+  Eigen::Vector3d T;
+  GetPerp(N, B, T);
+
+  for (int i = 0; i < res; i++) {
+    double ang = (2. * kPi * i) / res;
+    out_V.row(i + 1) = O + h * N + r * (cos(ang) * B + sin(ang) * T);
+  }
+
+  for (int i = 0; i < res; i++) {
+    out_F.row(i) << 0, i + 1, (i + 1) % res + 1;
+  }
+  for (int i = 2; i < res; i++) {
+    out_F.row(res + i - 2) << 1, i, i + 1;  
+  }
+}
+
 void MergeMesh(const Eigen::MatrixXd& V,
                const Eigen::MatrixXi& F,
                Eigen::MatrixXd& out_V,

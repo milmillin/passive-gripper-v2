@@ -127,6 +127,14 @@ void CreateCylinder(const Eigen::Vector3d& a,
                     Eigen::MatrixXd& out_V,
                     Eigen::MatrixXi& out_F);
 
+void CreateCone(const Eigen::Vector3d& O,
+                const Eigen::Vector3d& N,
+                double r,
+                double h,
+                int res,
+                Eigen::MatrixXd& out_V,
+                Eigen::MatrixXi& out_F);
+
 // Merge all disjoint sub-meshes in the mesh if they overlap
 void MergeMesh(const Eigen::MatrixXd& V,
                const Eigen::MatrixXi& F,

@@ -259,6 +259,38 @@ opt_done:
     igl::writeSTL(raw_fn + "_mesh.stl", V, F, igl::FileEncoding::Binary);
     Log() << ">> Mesh Dumped to " << raw_fn + "_mesh.stl" << std::endl;
 
+
+
+    std::vector<Eigen::MatrixXd> cp_V;
+    std::vector<Eigen::MatrixXi> cp_F;
+    size_t n_cp_V = 0;
+    size_t n_cp_F = 0;
+    auto cps = psg.GetContactPoints();
+    // psg.SetContactPoints(cps);
+    for (size_t i = 0; i < cps.size(); i++) {
+      Eigen::MatrixXd V_;
+      Eigen::MatrixXi F_;
+      psg::core::CreateCone(
+          cps[i].position, cps[i].normal, 0.0075, 0.02, 8, V_, F_);
+      cp_V.push_back(V_);
+      cp_F.push_back(F_);
+      n_cp_V += V_.rows();
+      n_cp_F += F_.rows();
+    }
+    Eigen::MatrixXd VVV(n_cp_V, 3);
+    Eigen::MatrixXi FFF(n_cp_F, 3);
+    size_t cur_cp_V = 0;
+    size_t cur_cp_F = 0;
+    for (int i = 0; i < cp_V.size(); i++) {
+      VVV.block(cur_cp_V, 0, cp_V[i].rows(), 3) = cp_V[i];
+      FFF.block(cur_cp_F, 0, cp_F[i].rows(), 3) =
+          cp_F[i].array() + (int)cur_cp_V;
+      cur_cp_V += cp_V[i].rows();
+      cur_cp_F += cp_F[i].rows();
+    }
+    igl::writeSTL(raw_fn + "_cp.stl", VVV, FFF, igl::FileEncoding::Binary);
+    Log() << ">> CP Dumped to " << raw_fn + "_cp.stl" << std::endl;
+
     psg::Fingers finger = psg.GetFingers();
     std::vector<Eigen::MatrixXd> finger_V;
     std::vector<Eigen::MatrixXi> finger_F;
