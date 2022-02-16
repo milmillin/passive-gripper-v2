@@ -751,7 +751,7 @@ double ComputeCost_SP(const GripperParams& params,
                       const MeshDependentResource& remeshed_mdr,
                       GripperParams& out_dCost_dParam,
                       Debugger* const debugger) {
-  constexpr double precision = 0.001;  // 1mm
+  constexpr double precision = 0.005;  // 1mm
 
   struct _SubInfo {
     // Pose pose;
@@ -792,7 +792,7 @@ double ComputeCost_SP(const GripperParams& params,
   std::vector<std::pair<int, double>> traj_contrib;
   AdaptiveSubdivideTrajectory(params.trajectory,
                               params.fingers,
-                              precision,
+                              0.001,
                               new_trajectory,
                               new_fingers,
                               traj_contrib);
