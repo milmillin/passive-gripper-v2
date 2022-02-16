@@ -16,6 +16,7 @@
 #include "../core/QualityMetric.h"
 #include "../core/SweptVolume.h"
 #include "../core/TopoOpt.h"
+#include "../core/models/ContactPointMetric.h"
 #include "../core/models/SettingsOverrider.h"
 #include "../utils.h"
 
@@ -27,6 +28,30 @@ void Usage(char* argv0) {
           << " psg [-s stgo] [--refine bin out-stl] [--gen-tpd out-tpd] "
              "[--dump-traj out-traj-csv]"
           << std::endl;
+}
+
+void CombineMesh(const std::vector<Eigen::MatrixXd>& V,
+                 const std::vector<Eigen::MatrixXi>& F,
+                 Eigen::MatrixXd& out_V,
+                 Eigen::MatrixXi& out_F) {
+  size_t V_rows = 0;
+  size_t F_rows = 0;
+  for (size_t i = 0; i < V.size(); i++) {
+    V_rows += V[i].rows();
+    F_rows += F[i].rows();
+  }
+  Eigen::MatrixXd VV(V_rows, 3);
+  Eigen::MatrixXi FF(F_rows, 3);
+  size_t cur_V = 0;
+  size_t cur_F = 0;
+  for (size_t i = 0; i < V.size(); i++) {
+    VV.block(cur_V, 0, V[i].rows(), 3) = V[i];
+    FF.block(cur_F, 0, F[i].rows(), 3) = F[i].array() + cur_V;
+    cur_V += V[i].rows();
+    cur_F += F[i].rows();
+  }
+  out_V = VV;
+  out_F = FF;
 }
 
 int main(int argc, char** argv) {
@@ -74,6 +99,10 @@ int main(int argc, char** argv) {
   // --dump-viz
   bool dump_viz = false;
 
+  // --dump-cpx
+  bool dump_cpx = false;
+  std::string cpx_fn;
+
   for (int i = 2; i < argc; i++) {
     std::string arg = argv[i];
     if (arg == "-s") {
@@ -103,6 +132,10 @@ int main(int argc, char** argv) {
       i++;
     } else if (arg == "--dump-viz") {
       dump_viz = true;
+    } else if (arg == "--dump-cpx") {
+      dump_cpx = true;
+      cpx_fn = argv[i + 1];
+      i++;
     } else {
       Error() << "Unknown option " << arg << std::endl;
     }
@@ -134,7 +167,69 @@ int main(int argc, char** argv) {
       goto opt_done;
     }
 
+    size_t count = 0;
+    auto cb = [raw_fn, &count](const psg::core::Optimizer& op) {
+      std::vector<Eigen::MatrixXd> traj_V;
+      std::vector<Eigen::MatrixXi> traj_F;
+      auto param = op.GetCurrentParams();
+      auto& traj = param.trajectory;
+      std::vector<Eigen::Vector3d> pos(traj.size());
+      for (size_t i = 0; i < traj.size(); i++) {
+        pos[i] = psg::core::robots::Forward(traj[i]).translation();
+      }
+      for (size_t i = 1; i < traj.size(); i++) {
+        if ((pos[i] - pos[i - 1]).norm() < 0.01) continue;
+        Eigen::Vector3d N = (pos[i] - pos[i - 1]).normalized();
+
+        Eigen::MatrixXd V_;
+        Eigen::MatrixXi F_;
+        psg::core::CreateCylinder(
+            pos[i - 1] + 0.005 * N, pos[i], 0.002, 5, V_, F_);
+        traj_V.push_back(V_);
+        traj_F.push_back(F_);
+
+        psg::core::CreateCone(pos[i - 1], N, 0.005, 0.01, 8, V_, F_);
+        traj_V.push_back(V_);
+        traj_F.push_back(F_);
+      }
+      Eigen::MatrixXd traj_VV;
+      Eigen::MatrixXi traj_FF;
+      CombineMesh(traj_V, traj_F, traj_VV, traj_FF);
+      igl::writeSTL(
+          raw_fn + "_traj_" + std::to_string(count) + ".stl", traj_VV, traj_FF, igl::FileEncoding::Binary);
+      Log() << ">> Traj dumped to " << raw_fn + "_traj_xx.stl" << std::endl;
+
+      psg::Fingers finger = param.fingers;
+      std::vector<Eigen::MatrixXd> finger_V;
+      std::vector<Eigen::MatrixXi> finger_F;
+      for (size_t i = 0; i < finger.size(); i++) {
+        for (size_t j = 0; j < finger[i].rows(); j++) {
+          Eigen::MatrixXd V_;
+          Eigen::MatrixXi F_;
+          psg::core::CreateSpheres(finger[i].row(j), 0.005, 10, V_, F_);
+          finger_V.push_back(V_);
+          finger_F.push_back(F_);
+          if (j > 0) {
+            psg::core::CreateCylinder(
+                finger[i].row(j - 1), finger[i].row(j), 0.002, 5, V_, F_);
+            finger_V.push_back(V_);
+            finger_F.push_back(F_);
+          }
+        }
+      }
+      Eigen::MatrixXd finger_VV;
+      Eigen::MatrixXi finger_FF;
+      CombineMesh(finger_V, finger_F, finger_VV, finger_FF);
+      igl::writeSTL(raw_fn + "_fingers_" + std::to_string(count) + ".stl",
+                    finger_VV,
+                    finger_FF,
+                    igl::FileEncoding::Binary);
+      Log() << ">> Finger dumped to " << raw_fn + "_finger_xx.stl" << std::endl;
+      count++;
+    };
+
     auto start_time = std::chrono::high_resolution_clock::now();
+    optimizer.RegisterCallback(cb);
     optimizer.Optimize(psg);
     optimizer.Wait();
     auto stop_time = std::chrono::high_resolution_clock::now();
@@ -251,6 +346,40 @@ opt_done:
     }
     Log() << ">> Done: Trajectory dumped to " << out_traj_csv_fn << std::endl;
   }
+  if (dump_cpx) {
+    std::ifstream cpx_file(cpx_fn, std::ios::in | std::ios::binary);
+    if (!cpx_file.is_open()) {
+      throw std::invalid_argument("> Cannot open cpx file " + psg_fn);
+    }
+    std::vector<psg::core::models::ContactPointMetric> cpx;
+    psg::core::serialization::Deserialize(cpx, cpx_file);
+
+    for (size_t i = 0; i < cpx.size(); i++) {
+      const auto& cps = cpx[i];
+      std::vector<Eigen::MatrixXd> cp_V;
+      std::vector<Eigen::MatrixXi> cp_F;
+      for (size_t i = 0; i < cps.contact_points.size(); i++) {
+        Eigen::MatrixXd V_;
+        Eigen::MatrixXi F_;
+        psg::core::CreateCone(cps.contact_points[i].position,
+                              cps.contact_points[i].normal,
+                              0.0075,
+                              0.02,
+                              8,
+                              V_,
+                              F_);
+        cp_V.push_back(V_);
+        cp_F.push_back(F_);
+      }
+      Eigen::MatrixXd V;
+      Eigen::MatrixXi F;
+      CombineMesh(cp_V, cp_F, V, F);
+      igl::writeSTL(raw_fn + "_cp_" + std::to_string(i) + ".stl",
+                    V,
+                    F,
+                    igl::FileEncoding::Binary);
+    }
+  }
   if (dump_viz) {
     Log() << "> Dumping Viz" << std::endl;
     Eigen::MatrixXd V;
@@ -258,8 +387,6 @@ opt_done:
     psg.GetMesh(V, F);
     igl::writeSTL(raw_fn + "_mesh.stl", V, F, igl::FileEncoding::Binary);
     Log() << ">> Mesh Dumped to " << raw_fn + "_mesh.stl" << std::endl;
-
-
 
     std::vector<Eigen::MatrixXd> cp_V;
     std::vector<Eigen::MatrixXi> cp_F;
@@ -290,6 +417,35 @@ opt_done:
     }
     igl::writeSTL(raw_fn + "_cp.stl", VVV, FFF, igl::FileEncoding::Binary);
     Log() << ">> CP Dumped to " << raw_fn + "_cp.stl" << std::endl;
+
+    std::vector<Eigen::MatrixXd> traj_V;
+    std::vector<Eigen::MatrixXi> traj_F;
+    auto& traj = psg.GetTrajectory();
+    std::vector<Eigen::Vector3d> pos(traj.size());
+    for (size_t i = 0; i < traj.size(); i++) {
+      pos[i] = psg::core::robots::Forward(traj[i]).translation();
+    }
+    for (size_t i = 1; i < traj.size(); i++) {
+      if ((pos[i] - pos[i - 1]).norm() < 0.01) continue;
+      Eigen::Vector3d N = (pos[i] - pos[i - 1]).normalized();
+
+      Eigen::MatrixXd V_;
+      Eigen::MatrixXi F_;
+      psg::core::CreateCylinder(
+          pos[i - 1] + 0.005 * N, pos[i], 0.002, 5, V_, F_);
+      traj_V.push_back(V_);
+      traj_F.push_back(F_);
+
+      psg::core::CreateCone(pos[i - 1], N, 0.005, 0.01, 8, V_, F_);
+      traj_V.push_back(V_);
+      traj_F.push_back(F_);
+    }
+    Eigen::MatrixXd traj_VV;
+    Eigen::MatrixXi traj_FF;
+    CombineMesh(traj_V, traj_F, traj_VV, traj_FF);
+    igl::writeSTL(
+        raw_fn + "_traj.stl", traj_VV, traj_FF, igl::FileEncoding::Binary);
+    Log() << ">> Traj dumped to " << raw_fn + "_traj.stl" << std::endl;
 
     psg::Fingers finger = psg.GetFingers();
     std::vector<Eigen::MatrixXd> finger_V;

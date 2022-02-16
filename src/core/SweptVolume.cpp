@@ -363,7 +363,7 @@ static void SweptVolumeImpl(const Eigen::MatrixXd& V,
   igl::copyleft::marching_cubes(CS, CV, CI, 0., out_V, out_F);
 }
 
-static std::vector<Eigen::Matrix4d> GetTransformations(
+std::vector<Eigen::Matrix4d> GetTransformations(
     const PassiveGripper& psg) {
   static const size_t subdivision = 8;
   size_t n_steps = (psg.GetTrajectory().size() - 1) * subdivision + 1;

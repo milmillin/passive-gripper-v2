@@ -171,7 +171,7 @@ void Optimizer::Cancel() {
   Wait();
 }
 
-const GripperParams& Optimizer::GetCurrentParams() {
+const GripperParams& Optimizer::GetCurrentParams() const {
   std::lock_guard<std::mutex> guard(g_min_x_mutex_);
   MyUnflatten(params_proto_, g_min_x_.get());
   return params_proto_;
@@ -203,6 +203,7 @@ double Optimizer::ComputeCostInternal(unsigned n,
     }
     std::cerr << "Iter: " << n_iters_ << ", Current Cost : " << cost
               << std::endl;
+    if (callback_) callback_(*this);
   }
   return cost;
 }

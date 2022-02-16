@@ -8,8 +8,8 @@
 #include <mutex>
 #include <vector>
 
-#include "PassiveGripper.h"
 #include "CostFunctions.h"
+#include "PassiveGripper.h"
 
 namespace psg {
 namespace core {
@@ -36,8 +36,12 @@ class Optimizer {
   GetStartTime() {
     return start_time_;
   }
-  const GripperParams& GetCurrentParams();
+  const GripperParams& GetCurrentParams() const;
 
+  inline void RegisterCallback(
+      const std::function<void(const Optimizer&)>& cb) {
+    callback_ = cb;
+  }
 
   // Internal use
   double ComputeCostInternal(unsigned n, const double* x, double* grad);
@@ -48,7 +52,7 @@ class Optimizer {
 
   GripperParams params_;
   GripperParams init_params_;
-  GripperParams params_proto_;
+  mutable GripperParams params_proto_;
   MeshDependentResource mdr_;
   GripperSettings settings_;
   std::unique_ptr<double> x_;
@@ -65,6 +69,8 @@ class Optimizer {
   double t_min_cost_;
   std::unique_ptr<double> g_min_x_;
   mutable std::mutex g_min_x_mutex_;
+
+  std::function<void(const Optimizer&)> callback_;
 
   std::chrono::time_point<std::chrono::high_resolution_clock> start_time_;
 

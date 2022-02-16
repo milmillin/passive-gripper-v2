@@ -5,6 +5,7 @@
 #include <igl/writeSTL.h>
 #include <iostream>
 
+#include <igl/copyleft/cgal/mesh_boolean.h>
 #include <igl/marching_cubes.h>
 #include <igl/voxel_grid.h>
 #include "../core/CostFunctions.h"
@@ -12,6 +13,7 @@
 #include "../core/GeometryUtils.h"
 #include "../core/Initialization.h"
 #include "../core/QualityMetric.h"
+#include "../core/SweptVolume.h"
 #include "../core/TopoOpt.h"
 #include "../core/models/GripperSettings.h"
 #include "../core/robots/Robots.h"
@@ -765,6 +767,55 @@ void MainUI::DrawDebugPanel() {
           }
           traj_csv_file << std::endl;
         }
+      }
+    }
+    if (ImGui::Button("Dump Swept Volume", ImVec2(w, 0))) {
+      std::string filename = igl::file_dialog_save();
+      const auto& psg = vm_.PSG();
+      if (!filename.empty()) {
+        Eigen::Vector3d floor(0, 0, 0);
+        Eigen::Vector3d floor_N(0, 1, 0);
+        Eigen::Affine3d finger_trans_inv = psg.GetFingerTransInv();
+        floor = finger_trans_inv * floor;
+        floor_N = finger_trans_inv.linear() * floor_N;
+
+        Eigen::MatrixXd out_V;
+        Eigen::MatrixXi out_F;
+
+        SweptVolume((finger_trans_inv *
+                     psg.GetMeshV().transpose().colwise().homogeneous())
+                        .transpose(),
+                    psg.GetMeshF(),
+                    GetTransformations(psg),
+                    psg.GetTopoOptSettings().neg_vol_res,
+                    out_V,
+                    out_F,
+                    100);
+
+        igl::writeSTL(
+            filename + "_sv.stl", out_V, out_F, igl::FileEncoding::Binary);
+
+        Eigen::MatrixXd neg_V;
+        Eigen::MatrixXi neg_F;
+        NegativeSweptVolumePSG(psg, neg_V, neg_F);
+
+        /*
+        Eigen::Vector3d box_lb = psg.GetTopoOptSettings().lower_bound;
+        Eigen::Vector3d box_ub = psg.GetTopoOptSettings().upper_bound;
+
+        Eigen::MatrixXd box_V = CreateCubeV(box_lb, box_ub);
+
+        igl::copyleft::cgal::mesh_boolean(box_V,
+                                          cube_F,
+                                          out_V,
+                                          out_F,
+                                          igl::MESH_BOOLEAN_TYPE_MINUS,
+                                          neg_V,
+                                          neg_F);
+        */
+
+        igl::writeSTL(
+            filename + "neg.stl", neg_V, neg_F, igl::FileEncoding::Binary);
       }
     }
   }

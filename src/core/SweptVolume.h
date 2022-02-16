@@ -9,6 +9,8 @@
 namespace psg {
 namespace core {
 
+std::vector<Eigen::Matrix4d> GetTransformations(const PassiveGripper& psg);
+
 void NegativeSweptVolume(const Eigen::MatrixXd& V,
                          const Eigen::MatrixXi& F,
                          const std::vector<Eigen::Matrix4d>& transformations,
