@@ -851,6 +851,7 @@ double ComputeCost_SP(const GripperParams& params,
   }
 
   // discretize fingers
+  /*
   std::vector<Eigen::Vector3d> d_fingers;
   for (size_t i = 0; i < fingers.size(); i++) {
     for (size_t j = 1; j < fingers[i].rows(); j++) {
@@ -864,12 +865,14 @@ double ComputeCost_SP(const GripperParams& params,
       }
     }
   }
+  */
 
   std::vector<Eigen::Affine3d> new_trans(new_trajectory.size());
   for (size_t i = 0; i < new_trajectory.size(); i++) {
     new_trans[i] = robots::Forward(new_trajectory[i]);
   }
 
+  /*
   double finger_max = 0;
 
 #pragma omp parallel
@@ -893,6 +896,7 @@ double ComputeCost_SP(const GripperParams& params,
 #pragma omp critical
     finger_max = std::max(finger_max, t_max);
   }
+  */
 
   // Robot floor collision
   double robot_floor = 0;
@@ -914,7 +918,7 @@ double ComputeCost_SP(const GripperParams& params,
                     .squaredNorm();
   }
 
-  return traj_max + finger_max + robot_floor_sig * robot_floor +
+  return traj_max /* + finger_max*/ + robot_floor_sig * robot_floor +
          settings.cost.regularization * traj_reg;
 }
 
