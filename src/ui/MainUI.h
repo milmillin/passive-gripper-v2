@@ -103,6 +103,7 @@ class MainUI : public igl::opengl::glfw::imgui::ImGuiMenu {
   size_t cp_num_seeds = 1000;
   size_t cp_num_candidates = 1000;
   std::vector<ContactPointMetric> contact_point_candidates_;
+  std::string cp_stat_file_path = "";  // File path to store statistics
 
   // Keyframe
   size_t selected_keyframe_index_ = -1;

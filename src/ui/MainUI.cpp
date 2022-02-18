@@ -276,10 +276,11 @@ void MainUI::DrawContactPointPanel() {
   if (ImGui::CollapsingHeader("Candidates", ImGuiTreeNodeFlags_DefaultOpen)) {
     ImGui::InputInt("# Candidates", (int*)&cp_num_candidates, 1000);
     ImGui::InputInt("# Seeds", (int*)&cp_num_seeds, 1000);
+    ImGui::InputText("Stat file path", cp_stat_file_path);
     if (ImGui::Button("Generate Candidates", ImVec2(w, 0))) {
       auto start_time = std::chrono::high_resolution_clock::now();
       contact_point_candidates_ = InitializeContactPoints(
-          vm_.PSG(), cp_filter, cp_num_candidates, cp_num_seeds);
+          vm_.PSG(), cp_filter, cp_num_candidates, cp_num_seeds, cp_stat_file_path);
       auto stop_time = std::chrono::high_resolution_clock::now();
       long long duration =
           std::chrono::duration_cast<std::chrono::milliseconds>(stop_time -
@@ -311,7 +312,7 @@ void MainUI::DrawContactPointPanel() {
         // }
       }
       ImGui::SameLine();
-      ImGui::Text("(%d) dist: %d mw: %.4e, pmw: %.4e",
+      ImGui::Text("(%d) dist: %.4e mw: %.4e, pmw: %.4e",
                   i,
                   contact_point_candidates_[i].finger_distance,
                   contact_point_candidates_[i].min_wrench,

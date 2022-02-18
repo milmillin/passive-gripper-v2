@@ -2,6 +2,7 @@
 
 #include <igl/random_points_on_mesh.h>
 #include <random>
+#include <fstream>
 #include "DiscreteDistanceField.h"
 #include "GeometryUtils.h"
 #include "QualityMetric.h"
@@ -375,7 +376,8 @@ std::vector<ContactPointMetric> InitializeContactPoints(
     const PassiveGripper& psg,
     const ContactPointFilter& filter,
     size_t num_candidates,
-    size_t num_seeds) {
+    size_t num_seeds,
+    std::string stat_file_path) {
   const MeshDependentResource& mdr = psg.GetMDR();
   const ContactSettings& settings = psg.GetContactSettings();
   Eigen::Vector3d effector_pos =
@@ -383,6 +385,17 @@ std::vector<ContactPointMetric> InitializeContactPoints(
 
   std::vector<int> FI;
   std::vector<Eigen::Vector3d> X;
+
+  // Open statistics file
+  std::ofstream f_stat;
+  if (!stat_file_path.empty()) {
+    f_stat.open(stat_file_path, std::ios::out | std::ios::trunc);
+    if (!f_stat) {
+      Error() << "Failed to open " << stat_file_path << std::endl;
+    } else {
+      Log() << "Saving contact point statistics to file " << stat_file_path << std::endl;
+    }
+  }
 
   InitializeContactPointSeeds(psg, num_seeds, filter, FI, X);
 
@@ -500,7 +513,7 @@ std::vector<ContactPointMetric> InitializeContactPoints(
       candidate.min_wrench = minWrench;
       candidate.trans = trans;
       candidate.finger_distance =
-          round(GetFingerDistance(distanceField, contactPoints));
+          GetFingerDistance(distanceField, contactPoints);
 #pragma omp critical
       {
         prelim.push_back(candidate);
@@ -514,6 +527,14 @@ std::vector<ContactPointMetric> InitializeContactPoints(
   if (prelim.size() < num_candidates) {
     Error() << "low success rate. exit early. got: " << prelim.size()
             << " expected: " << num_candidates << std::endl;
+  }
+
+  // Save statistics
+  if (f_stat) {
+    f_stat << std::setprecision(10);
+    for (const auto &candidate : prelim) {
+      f_stat << candidate.finger_distance << "," << candidate.partial_min_wrench << std::endl;
+    }
   }
 
   std::sort(prelim.begin(),

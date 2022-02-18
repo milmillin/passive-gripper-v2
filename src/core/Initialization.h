@@ -37,7 +37,8 @@ std::vector<ContactPointMetric> InitializeContactPoints(
     const PassiveGripper& psg,
     const ContactPointFilter& filter,
     size_t num_candidates,
-    size_t num_seeds);
+    size_t num_seeds,
+    std::string stat_file_path = "");
 
 void InitializeGripperBound(const PassiveGripper& psg,
                             Eigen::Vector3d& out_lb,
