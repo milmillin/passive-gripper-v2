@@ -23,7 +23,7 @@ char __buf[1024];
 std::string FormatOutput(const psgm::CostSettings& s, int iter) {
   std::snprintf(__buf,
                 1024,
-                "-%02d-%02.0d-%.0d-%.0d-%.0d-%.0d",
+                "-%02d-%02.0f-%.0f-%.0f-%.0f-%.0f",
                 iter,
                 s.d_subdivision * 1000,
                 s.geodesic_contrib,
@@ -71,6 +71,10 @@ int main(int argc, char** argv) {
   size_t lastdot = psg_fn.rfind('.');
   std::string raw_fn = psg_fn.substr(0, lastdot);
 
+  size_t lastslash = raw_fn.rfind('/');
+  if (lastslash == std::string::npos) lastslash = raw_fn.rfind('\\');
+  std::string wopath_fn = raw_fn.substr(lastslash + 1, std::string::npos);
+
   // output_dir
   std::string out_dir = argv[2];
 
@@ -108,11 +112,11 @@ int main(int argc, char** argv) {
   } else {
     ckpt_file >> ckpt_i >> ckpt_j;
     Log() << "Checkpoint loaded: " << ckpt_i << " " << ckpt_j << std::endl;
-    ckpt_j++;
-    if (ckpt_j >= testcases.size()) {
-      ckpt_i++;
-      ckpt_j = 0;
-    }
+  }
+  ckpt_j++;
+  if (ckpt_j >= testcases.size()) {
+    ckpt_i++;
+    ckpt_j = 0;
   }
 
   psgc::PassiveGripper psg;
@@ -120,7 +124,7 @@ int main(int argc, char** argv) {
   psgm::CostSettings org_cost_settings = psg.GetCostSettings();
   std::vector<psgm::ContactPoint> org_cps = psg.GetContactPoints();
 
-  std::string out_raw_fn = out_dir + "/" + raw_fn;
+  std::string out_raw_fn = out_dir + "/" + wopath_fn;
 
   auto Process = [&](const psgm::CostSettings& cost_settings, int iter) {
     Log() << "> Optimizing for:\n" << cost_settings << std::endl;
