@@ -13,9 +13,16 @@ struct CostSettings : psg::core::serialization::Serializable {
   double ang_velocity = kDegToRad * 60.;
   CostFunctionEnum cost_function = CostFunctionEnum::kSP;
   double regularization = 1e-6;
+  double robot_collision = 1000;
+  double traj_energy = 1.;
+  double gripper_energy = 1.;
+  double geodesic_contrib = 1.;
+  double inner_dis_contrib = 1.;
+  double d_subdivision = 0.001;
+  double d_linearity = 0.001;
 
   DECL_SERIALIZE() {
-    constexpr int version = 4;
+    constexpr int version = 5;
     SERIALIZE(version);
     SERIALIZE(floor);
     SERIALIZE(n_trajectory_steps);
@@ -23,6 +30,13 @@ struct CostSettings : psg::core::serialization::Serializable {
     SERIALIZE(ang_velocity);
     SERIALIZE(cost_function);
     SERIALIZE(regularization);
+    SERIALIZE(robot_collision);
+    SERIALIZE(traj_energy);
+    SERIALIZE(gripper_energy);
+    SERIALIZE(geodesic_contrib);
+    SERIALIZE(inner_dis_contrib);
+    SERIALIZE(d_subdivision);
+    SERIALIZE(d_linearity);
   }
 
   DECL_DESERIALIZE() {
@@ -50,6 +64,20 @@ struct CostSettings : psg::core::serialization::Serializable {
       DESERIALIZE(ang_velocity);
       DESERIALIZE(cost_function);
       DESERIALIZE(regularization);
+    } else if (version == 5) {
+      DESERIALIZE(floor);
+      DESERIALIZE(n_trajectory_steps);
+      DESERIALIZE(n_finger_steps);
+      DESERIALIZE(ang_velocity);
+      DESERIALIZE(cost_function);
+      DESERIALIZE(regularization);
+      DESERIALIZE(robot_collision);
+      DESERIALIZE(traj_energy);
+      DESERIALIZE(gripper_energy);
+      DESERIALIZE(geodesic_contrib);
+      DESERIALIZE(inner_dis_contrib);
+      DESERIALIZE(d_subdivision);
+      DESERIALIZE(d_linearity);
     }
   }
 };

@@ -656,6 +656,8 @@ struct _SegState {
 static double ComputeCollisionPenaltySegment(const Eigen::Vector3d& A,
                                              const Eigen::Vector3d& B,
                                              const MeshDependentResource& mdr,
+                                             double geodesic_contrib,
+                                             double inner_dis_contrib,
                                              _SegState& state,
                                              Debugger* const debugger) {
   const Eigen::MatrixXd& SP_ = mdr.GetSP();
@@ -697,13 +699,22 @@ static double ComputeCollisionPenaltySegment(const Eigen::Vector3d& A,
       // --|P
       if (state.is_first) {
         // A ----| P
-        total_dis += (P - A.transpose()).norm();
+        if (inner_dis_contrib != 0.) {
+          total_dis += (P - A.transpose()).norm() * inner_dis_contrib;
+        }
       } else {
         // state.last_pos |----| P
         soft_assert(state.last_pos_vid != -1llu);
 
-        total_dis += state.last_pos_vid_dis + SP_(state.last_pos_vid, vid) +
-                     best_dist + (P.transpose() - state.last_pos).norm();
+        if (inner_dis_contrib != 0.) {
+          total_dis +=
+              (P.transpose() - state.last_pos).norm() * inner_dis_contrib;
+        }
+        if (geodesic_contrib != 0.) {
+          total_dis += (state.last_pos_vid_dis + SP_(state.last_pos_vid, vid) +
+                        best_dist) *
+                       geodesic_contrib;
+        }
       }
       state.last_pos_vid = -1llu;
     } else {
@@ -720,11 +731,15 @@ static double ComputeCollisionPenaltySegment(const Eigen::Vector3d& A,
     // |-- B
     if (state.is_first) {
       // | A --- B |
-      total_dis += (B - A).norm();
+      if (inner_dis_contrib != 0.) {
+        total_dis += (B - A).norm() * inner_dis_contrib;
+      }
     } else {
       // state.last_pos |--- B
       soft_assert(state.last_pos_vid != -1llu);
-      total_dis += (B - state.last_pos).norm();
+      if (inner_dis_contrib != 0.) {
+        total_dis += (B - state.last_pos).norm();
+      }
     }
   }
 
@@ -751,8 +766,6 @@ double ComputeCost_SP(const GripperParams& params,
                       const MeshDependentResource& remeshed_mdr,
                       GripperParams& out_dCost_dParam,
                       Debugger* const debugger) {
-  constexpr double precision = 0.001;  // 1mm
-
   struct _SubInfo {
     // Pose pose;
     Fingers fingers;
@@ -766,15 +779,24 @@ double ComputeCost_SP(const GripperParams& params,
 
   // Cost between two points
   const double floor = settings.cost.floor;
-  auto MyCost = [floor, debugger, &remeshed_mdr](const Eigen::RowVector3d& p0,
-                                                 const Eigen::RowVector3d& p1,
-                                                 _SegState& state) -> double {
-    return ComputeCollisionPenaltySegment(
-               p0, p1, remeshed_mdr, state, debugger) +
+  const double inner_dis_contrib = settings.cost.inner_dis_contrib;
+  const double geodesic_contrib = settings.cost.geodesic_contrib;
+  auto MyCost =
+      [floor, debugger, inner_dis_contrib, geodesic_contrib, &remeshed_mdr](
+          const Eigen::RowVector3d& p0,
+          const Eigen::RowVector3d& p1,
+          _SegState& state) -> double {
+    return ComputeCollisionPenaltySegment(p0,
+                                          p1,
+                                          remeshed_mdr,
+                                          inner_dis_contrib,
+                                          geodesic_contrib,
+                                          state,
+                                          debugger) +
            ComputeFloorCost(p0, p1, floor);
   };
 
-  // discretize time
+  // Gripper energy at particular time
   auto ProcessFinger = [&MyCost](const Fingers& fingers) -> double {
     double cost = 0;
     _SegState state;
@@ -787,117 +809,129 @@ double ComputeCost_SP(const GripperParams& params,
     return cost;
   };
 
+  // Linearize trajectory
   Trajectory new_trajectory;
   std::vector<Fingers> new_fingers;
   std::vector<std::pair<int, double>> traj_contrib;
   AdaptiveSubdivideTrajectory(params.trajectory,
                               params.fingers,
-                              precision,
+                              settings.cost.d_linearity,
                               new_trajectory,
                               new_fingers,
                               traj_contrib);
   size_t n_trajectory = new_trajectory.size();
-  std::vector<bool> traj_skip(n_trajectory - 1, false);
-  std::vector<size_t> traj_subs(n_trajectory - 1, 0);
-
-  // #pragma omp parallel for
-  for (long long i = 0; i < n_trajectory - 1; i++) {
-    double max_deviation = 0;
-    bool intersects = false;
-    for (size_t j = 0; j < new_fingers[i].size(); j++) {
-      double dev = (new_fingers[i + 1][j] - new_fingers[i][j])
-                       .rowwise()
-                       .norm()
-                       .maxCoeff();
-      max_deviation = std::max(max_deviation, dev);
-      Eigen::RowVector3d p_min =
-          new_fingers[i][j].colwise().minCoeff().cwiseMin(
-              new_fingers[i + 1][j].colwise().minCoeff());
-      Eigen::RowVector3d p_max =
-          new_fingers[i][j].colwise().maxCoeff().cwiseMax(
-              new_fingers[i + 1][j].colwise().maxCoeff());
-      p_min.array() -= precision;
-      p_max.array() += precision;
-      intersects = intersects ||
-                   remeshed_mdr.Intersects(Eigen::AlignedBox3d(p_min, p_max));
-    }
-
-    traj_subs[i] = std::ceil(max_deviation / precision);
-    traj_skip[i] = !intersects;
-  }
-
-  double traj_max = 0;
-  for (size_t i = 0; i < n_trajectory - 1; i++) {
-    if (traj_skip[i]) continue;
-    size_t cur_sub = traj_subs[i];
-    size_t iters = cur_sub;
-    if (i == n_trajectory - 2) iters++;
-
-#pragma omp parallel
-    {
-      double t_max = 0;
-
-#pragma omp for
-      for (long long j = 0; j < iters; j++) {
-        double t = (double)j / cur_sub;
-        Pose pose = new_trajectory[i] * (1. - t) + new_trajectory[i + 1] * t;
-        auto f = TransformFingers(fingers, robots::Forward(pose));
-        t_max = std::max(t_max, ProcessFinger(f));
-      }
-
-#pragma omp critical
-      traj_max = std::max(traj_max, t_max);
-    }
-  }
-
-  // discretize fingers
-  std::vector<Eigen::Vector3d> d_fingers;
-  for (size_t i = 0; i < fingers.size(); i++) {
-    for (size_t j = 1; j < fingers[i].rows(); j++) {
-      double norm = (fingers[i].row(j) - fingers[i].row(j - 1)).norm();
-      size_t subs = std::ceil(norm / precision);
-      size_t iters = subs;
-      for (size_t k = (j == 1) ? 0 : 1; k <= subs; k++) {
-        double t = (double)k / subs;
-        d_fingers.push_back(fingers[i].row(j - 1) * (1. - t) +
-                            fingers[i].row(j) * t);
-      }
-    }
-  }
-
   std::vector<Eigen::Affine3d> new_trans(new_trajectory.size());
   for (size_t i = 0; i < new_trajectory.size(); i++) {
     new_trans[i] = robots::Forward(new_trajectory[i]);
   }
 
-  double finger_max = 0;
+  // ========================
+  // Gripper Energy
+  // ========================
+  double gripper_energy = 0;
 
-#pragma omp parallel
-  {
-    double t_max = 0;
-    _SegState state;
+  if (settings.cost.gripper_energy != 0.) {
+    std::vector<bool> traj_skip(n_trajectory - 1, false);
+    std::vector<size_t> traj_subs(n_trajectory - 1, 0);
 
-#pragma omp for
-    for (long long j = 0; j < d_fingers.size(); j++) {
-      Eigen::Vector3d p0 = new_trans[0] * d_fingers[j];
-      state.is_first = true;
-      double cur_cost = 0;
-      for (size_t k = 1; k < new_trajectory.size(); k++) {
-        Eigen::Vector3d p1 = new_trans[k] * d_fingers[j];
-        cur_cost += MyCost(p0, p1, state);
-        p0 = p1;
+    // #pragma omp parallel for
+    for (long long i = 0; i < n_trajectory - 1; i++) {
+      double max_deviation = 0;
+      bool intersects = false;
+      for (size_t j = 0; j < new_fingers[i].size(); j++) {
+        double dev = (new_fingers[i + 1][j] - new_fingers[i][j])
+                         .rowwise()
+                         .norm()
+                         .maxCoeff();
+        max_deviation = std::max(max_deviation, dev);
+        Eigen::RowVector3d p_min =
+            new_fingers[i][j].colwise().minCoeff().cwiseMin(
+                new_fingers[i + 1][j].colwise().minCoeff());
+        Eigen::RowVector3d p_max =
+            new_fingers[i][j].colwise().maxCoeff().cwiseMax(
+                new_fingers[i + 1][j].colwise().maxCoeff());
+        p_min.array() -= settings.cost.d_subdivision;
+        p_max.array() += settings.cost.d_subdivision;
+        intersects = intersects ||
+                     remeshed_mdr.Intersects(Eigen::AlignedBox3d(p_min, p_max));
       }
-      t_max = std::max(t_max, cur_cost);
+
+      traj_subs[i] = std::ceil(max_deviation / settings.cost.d_subdivision);
+      traj_skip[i] = !intersects;
     }
 
+    for (size_t i = 0; i < n_trajectory - 1; i++) {
+      if (traj_skip[i]) continue;
+      size_t cur_sub = traj_subs[i];
+      size_t iters = cur_sub;
+      if (i == n_trajectory - 2) iters++;
+
+#pragma omp parallel
+      {
+        double t_max = 0;
+
+#pragma omp for
+        for (long long j = 0; j < iters; j++) {
+          double t = (double)j / cur_sub;
+          Pose pose = new_trajectory[i] * (1. - t) + new_trajectory[i + 1] * t;
+          auto f = TransformFingers(fingers, robots::Forward(pose));
+          t_max = std::max(t_max, ProcessFinger(f));
+        }
+
 #pragma omp critical
-    finger_max = std::max(finger_max, t_max);
+        gripper_energy = std::max(gripper_energy, t_max);
+      }
+    }
   }
 
+  // ========================
+  // Trajectory Energy
+  // ========================
+  double trajectory_energy = 0;
+
+  if (settings.cost.traj_energy != 0.) {
+    std::vector<Eigen::Vector3d> d_fingers;
+    for (size_t i = 0; i < fingers.size(); i++) {
+      for (size_t j = 1; j < fingers[i].rows(); j++) {
+        double norm = (fingers[i].row(j) - fingers[i].row(j - 1)).norm();
+        size_t subs = std::ceil(norm / settings.cost.d_subdivision);
+        size_t iters = subs;
+        for (size_t k = (j == 1) ? 0 : 1; k <= subs; k++) {
+          double t = (double)k / subs;
+          d_fingers.push_back(fingers[i].row(j - 1) * (1. - t) +
+                              fingers[i].row(j) * t);
+        }
+      }
+    }
+
+#pragma omp parallel
+    {
+      double t_max = 0;
+      _SegState state;
+
+#pragma omp for
+      for (long long j = 0; j < d_fingers.size(); j++) {
+        Eigen::Vector3d p0 = new_trans[0] * d_fingers[j];
+        state.is_first = true;
+        double cur_cost = 0;
+        for (size_t k = 1; k < new_trajectory.size(); k++) {
+          Eigen::Vector3d p1 = new_trans[k] * d_fingers[j];
+          cur_cost += MyCost(p0, p1, state);
+          p0 = p1;
+        }
+        t_max = std::max(t_max, cur_cost);
+      }
+
+#pragma omp critical
+      trajectory_energy = std::max(trajectory_energy, t_max);
+    }
+  }
+
+  // ========================
   // Robot floor collision
+  // ========================
   double robot_floor = 0;
   double max_penetration = 0;
-  constexpr double robot_floor_sig = 1000;
   constexpr double robot_clearance = 0.05;
   for (const auto& trans : new_trans) {
     max_penetration =
@@ -906,7 +940,9 @@ double ComputeCost_SP(const GripperParams& params,
   }
   robot_floor = max_penetration;
 
+  // ========================
   // L2 regularization term
+  // ========================
   double traj_reg = 0;
   for (size_t i = 1; i < params.trajectory.size() - 1; i++) {
     traj_reg += (params.trajectory[i] - init_params.trajectory[i])
@@ -914,7 +950,12 @@ double ComputeCost_SP(const GripperParams& params,
                     .squaredNorm();
   }
 
-  return traj_max + finger_max + robot_floor_sig * robot_floor +
+  // ========================
+  // Total Cost
+  // ========================
+  return settings.cost.gripper_energy * gripper_energy +
+         settings.cost.traj_energy * trajectory_energy +
+         settings.cost.robot_collision * robot_floor +
          settings.cost.regularization * traj_reg;
 }
 
