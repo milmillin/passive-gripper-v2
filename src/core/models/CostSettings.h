@@ -82,6 +82,20 @@ struct CostSettings : psg::core::serialization::Serializable {
   }
 };
 
+inline std::ostream& operator<<(std::ostream& f, const CostSettings& c) {
+  f << "CostSettings:\n"
+    << "  floor: " << c.floor << "\n"
+    << "  traj_reg: " << c.regularization << "\n"
+    << "  robot_collision: " << c.robot_collision << "\n"
+    << "  traj_energy: " << c.traj_energy << "\n"
+    << "  gripper_energy: " << c.gripper_energy << "\n"
+    << "  geodesic_contrib: " << c.geodesic_contrib << "\n"
+    << "  inner_dis_contrib: " << c.inner_dis_contrib << "\n"
+    << "  d_subdivision: " << c.d_subdivision << "\n"
+    << "  d_linearity: " << c.d_linearity << std::endl;
+  return f;
+}
+
 }  // namespace models
 }  // namespace core
 }  // namespace psg

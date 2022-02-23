@@ -16,6 +16,20 @@ namespace serialization {
 struct Serializable {
   virtual void Serialize(std::ofstream& f) const = 0;
   virtual void Deserialize(std::ifstream& f) = 0;
+  inline void Serialize(const std::string& fn) const {
+    std::ofstream f(fn, std::ios::out || std::ios::binary);
+    if (!f.is_open()) {
+      throw std::invalid_argument("cannot open " + fn);
+    }
+    this->Serialize(f);
+  }
+  inline void Deserialize(const std::string& fn) {
+    std::ifstream f(fn, std::ios::in || std::ios::binary);
+    if (!f.is_open()) {
+      throw std::invalid_argument("cannot open " + fn);
+    }
+    this->Deserialize(f);
+  }
 };
 
 // Serializable
@@ -69,6 +83,12 @@ inline void Serialize(const Eigen::Matrix<T, R, C, P, MR, MC>& obj,
 template <typename T, int R, int C, int P, int MR, int MC>
 inline void Deserialize(Eigen::Matrix<T, R, C, P, MR, MC>& obj,
                         std::ifstream& f);
+
+// Wrapper
+template <typename T>
+inline void Serialize(const T& obj, const std::string& fn);
+template <typename T>
+inline void Deserialize(T& obj, const std::string& fn);
 
 //============== IMPLEMENTATION =================
 
@@ -204,6 +224,24 @@ void Deserialize(Eigen::Matrix<T, R, C, P, MR, MC>& obj, std::ifstream& f) {
   for (long long i = 0; i < obj.size(); i++) {
     Deserialize(obj(i), f);
   }
+}
+
+// Wrapper
+template <typename T>
+inline void Serialize(const T& obj, const std::string& fn) {
+  std::ofstream f(fn, std::ios::out || std::ios::binary);
+  if (!f.is_open()) {
+    throw std::invalid_argument("cannot open " + fn);
+  }
+  Serialize(obj, f);
+}
+template <typename T>
+inline void Deserialize(T& obj, const std::string& fn) {
+  std::ifstream f(fn, std::ios::in || std::ios::binary);
+  if (!f.is_open()) {
+    throw std::invalid_argument("cannot open " + fn);
+  }
+  Deserialize(obj, f);
 }
 
 }  // namespace serialization
