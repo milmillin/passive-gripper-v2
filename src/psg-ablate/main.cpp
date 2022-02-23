@@ -153,7 +153,12 @@ int main(int argc, char** argv) {
       bp::ipstream out;
       bp::child c(hook_str,
                   bp::std_out > out,
-                  raw_fn,
+                  wopath_fn,
+                  ToString(cost_settings.d_subdivision),
+                  ToString(cost_settings.geodesic_contrib),
+                  ToString(cost_settings.inner_dis_contrib),
+                  ToString(cost_settings.gripper_energy),
+                  ToString(cost_settings.traj_energy),
                   psg::kBoolStr[success],
                   ToString(psg.GetMinDist()),
                   std::to_string(duration.count()),
