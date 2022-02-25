@@ -789,8 +789,8 @@ double ComputeCost_SP(const GripperParams& params,
     return ComputeCollisionPenaltySegment(p0,
                                           p1,
                                           remeshed_mdr,
-                                          inner_dis_contrib,
                                           geodesic_contrib,
+                                          inner_dis_contrib,
                                           state,
                                           debugger) +
            ComputeFloorCost(p0, p1, floor);

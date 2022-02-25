@@ -201,6 +201,7 @@ int main(int argc, char** argv) {
         Log() << "Ckeckpoint updated: " << i << " " << j << std::endl;
       }
     }
+    ckpt_j = 0;
   }
 
   return 0;
