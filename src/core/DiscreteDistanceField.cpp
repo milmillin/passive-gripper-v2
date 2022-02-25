@@ -54,7 +54,7 @@ DiscreteDistanceField::DiscreteDistanceField(const Eigen::MatrixXd& V,
     for (int dx = -1; dx <= 1; dx++)
       for (int dy = -1; dy <= 1; dy++)
         for (int dz = -1; dz <= 1; dz++) {
-          double cur_cost = current_cost + Eigen::Vector3i(dx, dy, dz).norm();
+          double cur_cost = current_cost + Eigen::Vector3i(dx, dy, dz).cast<double>().norm();
           Eigen::Vector3i next_coord = next + Eigen::Vector3i(dx, dy, dz);
           next_coord = next_coord.cwiseMax(Eigen::Vector3i(0, 0, 0));
           next_coord = next_coord.cwiseMin(size - Eigen::Vector3i(1, 1, 1));
