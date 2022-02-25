@@ -30,12 +30,13 @@ int main(int argc, char** argv) {
   psg.Deserialize(psg_f);
 
   size_t n_seeds = 1000;
-  size_t n_candidates = 3000;
+  size_t n_candidates = 5000;
   psg::core::models::ContactPointFilter cp_filter_1;
 
   auto start_time = std::chrono::high_resolution_clock::now();
+  std::string stat_file_name = psg_fn.substr(0, psg_fn.find('.')) + ".csv";
   auto cps = psg::core::InitializeContactPoints(
-      psg, cp_filter_1, n_candidates, n_seeds);
+      psg, cp_filter_1, n_candidates, n_seeds, stat_file_name);
   auto stop_time = std::chrono::high_resolution_clock::now();
   long long duration = std::chrono::duration_cast<std::chrono::milliseconds>(
                            stop_time - start_time)
