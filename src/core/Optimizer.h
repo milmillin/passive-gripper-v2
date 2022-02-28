@@ -8,8 +8,8 @@
 #include <mutex>
 #include <vector>
 
-#include "PassiveGripper.h"
 #include "CostFunctions.h"
+#include "PassiveGripper.h"
 
 namespace psg {
 namespace core {
@@ -37,7 +37,6 @@ class Optimizer {
     return start_time_;
   }
   const GripperParams& GetCurrentParams();
-
 
   // Internal use
   double ComputeCostInternal(unsigned n, const double* x, double* grad);
@@ -69,6 +68,9 @@ class Optimizer {
   std::chrono::time_point<std::chrono::high_resolution_clock> start_time_;
 
   CostFunctionItem cost_function_;
+
+ public:
+  DECLARE_GETTER(GetIters, n_iters_);
 };
 
 }  // namespace core

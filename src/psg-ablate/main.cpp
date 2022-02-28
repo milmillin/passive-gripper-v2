@@ -41,7 +41,8 @@ struct Testcase {
   double traj_energy;
 };
 
-std::vector<double> subdivisions = {0.0001, 0.0003, 0.0005, 0.001, 0.005, 0.01, 0.03, 0.05};
+std::vector<double> subdivisions =
+    {0.0001, 0.0003, 0.0005, 0.001, 0.005, 0.01, 0.03, 0.05};
 
 std::vector<Testcase> testcases;
 
@@ -145,7 +146,8 @@ int main(int argc, char** argv) {
     psg.SetParams(params);
     bool success = psg.GetMinDist() >= -1e-5;
 
-    std::string out_fn = out_raw_fn + FormatOutput(cost_settings, iter) + ".params";
+    std::string out_fn =
+        out_raw_fn + FormatOutput(cost_settings, iter) + ".params";
     psgs::Serialize(params, out_fn);
     Log() << ">> Params written to " << out_fn << std::endl;
 
@@ -166,7 +168,8 @@ int main(int argc, char** argv) {
                   psg::kBoolStr[psg.GetIsForceClosure()],
                   ToString(psg.GetMinWrench()),
                   ToString(psg.GetPartialMinWrench()),
-                  ToString(psgc::GetTrajectoryComplexity(psg.GetTrajectory())));
+                  ToString(psgc::GetTrajectoryComplexity(psg.GetTrajectory())),
+                  std::to_string(optimizer.GetIters()));
       char a[1024];
       auto& out_s = Log() << "[child proc]" << std::endl;
       while (out.read(a, 1024)) {
