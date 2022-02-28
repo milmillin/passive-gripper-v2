@@ -41,7 +41,7 @@ struct Testcase {
   double traj_energy;
 };
 
-std::vector<double> subdivisions = {0.001, 0.005, 0.01, 0.03, 0.05};
+std::vector<double> subdivisions = {0.0001, 0.0003, 0.0005, 0.001, 0.005, 0.01, 0.03, 0.05};
 
 std::vector<Testcase> testcases;
 
@@ -83,7 +83,7 @@ int main(int argc, char** argv) {
   std::string hook_str;
 
   // -m iters
-  int iters = 2;
+  int iters = 5;
 
   for (int i = 3; i < argc; i++) {
     std::string arg = argv[i];
