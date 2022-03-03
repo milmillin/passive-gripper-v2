@@ -23,9 +23,9 @@ char __buf[1024];
 std::string FormatOutput(const psgm::CostSettings& s, int iter) {
   std::snprintf(__buf,
                 1024,
-                "-%02d-%02.0f-%.0f-%.0f-%.0f-%.0f",
+                "-%02d-%04lld-%.0f-%.0f-%.0f-%.0f",
                 iter,
-                s.d_subdivision * 1000,
+                s.d_subdivision,
                 s.geodesic_contrib,
                 s.inner_dis_contrib,
                 s.gripper_energy,
@@ -34,29 +34,28 @@ std::string FormatOutput(const psgm::CostSettings& s, int iter) {
 }
 
 struct Testcase {
-  double d_subdivision;
+  size_t d_subdivision;
   double geodesic_contrib;
   double inner_dis_contrib;
   double gripper_energy;
   double traj_energy;
 };
 
-std::vector<double> subdivisions =
-    {0.0001, 0.0003, 0.0005, 0.001, 0.005, 0.01, 0.03, 0.05};
+// std::vector<double> subdivisions =
+    // {0.0001, 0.0003, 0.0005, 0.001, 0.005, 0.01, 0.03, 0.05};
+
+std::vector<size_t> subdivisions = {1024, 512, 256, 128, 64, 32};
 
 std::vector<Testcase> testcases;
 
 void GenerateTestcases() {
-  for (double sub : subdivisions) {
+  for (size_t sub : subdivisions) {
     testcases.push_back(Testcase{sub, 1, 1, 1, 1});
     testcases.push_back(Testcase{sub, 1, 0, 1, 1});
-    testcases.push_back(Testcase{sub, 0, 1, 1, 1});
     testcases.push_back(Testcase{sub, 1, 1, 1, 0});
     testcases.push_back(Testcase{sub, 1, 0, 1, 0});
-    testcases.push_back(Testcase{sub, 0, 1, 1, 0});
     testcases.push_back(Testcase{sub, 1, 1, 0, 1});
     testcases.push_back(Testcase{sub, 1, 0, 0, 1});
-    testcases.push_back(Testcase{sub, 0, 1, 0, 1});
   }
 }
 
@@ -156,7 +155,7 @@ int main(int argc, char** argv) {
       bp::child c(hook_str,
                   bp::std_out > out,
                   wopath_fn,
-                  ToString(cost_settings.d_subdivision),
+                  std::to_string(cost_settings.d_subdivision),
                   ToString(cost_settings.geodesic_contrib),
                   ToString(cost_settings.inner_dis_contrib),
                   ToString(cost_settings.gripper_energy),
@@ -187,7 +186,8 @@ int main(int argc, char** argv) {
     for (int j = ckpt_j; j < (int)testcases.size(); j++) {
       const auto& testcase = testcases[j];
       psgm::CostSettings cost_settings = org_cost_settings;
-      cost_settings.d_subdivision = testcase.d_subdivision;
+      cost_settings.n_finger_steps = testcase.d_subdivision;
+      cost_settings.n_trajectory_steps = testcase.d_subdivision;
       cost_settings.geodesic_contrib = testcase.geodesic_contrib;
       cost_settings.inner_dis_contrib = testcase.inner_dis_contrib;
       cost_settings.traj_energy = testcase.traj_energy;

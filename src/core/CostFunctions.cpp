@@ -844,7 +844,9 @@ double ComputeCost_SP(const GripperParams& params,
 
   if (settings.cost.gripper_energy != 0.) {
     std::vector<bool> traj_skip(n_trajectory - 1, false);
+    std::vector<double> traj_devs(n_trajectory - 1);
     std::vector<size_t> traj_subs(n_trajectory - 1, 0);
+    double total_dev = 0;
 
     // #pragma omp parallel for
     for (long long i = 0; i < n_trajectory - 1; i++) {
@@ -868,8 +870,13 @@ double ComputeCost_SP(const GripperParams& params,
                      remeshed_mdr.Intersects(Eigen::AlignedBox3d(p_min, p_max));
       }
 
-      traj_subs[i] = std::ceil(max_deviation / settings.cost.d_subdivision);
+      total_dev += max_deviation;
+      traj_devs[i] = max_deviation;
       traj_skip[i] = !intersects;
+    }
+    double d_sub = total_dev / settings.cost.n_finger_steps;
+    for (long long i = 0; i < n_trajectory - 1; i++) {
+      traj_subs[i] = std::ceil(traj_devs[i] / d_sub);
     }
 
     for (size_t i = 0; i < n_trajectory - 1; i++) {
@@ -904,9 +911,15 @@ double ComputeCost_SP(const GripperParams& params,
   if (settings.cost.traj_energy != 0.) {
     std::vector<Eigen::Vector3d> d_fingers;
     for (size_t i = 0; i < fingers.size(); i++) {
+      double total_norm = 0;
       for (size_t j = 1; j < fingers[i].rows(); j++) {
         double norm = (fingers[i].row(j) - fingers[i].row(j - 1)).norm();
-        size_t subs = std::ceil(norm / settings.cost.d_subdivision);
+        total_norm += norm;
+      }
+      double d_sub = total_norm / settings.cost.n_trajectory_steps;
+      for (size_t j = 1; j < fingers[i].rows(); j++) {
+        double norm = (fingers[i].row(j) - fingers[i].row(j - 1)).norm();
+        size_t subs = std::ceil(norm / d_sub);
         size_t iters = subs;
         for (size_t k = (j == 1) ? 0 : 1; k <= subs; k++) {
           double t = (double)k / subs;
