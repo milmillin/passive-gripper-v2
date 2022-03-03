@@ -496,6 +496,16 @@ void MainUI::DrawOptimizationPanel() {
         "Finger Subdivision", (int*)&cost_settings.n_finger_steps, 1);
     cost_update |= ImGui::InputInt(
         "Trajectory Subdivision", (int*)&cost_settings.n_trajectory_steps, 1);
+    cost_update |= ImGui::InputDouble(
+        "Subdivision", &cost_settings.d_subdivision, 1);
+    cost_update |= ImGui::InputDouble(
+        "Inner Contrib", &cost_settings.inner_dis_contrib, 1);
+    cost_update |= ImGui::InputDouble(
+        "Geodesic Contrib", &cost_settings.geodesic_contrib, 1);
+    cost_update |= ImGui::InputDouble(
+        "Gripper Energy", &cost_settings.gripper_energy, 1);
+    cost_update |= ImGui::InputDouble(
+        "Traj Energy", &cost_settings.traj_energy, 1);
     if (opt_update) vm_.PSG().SetOptSettings(opt_settings);
     if (cost_update) vm_.PSG().SetCostSettings(cost_settings);
     if (ImGui::Button("Optimize", ImVec2(w, 0))) {

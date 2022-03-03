@@ -714,6 +714,18 @@ static double ComputeCollisionPenaltySegment(const Eigen::Vector3d& A,
           total_dis += (state.last_pos_vid_dis + SP_(state.last_pos_vid, vid) +
                         best_dist) *
                        geodesic_contrib;
+          if (debugger) {
+            debugger->AddEdge(
+                state.last_pos, mdr.V.row(state.last_pos_vid), colors::kRed);
+            debugger->AddEdge(mdr.V.row(vid), P, colors::kBrown);
+            size_t cur = vid;
+            while (cur != state.last_pos_vid) {
+              size_t par = SP_par_(cur, state.last_pos_vid);
+              debugger->AddEdge(
+                  mdr.V.row(par), mdr.V.row(cur), colors::kPurple);
+              cur = par;
+            }
+          }
         }
       }
       state.last_pos_vid = -1llu;
