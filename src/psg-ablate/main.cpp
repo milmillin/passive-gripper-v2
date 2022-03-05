@@ -25,7 +25,7 @@ std::string FormatOutput(const psgm::CostSettings& s, int iter) {
                 1024,
                 "-%02d-%04lld-%.0f-%.0f-%.0f-%.0f",
                 iter,
-                s.d_subdivision,
+                s.n_trajectory_steps,
                 s.geodesic_contrib,
                 s.inner_dis_contrib,
                 s.gripper_energy,
@@ -42,7 +42,7 @@ struct Testcase {
 };
 
 // std::vector<double> subdivisions =
-    // {0.0001, 0.0003, 0.0005, 0.001, 0.005, 0.01, 0.03, 0.05};
+// {0.0001, 0.0003, 0.0005, 0.001, 0.005, 0.01, 0.03, 0.05};
 
 std::vector<size_t> subdivisions = {1024, 512, 256, 128, 64, 32};
 
@@ -50,12 +50,12 @@ std::vector<Testcase> testcases;
 
 void GenerateTestcases() {
   for (size_t sub : subdivisions) {
-    testcases.push_back(Testcase{sub, 1, 1, 1, 1});
-    testcases.push_back(Testcase{sub, 1, 0, 1, 1});
-    testcases.push_back(Testcase{sub, 1, 1, 1, 0});
-    testcases.push_back(Testcase{sub, 1, 0, 1, 0});
-    testcases.push_back(Testcase{sub, 1, 1, 0, 1});
-    testcases.push_back(Testcase{sub, 1, 0, 0, 1});
+    // testcases.push_back(Testcase{sub, 1, 1, 1, 1});
+    testcases.push_back(Testcase{sub, 0, 1, 1, 1});
+    // testcases.push_back(Testcase{sub, 1, 1, 1, 0});
+    testcases.push_back(Testcase{sub, 0, 1, 1, 0});
+    // testcases.push_back(Testcase{sub, 1, 1, 0, 1});
+    // testcases.push_back(Testcase{sub, 0, 1, 0, 1});
   }
 }
 
@@ -83,7 +83,7 @@ int main(int argc, char** argv) {
   std::string hook_str;
 
   // -m iters
-  int iters = 5;
+  int iters = 2;
 
   for (int i = 3; i < argc; i++) {
     std::string arg = argv[i];
@@ -96,6 +96,16 @@ int main(int argc, char** argv) {
       i++;
     }
   }
+
+  std::string out_raw_fn = out_dir + "/" + wopath_fn;
+  std::string res_fn = out_dir + "/" + wopath_fn + "_ablation.csv";
+  std::ofstream res_f(res_fn, std::ios::out);
+  if (!res_f.is_open()) {
+    Error() << "error: cannot open " << res_fn << std::endl;
+  }
+  res_f << "name\tsub\tgeodesic_contrib\tinner_contrib\tgripper_energy\ttraj_"
+           "energy\tsuccess\tdist\ttime\tcost\tfc\tmw\tpmw\ttraj_cpx\tn_iters"
+        << std::endl;
 
   if (!fs::is_directory(out_dir) || !fs::exists(out_dir)) {
     fs::create_directory(out_dir);
@@ -124,7 +134,6 @@ int main(int argc, char** argv) {
   psgm::CostSettings org_cost_settings = psg.GetCostSettings();
   std::vector<psgm::ContactPoint> org_cps = psg.GetContactPoints();
 
-  std::string out_raw_fn = out_dir + "/" + wopath_fn;
 
   auto Process = [&](const psgm::CostSettings& cost_settings, int iter) {
     Log() << "> Optimizing for:\n" << cost_settings << std::endl;
@@ -150,12 +159,23 @@ int main(int argc, char** argv) {
     psgs::Serialize(params, out_fn);
     Log() << ">> Params written to " << out_fn << std::endl;
 
+    res_f << wopath_fn << '\t' << cost_settings.n_trajectory_steps << '\t'
+          << cost_settings.geodesic_contrib << '\t'
+          << cost_settings.inner_dis_contrib << '\t'
+          << cost_settings.gripper_energy << '\t' << cost_settings.traj_energy
+          << '\t' << success << '\t' << psg.GetMinDist() << '\t'
+          << duration.count() << '\t' << psg.GetCost() << '\t'
+          << psg.GetIsForceClosure() << '\t' << psg.GetMinWrench() << '\t'
+          << psg.GetPartialMinWrench() << '\t'
+          << psgc::GetTrajectoryComplexity(psg.GetTrajectory()) << '\t'
+          << optimizer.GetIters() << std::endl;
+
     if (hook_set) {
       bp::ipstream out;
       bp::child c(hook_str,
                   bp::std_out > out,
                   wopath_fn,
-                  std::to_string(cost_settings.d_subdivision),
+                  std::to_string(cost_settings.n_trajectory_steps),
                   ToString(cost_settings.geodesic_contrib),
                   ToString(cost_settings.inner_dis_contrib),
                   ToString(cost_settings.gripper_energy),
