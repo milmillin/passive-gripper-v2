@@ -870,6 +870,7 @@ double ComputeCost_SP(const GripperParams& params,
                      remeshed_mdr.Intersects(Eigen::AlignedBox3d(p_min, p_max));
       }
 
+      // if (intersects) 
       total_dev += max_deviation;
       traj_devs[i] = max_deviation;
       traj_skip[i] = !intersects;
@@ -879,10 +880,12 @@ double ComputeCost_SP(const GripperParams& params,
       traj_subs[i] = std::ceil(traj_devs[i] / d_sub);
     }
 
+    size_t gripper_subs = 0;
     for (size_t i = 0; i < n_trajectory - 1; i++) {
-      if (traj_skip[i]) continue;
+      // if (traj_skip[i]) continue;
       size_t cur_sub = traj_subs[i];
       size_t iters = cur_sub;
+      gripper_subs += cur_sub;
       if (i == n_trajectory - 2) iters++;
 
 #pragma omp parallel
@@ -901,6 +904,7 @@ double ComputeCost_SP(const GripperParams& params,
         gripper_energy = std::max(gripper_energy, t_max);
       }
     }
+    // std::cout << "gripper_sub: " << gripper_subs << std::endl;
   }
 
   // ========================
@@ -910,16 +914,18 @@ double ComputeCost_SP(const GripperParams& params,
 
   if (settings.cost.traj_energy != 0.) {
     std::vector<Eigen::Vector3d> d_fingers;
+    size_t traj_subs = 0;
     for (size_t i = 0; i < fingers.size(); i++) {
       double total_norm = 0;
       for (size_t j = 1; j < fingers[i].rows(); j++) {
         double norm = (fingers[i].row(j) - fingers[i].row(j - 1)).norm();
         total_norm += norm;
       }
-      double d_sub = total_norm / settings.cost.n_trajectory_steps;
+      double d_sub = total_norm * fingers.size() / settings.cost.n_trajectory_steps;
       for (size_t j = 1; j < fingers[i].rows(); j++) {
         double norm = (fingers[i].row(j) - fingers[i].row(j - 1)).norm();
         size_t subs = std::ceil(norm / d_sub);
+        traj_subs += subs;
         size_t iters = subs;
         for (size_t k = (j == 1) ? 0 : 1; k <= subs; k++) {
           double t = (double)k / subs;
@@ -928,6 +934,7 @@ double ComputeCost_SP(const GripperParams& params,
         }
       }
     }
+    // std::cout << "traj_subs: " << traj_subs << std::endl;
 
 #pragma omp parallel
     {
