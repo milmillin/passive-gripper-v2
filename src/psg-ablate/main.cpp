@@ -62,6 +62,7 @@ void GenerateTestcases() {
 
 int main(int argc, char** argv) {
   EASY_PROFILER_ENABLE;
+  EASY_MAIN_THREAD;
 
   GenerateTestcases();
   Log() << "Num threads: " << omp_get_max_threads() << std::endl;
@@ -89,6 +90,7 @@ int main(int argc, char** argv) {
   int iters = 2;
 
   for (int i = 3; i < argc; i++) {
+    EASY_BLOCK("test");
     std::string arg = argv[i];
     if (arg == "-h") {
       hook_set = true;
@@ -140,9 +142,13 @@ int main(int argc, char** argv) {
 
   auto Process = [&](const psgm::CostSettings& cost_settings, int iter) {
     Log() << "> Optimizing for:\n" << cost_settings << std::endl;
+
+    {
+    EASY_BLOCK("Initialize")
     psg.SetCostSettings(cost_settings);
     psg.reinit_trajectory = true;
     psg.SetContactPoints(org_cps);
+    }
 
     psgc::Optimizer optimizer;
     auto start_time = std::chrono::high_resolution_clock::now();
@@ -153,8 +159,10 @@ int main(int argc, char** argv) {
         stop_time - start_time);
     Log() << "> Optimization took " << duration.count() << " ms." << std::endl;
 
+    EASY_BLOCK("Copy params");
     psgm::GripperParams params = optimizer.GetCurrentParams();
     psg.SetParams(params);
+    EASY_END_BLOCK;
     bool success = psg.GetMinDist() >= -1e-5;
 
     std::string out_fn =
@@ -162,6 +170,8 @@ int main(int argc, char** argv) {
     psgs::Serialize(params, out_fn);
     Log() << ">> Params written to " << out_fn << std::endl;
 
+    {
+    EASY_BLOCK("Write Result");
     res_f << wopath_fn << '\t' << cost_settings.n_trajectory_steps << '\t'
           << cost_settings.geodesic_contrib << '\t'
           << cost_settings.inner_dis_contrib << '\t'
@@ -172,8 +182,10 @@ int main(int argc, char** argv) {
           << psg.GetPartialMinWrench() << '\t'
           << psgc::GetTrajectoryComplexity(psg.GetTrajectory()) << '\t'
           << optimizer.GetIters() << std::endl;
+    }
 
     if (hook_set) {
+      EASY_BLOCK("If hook_set");
       bp::ipstream out;
       bp::child c(hook_str,
                   bp::std_out > out,
@@ -206,7 +218,9 @@ int main(int argc, char** argv) {
   };
 
   for (int i = ckpt_i; i < iters; i++) {
+    EASY_BLOCK("iteration");
     for (int j = ckpt_j; j < (int)testcases.size(); j++) {
+      EASY_BLOCK("init cost_settings");
       const auto& testcase = testcases[j];
       psgm::CostSettings cost_settings = org_cost_settings;
       cost_settings.n_finger_steps = testcase.d_subdivision;
@@ -215,16 +229,21 @@ int main(int argc, char** argv) {
       cost_settings.inner_dis_contrib = testcase.inner_dis_contrib;
       cost_settings.traj_energy = testcase.traj_energy;
       cost_settings.gripper_energy = testcase.gripper_energy;
+      EASY_END_BLOCK;
+
       Process(cost_settings, i);
 
       // save checkpoint
-      std::ofstream ckpt_file(ckpt_fn);
-      if (!ckpt_file.is_open()) {
-        Error() << "Warning: cannot open checkpoint file: " << ckpt_fn
-                << std::endl;
-      } else {
-        ckpt_file << i << " " << j << std::endl;
-        Log() << "Ckeckpoint updated: " << i << " " << j << std::endl;
+      {
+        EASY_BLOCK("save checkpoint");
+        std::ofstream ckpt_file(ckpt_fn);
+        if (!ckpt_file.is_open()) {
+          Error() << "Warning: cannot open checkpoint file: " << ckpt_fn
+                  << std::endl;
+        } else {
+          ckpt_file << i << " " << j << std::endl;
+          Log() << "Ckeckpoint updated: " << i << " " << j << std::endl;
+        }
       }
     }
     ckpt_j = 0;

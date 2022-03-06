@@ -9,44 +9,49 @@
 #include <igl/principal_curvature.h>
 #include <igl/signed_distance.h>
 #include "../GeometryUtils.h"
+#include "../../easy_profiler_headers.h"
 
 namespace psg {
 namespace core {
 namespace models {
 void MeshDependentResource::init(const Eigen::MatrixXd& V_,
                                  const Eigen::MatrixXi& F_) {
+  EASY_FUNCTION();
+
   if (initialized) {
     tree.deinit();
     intersector.deinit();
   }
   V = V_;
   F = F_;
-  tree.init(V_, F_);
-  intersector.init(V.cast<float>(), F, true);
-  igl::per_face_normals(V_, F_, FN);
-  igl::per_vertex_normals(
-      V_, F_, igl::PER_VERTEX_NORMALS_WEIGHTING_TYPE_ANGLE, FN, VN);
-  igl::per_edge_normals(
-      V_, F_, igl::PER_EDGE_NORMALS_WEIGHTING_TYPE_UNIFORM, FN, EN, E, EMAP);
+  EASY_STATEMENT("AABB", tree.init(V_, F_));
+  EASY_STATEMENT("intersector", intersector.init(V.cast<float>(), F, true));
+  EASY_STATEMENT("per_face_normals", igl::per_face_normals(V_, F_, FN));
+  EASY_STATEMENT("per_vertex_normals", igl::per_vertex_normals(
+      V_, F_, igl::PER_VERTEX_NORMALS_WEIGHTING_TYPE_ANGLE, FN, VN));
+  EASY_STATEMENT("per_edge_normals", igl::per_edge_normals(
+      V_, F_, igl::PER_EDGE_NORMALS_WEIGHTING_TYPE_UNIFORM, FN, EN, E, EMAP));
 
   minimum = V.colwise().minCoeff();
   maximum = V.colwise().maxCoeff();
   size = maximum - minimum;
 
-  center_of_mass = CenterOfMass(V, F);
+  EASY_STATEMENT("CenterOfMass", center_of_mass = CenterOfMass(V, F));
 
-  igl::principal_curvature(V, F, PD1, PD2, PV1, PV2);
+  EASY_STATEMENT("principal_curvature", igl::principal_curvature(V, F, PD1, PD2, PV1, PV2));
 
   SP_valid_ = false;
   // curvature_valid_ = false;
 }
 
 void MeshDependentResource::init(const MeshDependentResource& other) {
+  EASY_FUNCTION();
+
   init(other.V, other.F);
   if (other.SP_valid_) {
-    SP_valid_ = other.SP_valid_;
-    SP_ = other.SP_;
-    SP_par_ = other.SP_par_;
+    EASY_STATEMENT("copy SP_valid_", SP_valid_ = other.SP_valid_);
+    EASY_STATEMENT("copy SP_", SP_ = other.SP_);
+    EASY_STATEMENT("copy SP_par_", SP_par_ = other.SP_par_);
   }
   /*
   if (other.curvature_valid_) {
@@ -57,6 +62,8 @@ void MeshDependentResource::init(const MeshDependentResource& other) {
 }
 
 void MeshDependentResource::init_sp() const {
+  EASY_FUNCTION();
+
   if (SP_valid_) return;
   std::lock_guard<std::mutex> lock(SP_mutex_);
   if (SP_valid_) return;
@@ -136,6 +143,8 @@ double MeshDependentResource::ComputeSignedDistance(
     const Eigen::Vector3d& position,
     Eigen::RowVector3d& c,
     double& s) const {
+  // EASY_FUNCTION();
+
   double sqrd;
   int i;
   Eigen::RowVector3d n;
@@ -260,6 +269,8 @@ bool MeshDependentResource::Intersects(const Eigen::AlignedBox3d box) const {
 
 // Getters
 const Eigen::MatrixXd& MeshDependentResource::GetSP() const {
+  EASY_FUNCTION();
+
   init_sp();
   return SP_;
 }

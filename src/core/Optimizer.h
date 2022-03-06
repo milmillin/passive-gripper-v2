@@ -18,7 +18,18 @@ size_t MyFlattenSize(const GripperParams& meta);
 void MyUnflatten(GripperParams& meta, const double* x);
 void MyFlattenGrad(const GripperParams& meta, double* x);
 
+
+struct _DestructorCompleteMarker{
+  char *foo;
+  ~_DestructorCompleteMarker() {
+    EASY_FUNCTION();
+    EASY_EVENT("~Optimizer Complete");
+  }
+};
+
 class Optimizer {
+ private:
+  _DestructorCompleteMarker destructor_complete_marker_;  // Destructors are run in reverse order
  public:
   ~Optimizer();
   void Optimize(const PassiveGripper& psg);

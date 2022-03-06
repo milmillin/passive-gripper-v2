@@ -40,6 +40,8 @@ void MyFlatten(const GripperParams& meta,
 }
 
 void MyFlattenGrad(const GripperParams& meta, double* x) {
+  EASY_FUNCTION();
+
   for (size_t i = 0; i < meta.fingers.size(); i++) {
     const auto& finger = meta.fingers[i];
     for (size_t r = 1; r < finger.rows() - 1; r++) {
@@ -58,6 +60,8 @@ void MyFlattenGrad(const GripperParams& meta, double* x) {
 
 // x -> meta
 void MyUnflatten(GripperParams& meta, const double* x) {
+  EASY_FUNCTION();
+
   for (size_t i = 0; i < meta.fingers.size(); i++) {
     auto& finger = meta.fingers[i];
     for (size_t r = 1; r < finger.rows() - 1; r++) {
@@ -83,11 +87,13 @@ static double ComputeCostWrapper(unsigned n,
 }
 
 Optimizer::~Optimizer() {
+  EASY_FUNCTION();
   Cancel();
   if (opt_ != nullptr) nlopt_destroy(opt_);
 }
 
 void Optimizer::Optimize(const PassiveGripper& psg) {
+  EASY_FUNCTION();
   Cancel();
   params_ = psg.GetParams();
   params_proto_ = psg.GetParams();
@@ -145,6 +151,7 @@ void Optimizer::Resume() {
   if (!is_resumable_) return;
   is_running_ = true;
   optimize_future_ = std::async(std::launch::async, [&] {
+    EASY_BLOCK("optimize_future_");
     double minf; /* minimum objective value, upon return */
     nlopt_result result = nlopt_optimize(opt_, x_.get(), &minf);
     is_running_ = false;
@@ -160,12 +167,15 @@ void Optimizer::Reset() {
 }
 
 void Optimizer::Wait() {
+  EASY_FUNCTION();
   if (optimize_future_.valid()) {
     optimize_future_.get();
   }
 }
 
 void Optimizer::Cancel() {
+  EASY_FUNCTION();
+
   if (opt_ != nullptr) {
     nlopt_force_stop(opt_);
   }
@@ -173,6 +183,8 @@ void Optimizer::Cancel() {
 }
 
 const GripperParams& Optimizer::GetCurrentParams() {
+  EASY_FUNCTION();
+
   std::lock_guard<std::mutex> guard(g_min_x_mutex_);
   MyUnflatten(params_proto_, g_min_x_.get());
   return params_proto_;

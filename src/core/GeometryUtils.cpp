@@ -17,6 +17,7 @@
 #include <list>
 
 #include "robots/Robots.h"
+#include "../easy_profiler_headers.h"
 
 #include "UnionFind.h"
 
@@ -78,6 +79,8 @@ void AdaptiveSubdivideTrajectory(
     Trajectory& out_trajectory,
     std::vector<Fingers>& out_t_fingers,
     std::vector<std::pair<int, double>>& out_traj_contrib) {
+  EASY_FUNCTION();
+
   Eigen::Affine3d finger_trans_inv =
       robots::Forward(trajectory.front()).inverse();
 
@@ -505,7 +508,7 @@ void CreateCone(const Eigen::Vector3d& O,
     out_F.row(i) << 0, i + 1, (i + 1) % res + 1;
   }
   for (int i = 2; i < res; i++) {
-    out_F.row(res + i - 2) << 1, i, i + 1;  
+    out_F.row(res + i - 2) << 1, i, i + 1;
   }
 }
 

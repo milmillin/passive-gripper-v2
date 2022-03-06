@@ -1,6 +1,7 @@
 #include "CostFunctions.h"
 
 #include <igl/copyleft/cgal/intersect_other.h>
+#include "../easy_profiler_headers.h"
 #include "GeometryUtils.h"
 #include "robots/Robots.h"
 
@@ -27,6 +28,8 @@ static double GetDist(const Eigen::Vector3d& p,
                       const CostSettings& settings,
                       const MeshDependentResource& mdr,
                       Eigen::RowVector3d& out_ds_dp) {
+  EASY_FUNCTION();
+
   Eigen::RowVector3d c;
   double sign;
   double s = mdr.ComputeSignedDistance(p, c, sign);
@@ -90,6 +93,8 @@ double ComputeCost(const GripperParams& params,
                    const MeshDependentResource& mdr,
                    GripperParams& out_dCost_dParam,
                    Debugger* const debugger) {
+  EASY_FUNCTION();
+
   const size_t nTrajectorySteps = settings.cost.n_trajectory_steps;
   const long long nFingerSteps = settings.cost.n_finger_steps;
   const double angVelocity = settings.cost.ang_velocity;
@@ -567,6 +572,8 @@ double ComputeCost1(const GripperParams& params,
 double MinDistance(const GripperParams& params,
                    const GripperSettings& settings,
                    const MeshDependentResource& mdr) {
+  EASY_FUNCTION();
+
   constexpr double precision = 0.001;  // 1mm
 
   Eigen::Affine3d finger_trans_inv =
@@ -575,6 +582,7 @@ double MinDistance(const GripperParams& params,
       TransformFingers(params.fingers, finger_trans_inv);
 
   // discretize fingers
+  EASY_BLOCK("discretize fingers")
   std::vector<Eigen::Vector3d> d_fingers;
   for (size_t i = 0; i < fingers.size(); i++) {
     for (size_t j = 1; j < fingers[i].rows(); j++) {
@@ -593,8 +601,10 @@ double MinDistance(const GripperParams& params,
   for (long long i = 0; i < d_fingers.size(); i++) {
     D_fingers.row(i) = d_fingers[i];
   }
+  EASY_END_BLOCK;
 
   // discretize time
+  EASY_BLOCK("discretize time")
   Trajectory new_trajectory;
   std::vector<std::vector<Eigen::MatrixXd>> new_fingers;
   std::vector<std::pair<int, double>> traj_contrib;
@@ -639,6 +649,7 @@ double MinDistance(const GripperParams& params,
       }
     }
   }
+  EASY_END_BLOCK;
   return min_dist;
 }
 
@@ -660,6 +671,8 @@ static double ComputeCollisionPenaltySegment(const Eigen::Vector3d& A,
                                              double inner_dis_contrib,
                                              _SegState& state,
                                              Debugger* const debugger) {
+  EASY_FUNCTION();
+
   const Eigen::MatrixXd& SP_ = mdr.GetSP();
   const Eigen::MatrixXi& SP_par_ = mdr.GetSPPar();
   Eigen::RowVector3d dir = B - A;
@@ -669,9 +682,13 @@ static double ComputeCollisionPenaltySegment(const Eigen::Vector3d& A,
   // std::cout << dir << std::endl;
   std::vector<igl::Hit> hits;
   int num_rays;
+
+  EASY_BLOCK("intersectRay");
   mdr.intersector.intersectRay(
       A.cast<float>(), dir.cast<float>(), hits, num_rays);
   bool is_A_in = hits.size() % 2 == 1;
+  EASY_END_BLOCK;
+  EASY_BLOCK("After intersectRay");
 
   if (state.is_first) {
     state.is_in = is_A_in;
@@ -679,6 +696,7 @@ static double ComputeCollisionPenaltySegment(const Eigen::Vector3d& A,
 
   double total_dis = 0;
   for (const auto& hit : hits) {
+    EASY_BLOCK("ProcessHit");
     if (hit.t >= norm) break;
     Eigen::RowVector3d P = A.transpose() + dir * hit.t;
 
@@ -761,6 +779,8 @@ static double ComputeCollisionPenaltySegment(const Eigen::Vector3d& A,
 double ComputeFloorCost(Eigen::RowVector3d p0,
                         Eigen::RowVector3d p1,
                         double floor) {
+  EASY_FUNCTION();
+
   if (p0.y() >= floor && p1.y() >= floor) return 0;
   Eigen::RowVector3d p01 = p1 - p0;
   if (p0.y() < floor != p1.y() < floor) {
@@ -778,6 +798,8 @@ double ComputeCost_SP(const GripperParams& params,
                       const MeshDependentResource& remeshed_mdr,
                       GripperParams& out_dCost_dParam,
                       Debugger* const debugger) {
+  EASY_FUNCTION();
+
   struct _SubInfo {
     // Pose pose;
     Fingers fingers;
@@ -798,6 +820,7 @@ double ComputeCost_SP(const GripperParams& params,
           const Eigen::RowVector3d& p0,
           const Eigen::RowVector3d& p1,
           _SegState& state) -> double {
+    EASY_BLOCK("MyCost", profiler::EasyBlockStatus::OFF_RECURSIVE);
     return ComputeCollisionPenaltySegment(p0,
                                           p1,
                                           remeshed_mdr,
@@ -810,6 +833,7 @@ double ComputeCost_SP(const GripperParams& params,
 
   // Gripper energy at particular time
   auto ProcessFinger = [&MyCost](const Fingers& fingers) -> double {
+    EASY_BLOCK("ProcessFinger");
     double cost = 0;
     _SegState state;
     for (size_t i = 0; i < fingers.size(); i++) {
@@ -843,6 +867,8 @@ double ComputeCost_SP(const GripperParams& params,
   double gripper_energy = 0;
 
   if (settings.cost.gripper_energy != 0.) {
+    EASY_BLOCK("Gripper Energy");
+
     std::vector<bool> traj_skip(n_trajectory - 1, false);
     std::vector<double> traj_devs(n_trajectory - 1);
     std::vector<size_t> traj_subs(n_trajectory - 1, 0);
@@ -909,6 +935,7 @@ double ComputeCost_SP(const GripperParams& params,
   double trajectory_energy = 0;
 
   if (settings.cost.traj_energy != 0.) {
+    EASY_BLOCK("Trajectory Energy");
     std::vector<Eigen::Vector3d> d_fingers;
     for (size_t i = 0; i < fingers.size(); i++) {
       double total_norm = 0;
@@ -955,6 +982,7 @@ double ComputeCost_SP(const GripperParams& params,
   // ========================
   // Robot floor collision
   // ========================
+  EASY_BLOCK("Robot floor collision");
   double robot_floor = 0;
   double max_penetration = 0;
   constexpr double robot_clearance = 0.05;
@@ -964,16 +992,19 @@ double ComputeCost_SP(const GripperParams& params,
                  std::max(0., robot_clearance - trans.translation()(1)));
   }
   robot_floor = max_penetration;
+  EASY_END_BLOCK;
 
   // ========================
   // L2 regularization term
   // ========================
+  EASY_BLOCK("L2 regularization term");
   double traj_reg = 0;
   for (size_t i = 1; i < params.trajectory.size() - 1; i++) {
     traj_reg += (params.trajectory[i] - init_params.trajectory[i])
                     .matrix()
                     .squaredNorm();
   }
+  EASY_END_BLOCK;
 
   // ========================
   // Total Cost

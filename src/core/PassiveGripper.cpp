@@ -9,6 +9,7 @@
 #include "Initialization.h"
 #include "QualityMetric.h"
 #include "robots/Robots.h"
+#include "../easy_profiler_headers.h"
 
 namespace psg {
 namespace core {
@@ -23,6 +24,8 @@ static void InitMdrFloor(const Eigen::MatrixXd& V,
                          const Eigen::MatrixXi& F,
                          double floor,
                          MeshDependentResource& out_mdr) {
+  EASY_FUNCTION();
+
   Eigen::MatrixXd cur_cube_V = cube_V;
 
   Eigen::RowVector3d p_min = V.colwise().minCoeff();
@@ -48,6 +51,8 @@ static void InitMdrFloor(const Eigen::MatrixXd& V,
 }
 
 void PassiveGripper::GenerateRemesh() {
+  EASY_FUNCTION();
+
   constexpr int kPad = 4;
   constexpr double kVoxelSize = 0.001;
   Eigen::RowVector3d p_min = mdr_.minimum.array() - (kVoxelSize * kPad);
@@ -86,6 +91,8 @@ void PassiveGripper::SetMesh(const Eigen::MatrixXd& V,
                              const Eigen::MatrixXi& remesh_F,
                              int remesh_version,
                              bool invalidate) {
+  EASY_FUNCTION();
+
   mdr_.init(V, F);
 
   if (remesh_version != kRemeshVersion) {
@@ -109,6 +116,8 @@ void PassiveGripper::SetMesh(const Eigen::MatrixXd& V,
 void PassiveGripper::SetMesh(const Eigen::MatrixXd& V,
                              const Eigen::MatrixXi& F,
                              bool invalidate) {
+  EASY_FUNCTION();
+
   mdr_.init(V, F);
 
   GenerateRemesh();
@@ -186,6 +195,8 @@ void PassiveGripper::ClearKeyframe() {
 }
 
 void PassiveGripper::SetTrajectory(const Trajectory& trajectory) {
+  EASY_FUNCTION();
+
   params_.trajectory = trajectory;
   FixTrajectory(params_.trajectory);
   trajectory_changed_ = true;
@@ -193,36 +204,48 @@ void PassiveGripper::SetTrajectory(const Trajectory& trajectory) {
 }
 
 void PassiveGripper::SetContactSettings(const ContactSettings& settings) {
+  EASY_FUNCTION();
+
   settings_.contact = settings;
   contact_settings_changed_ = true;
   Invalidate();
 }
 
 void PassiveGripper::SetFingerSettings(const FingerSettings& settings) {
+  EASY_FUNCTION();
+
   settings_.finger = settings;
   finger_settings_changed_ = true;
   Invalidate();
 }
 
 void PassiveGripper::SetTrajectorySettings(const TrajectorySettings& settings) {
+  EASY_FUNCTION();
+
   settings_.trajectory = settings;
   trajectory_settings_changed_ = true;
   Invalidate();
 }
 
 void PassiveGripper::SetOptSettings(const OptSettings& settings) {
+  EASY_FUNCTION();
+
   settings_.opt = settings;
   opt_settings_changed_ = true;
   Invalidate();
 }
 
 void PassiveGripper::SetTopoOptSettings(const TopoOptSettings& settings) {
+  EASY_FUNCTION();
+
   settings_.topo_opt = settings;
   topo_opt_settings_changed_ = true;
   Invalidate();
 }
 
 void PassiveGripper::SetCostSettings(const CostSettings& settings) {
+  EASY_FUNCTION();
+
   settings_.cost = settings;
   cost_settings_changed_ = true;
   Invalidate();
@@ -230,6 +253,9 @@ void PassiveGripper::SetCostSettings(const CostSettings& settings) {
 
 void PassiveGripper::SetSettings(const GripperSettings& settings,
                                  bool invalidate) {
+
+  EASY_FUNCTION();
+
   settings_ = settings;
   contact_settings_changed_ = true;
   finger_settings_changed_ = true;
@@ -241,6 +267,8 @@ void PassiveGripper::SetSettings(const GripperSettings& settings,
 }
 
 void PassiveGripper::SetParams(const GripperParams& params, bool invalidate) {
+  EASY_FUNCTION();
+
   bool tmp_reinit_finger = reinit_fingers;
   bool tmp_reinit_trajectory = reinit_trajectory;
   reinit_fingers = false;
@@ -256,6 +284,8 @@ void PassiveGripper::SetParams(const GripperParams& params, bool invalidate) {
 }
 
 void PassiveGripper::InitGripperBound() {
+  EASY_FUNCTION();
+
   Eigen::Vector3d lb;
   Eigen::Vector3d ub;
   InitializeGripperBound(*this, lb, ub);
@@ -277,6 +307,8 @@ void PassiveGripper::InitGripperBound() {
 // [Finger, Trajectory, CostSettings] -> [Cost]
 
 void PassiveGripper::Invalidate() {
+  EASY_FUNCTION();
+
   if (mesh_changed_) InvalidateMesh();
   if (contact_settings_changed_) InvalidateContactSettings();
   if (contact_changed_) InvalidateContact();
@@ -313,6 +345,8 @@ void PassiveGripper::InvokeInvalidated(InvalidatedReason reason) {
 }
 
 void PassiveGripper::InvalidateMesh() {
+  EASY_FUNCTION();
+
   mesh_changed_ = false;
   params_.contact_points.clear();
   params_.fingers.clear();
@@ -322,6 +356,8 @@ void PassiveGripper::InvalidateMesh() {
 }
 
 void PassiveGripper::InvalidateContactSettings() {
+  EASY_FUNCTION();
+
   contact_settings_changed_ = false;
   contact_changed_ = true;
 
@@ -336,21 +372,29 @@ void PassiveGripper::InvalidateContactSettings() {
 }
 
 void PassiveGripper::InvalidateFingerSettings() {
+  EASY_FUNCTION();
+
   finger_settings_changed_ = false;
   finger_changed_ = true;
 }
 
 void PassiveGripper::InvalidateTrajectorySettings() {
+  EASY_FUNCTION();
+
   trajectory_settings_changed_ = false;
   trajectory_changed_ = true;
 }
 
 void PassiveGripper::InvalidateCostSettings() {
+  EASY_FUNCTION();
+
   cost_settings_changed_ = false;
   cost_changed_ = true;
 }
 
 void PassiveGripper::InvalidateContact() {
+  EASY_FUNCTION();
+
   contact_changed_ = false;
 
   contact_cones_ = GenerateContactCones(params_.contact_points,
@@ -363,6 +407,8 @@ void PassiveGripper::InvalidateContact() {
 }
 
 void PassiveGripper::InvalidateFinger() {
+  EASY_FUNCTION();
+
   finger_changed_ = false;
   if (reinit_fingers) {
     Eigen::Affine3d effector_pos = robots::Forward(params_.trajectory.front());
@@ -384,17 +430,23 @@ void PassiveGripper::InvalidateFinger() {
 }
 
 void PassiveGripper::InvalidateTrajectory() {
+  EASY_FUNCTION();
+
   trajectory_changed_ = false;
   InvokeInvalidated(InvalidatedReason::kTrajectory);
   cost_changed_ = true;
 }
 
 void PassiveGripper::InvalidateTopoOptSettings() {
+  EASY_FUNCTION();
+
   topo_opt_settings_changed_ = false;
   InvokeInvalidated(InvalidatedReason::kTopoOptSettings);
 }
 
 void PassiveGripper::InvalidateQuality() {
+  EASY_FUNCTION();
+
   quality_changed_ = false;
   is_force_closure_ = CheckForceClosureQP(contact_cones_, mdr_.center_of_mass);
   is_partial_closure_ = CheckPartialClosureQP(contact_cones_,
@@ -409,6 +461,8 @@ void PassiveGripper::InvalidateQuality() {
 }
 
 void PassiveGripper::InvalidateCost() {
+  EASY_FUNCTION();
+
   cost_changed_ = false;
   cost_ = kCostFunctions[(int)settings_.cost.cost_function].cost_function(
       params_, params_, settings_, mdr_remeshed_, dCost_dParam_, nullptr);
