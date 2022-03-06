@@ -84,6 +84,8 @@ struct CostSettings : psg::core::serialization::Serializable {
 
 inline std::ostream& operator<<(std::ostream& f, const CostSettings& c) {
   f << "CostSettings:\n"
+    << "  n_traj_subs: " << c.n_trajectory_steps << "\n"
+    << "  n_gripper_subs: " << c.n_finger_steps << "\n"
     << "  floor: " << c.floor << "\n"
     << "  traj_reg: " << c.regularization << "\n"
     << "  robot_collision: " << c.robot_collision << "\n"

@@ -45,7 +45,7 @@ struct Testcase {
 // std::vector<double> subdivisions =
 // {0.0001, 0.0003, 0.0005, 0.001, 0.005, 0.01, 0.03, 0.05};
 
-std::vector<size_t> subdivisions = {1024, 512, 256, 128, 64, 32};
+std::vector<size_t> subdivisions = {2048, 1536, 1024, 768, 512, 256, 128, 64, 32};
 
 std::vector<Testcase> testcases;
 
@@ -87,7 +87,7 @@ int main(int argc, char** argv) {
   std::string hook_str;
 
   // -m iters
-  int iters = 2;
+  int iters = 5;
 
   for (int i = 3; i < argc; i++) {
     EASY_BLOCK("test");
