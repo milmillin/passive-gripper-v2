@@ -1,4 +1,5 @@
 #include "Optimizer.h"
+#include "../easy_profiler_headers.h"
 
 namespace psg {
 namespace core {
@@ -179,6 +180,8 @@ const GripperParams& Optimizer::GetCurrentParams() {
 double Optimizer::ComputeCostInternal(unsigned n,
                                       const double* x,
                                       double* grad) {
+  EASY_FUNCTION();
+
   MyUnflatten(params_, x);
   GripperParams dCost_dParam;
   double cost = cost_function_.cost_function(

@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.14)
 project(passive-gripper)
 
 option(CLUSTER_RELEASE_BUILD "Release build that should run on cluster" OFF)
+option(ENABLE_EASY_PROFILER "Enable easy profiler" OFF)
+set(EASY_PROFILER_LIB_PATH "/home/louyu/Documents/UW/Research/GRAIL/passive-gripper/easy_profiler-v2.1.0-linux-x64-libc-2.27/lib/cmake/easy_profiler")
 
 set (CMAKE_CXX_STANDARD 17)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -19,7 +21,6 @@ if (CLUSTER_RELEASE_BUILD)
   set (CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
   message(STATUS "Link time optimization enabled")
 endif()
-
 
 # Add your project files
 file(GLOB_RECURSE CORE_SRCFILES "src/core/*.cpp")
@@ -120,18 +121,27 @@ else()
     list(APPEND CORE_LINK_LIBS Qhull::qhull_r)
 endif()
 
-add_library(core ${CORE_SRCFILES})
-target_link_libraries(core ${CORE_LINK_LIBS})
-
 set(UI_LINK_LIBS core igl::core igl::opengl_glfw igl::opengl_glfw_imgui Boost::filesystem Boost::system)
-
-add_executable(${PROJECT_NAME} ${UI_SRCFILES})
-target_link_libraries(${PROJECT_NAME} ${UI_LINK_LIBS})
 
 set(BATCH_LINK_LIBS core Boost::filesystem Boost::system)
 if (NOT MSVC)
     list(APPEND BATCH_LINK_LIBS stdc++fs)
 endif()
+
+# Enable easy profiler
+if (ENABLE_EASY_PROFILER)
+  message(STATUS "Using easy profiler in path:" ${EASY_PROFILER_LIB_PATH})
+  list(APPEND CMAKE_PREFIX_PATH ${EASY_PROFILER_LIB_PATH})
+  find_package(easy_profiler REQUIRED)
+  list(APPEND CORE_LINK_LIBS easy_profiler)
+  add_compile_definitions(COMPILE_WITH_EASY_PROFILER)
+endif()
+
+add_library(core ${CORE_SRCFILES})
+target_link_libraries(core ${CORE_LINK_LIBS})
+
+add_executable(${PROJECT_NAME} ${UI_SRCFILES})
+target_link_libraries(${PROJECT_NAME} ${UI_LINK_LIBS})
 
 add_executable(psg-batch ${BATCH_SRCFILES})
 target_link_libraries(psg-batch ${BATCH_LINK_LIBS})

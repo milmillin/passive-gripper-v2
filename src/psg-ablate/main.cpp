@@ -12,6 +12,7 @@
 #include "../core/PassiveGripper.h"
 #include "../core/QualityMetric.h"
 #include "../utils.h"
+#include "../easy_profiler_headers.h"
 
 namespace fs = std::filesystem;
 namespace bp = boost::process;
@@ -60,6 +61,8 @@ void GenerateTestcases() {
 }
 
 int main(int argc, char** argv) {
+  EASY_PROFILER_ENABLE;
+
   GenerateTestcases();
   Log() << "Num threads: " << omp_get_max_threads() << std::endl;
   if (argc < 3) {
@@ -226,6 +229,8 @@ int main(int argc, char** argv) {
     }
     ckpt_j = 0;
   }
+
+  profiler::dumpBlocksToFile("psg-ablate.prof");
 
   return 0;
 }
