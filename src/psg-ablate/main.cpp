@@ -44,7 +44,6 @@ struct Testcase {
 
 // std::vector<double> subdivisions =
 // {0.0001, 0.0003, 0.0005, 0.001, 0.005, 0.01, 0.03, 0.05};
-
 std::vector<size_t> subdivisions = {2048, 1536, 1024, 768, 512, 256, 128, 64, 32};
 
 std::vector<Testcase> testcases;
@@ -249,7 +248,7 @@ int main(int argc, char** argv) {
     ckpt_j = 0;
   }
 
-  profiler::dumpBlocksToFile("psg-ablate.prof");
+  profiler::dumpBlocksToFile((raw_fn + "_psg-ablate.prof").c_str());
 
   return 0;
 }

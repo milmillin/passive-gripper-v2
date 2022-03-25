@@ -1,5 +1,4 @@
 #include "Optimizer.h"
-#include "../easy_profiler_headers.h"
 
 namespace psg {
 namespace core {

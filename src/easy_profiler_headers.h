@@ -1,3 +1,5 @@
+#pragma once
+
 #ifdef COMPILE_WITH_EASY_PROFILER  // This should be set by CMake
 
 #include <easy/profiler.h>
@@ -14,7 +16,7 @@
 #define EASY_EVENT(...)
 
 namespace profiler {
-  inline void dumpBlocksToFile(char *) {}
+  inline void dumpBlocksToFile(const char *) {}
 
   enum EasyBlockStatus : uint8_t {
       OFF = 0, ///< The block is OFF

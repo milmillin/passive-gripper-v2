@@ -10,6 +10,7 @@
 
 #include "CostFunctions.h"
 #include "PassiveGripper.h"
+#include "../easy_profiler_headers.h"
 
 namespace psg {
 namespace core {

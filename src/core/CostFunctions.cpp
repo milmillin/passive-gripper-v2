@@ -28,7 +28,7 @@ static double GetDist(const Eigen::Vector3d& p,
                       const CostSettings& settings,
                       const MeshDependentResource& mdr,
                       Eigen::RowVector3d& out_ds_dp) {
-  EASY_FUNCTION();
+  // EASY_FUNCTION();
 
   Eigen::RowVector3d c;
   double sign;
@@ -806,10 +806,14 @@ double ComputeCost_SP(const GripperParams& params,
     std::vector<Eigen::VectorXd> costs;
   };
 
+  if (params.fingers.empty()) return 0;
+
   Eigen::Affine3d finger_trans_inv =
       robots::Forward(params.trajectory.front()).inverse();
   std::vector<Eigen::MatrixXd> fingers =
       TransformFingers(params.fingers, finger_trans_inv);
+
+  // std::cout << params.fingers[0] << std::endl;
 
   // Cost between two points
   const double floor = settings.cost.floor;
@@ -833,7 +837,7 @@ double ComputeCost_SP(const GripperParams& params,
 
   // Gripper energy at particular time
   auto ProcessFinger = [&MyCost](const Fingers& fingers) -> double {
-    EASY_BLOCK("ProcessFinger");
+    // EASY_BLOCK("ProcessFinger");
     double cost = 0;
     _SegState state;
     for (size_t i = 0; i < fingers.size(); i++) {
@@ -846,6 +850,7 @@ double ComputeCost_SP(const GripperParams& params,
   };
 
   // Linearize trajectory
+  EASY_BLOCK("Linearize Trajectory");
   Trajectory new_trajectory;
   std::vector<Fingers> new_fingers;
   std::vector<std::pair<int, double>> traj_contrib;
@@ -860,6 +865,7 @@ double ComputeCost_SP(const GripperParams& params,
   for (size_t i = 0; i < new_trajectory.size(); i++) {
     new_trans[i] = robots::Forward(new_trajectory[i]);
   }
+  EASY_END_BLOCK;
 
   // ========================
   // Gripper Energy
@@ -869,10 +875,12 @@ double ComputeCost_SP(const GripperParams& params,
   if (settings.cost.gripper_energy != 0.) {
     EASY_BLOCK("Gripper Energy");
 
-    std::vector<bool> traj_skip(n_trajectory - 1, false);
+    // std::vector<bool> traj_skip(n_trajectory - 1, false);
     std::vector<double> traj_devs(n_trajectory - 1);
-    std::vector<size_t> traj_subs(n_trajectory - 1, 0);
+    // std::vector<size_t> traj_subs(n_trajectory - 1, 0);
     double total_dev = 0;
+
+    EASY_BLOCK("Prepare Grip");
 
     // #pragma omp parallel for
     for (long long i = 0; i < n_trajectory - 1; i++) {
@@ -896,16 +904,44 @@ double ComputeCost_SP(const GripperParams& params,
                      remeshed_mdr.Intersects(Eigen::AlignedBox3d(p_min, p_max));
       }
 
-      // if (intersects) 
+      // if (intersects)
       total_dev += max_deviation;
       traj_devs[i] = max_deviation;
-      traj_skip[i] = !intersects;
+      // traj_skip[i] = !intersects;
     }
     double d_sub = total_dev / settings.cost.n_finger_steps;
+    std::vector<Pose> poses;
+    poses.reserve(settings.cost.n_finger_steps + 32);
     for (long long i = 0; i < n_trajectory - 1; i++) {
-      traj_subs[i] = std::ceil(traj_devs[i] / d_sub);
+      size_t cur_sub = std::ceil(traj_devs[i] / d_sub);
+      size_t iters = cur_sub;
+      if (i == n_trajectory - 2) iters++;
+      // std::cout << cur_sub << " " << traj_devs[i] << " " << d_sub << std::endl;
+      for (long long j = 0; j < iters; j++) {
+        double t = (double)j / cur_sub;
+        Pose pose = new_trajectory[i] * (1. - t) + new_trajectory[i + 1] * t;
+        poses.push_back(pose);
+      }
+    }
+    EASY_END_BLOCK;
+
+    EASY_BLOCK("Actual Grip");
+    long long n_poses = poses.size();
+
+#pragma omp parallel
+    {
+      double t_max = 0;
+
+#pragma omp for nowait
+      for (long long j = 0; j < n_poses; j++) {
+        auto f = TransformFingers(fingers, robots::Forward(poses[j]));
+        t_max = std::max(t_max, ProcessFinger(f));
+      }
+#pragma omp critical
+      gripper_energy = std::max(gripper_energy, t_max);
     }
 
+    /*
     size_t gripper_subs = 0;
     for (size_t i = 0; i < n_trajectory - 1; i++) {
       // if (traj_skip[i]) continue;
@@ -930,6 +966,8 @@ double ComputeCost_SP(const GripperParams& params,
         gripper_energy = std::max(gripper_energy, t_max);
       }
     }
+    */
+    EASY_END_BLOCK;
     // std::cout << "gripper_sub: " << gripper_subs << std::endl;
   }
 
@@ -940,6 +978,8 @@ double ComputeCost_SP(const GripperParams& params,
 
   if (settings.cost.traj_energy != 0.) {
     EASY_BLOCK("Trajectory Energy");
+
+    EASY_BLOCK("Prepare Traj");
     std::vector<Eigen::Vector3d> d_fingers;
     size_t traj_subs = 0;
     for (size_t i = 0; i < fingers.size(); i++) {
@@ -948,7 +988,8 @@ double ComputeCost_SP(const GripperParams& params,
         double norm = (fingers[i].row(j) - fingers[i].row(j - 1)).norm();
         total_norm += norm;
       }
-      double d_sub = total_norm * fingers.size() / settings.cost.n_trajectory_steps;
+      double d_sub =
+          total_norm * fingers.size() / settings.cost.n_trajectory_steps;
       for (size_t j = 1; j < fingers[i].rows(); j++) {
         double norm = (fingers[i].row(j) - fingers[i].row(j - 1)).norm();
         size_t subs = std::ceil(norm / d_sub);
@@ -961,8 +1002,9 @@ double ComputeCost_SP(const GripperParams& params,
         }
       }
     }
+    EASY_END_BLOCK;
     // std::cout << "traj_subs: " << traj_subs << std::endl;
-
+    EASY_BLOCK("Actual Traj");
 #pragma omp parallel
     {
       double t_max = 0;
@@ -984,6 +1026,7 @@ double ComputeCost_SP(const GripperParams& params,
 #pragma omp critical
       trajectory_energy = std::max(trajectory_energy, t_max);
     }
+    EASY_END_BLOCK;
   }
 
   // ========================
