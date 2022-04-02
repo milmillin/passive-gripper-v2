@@ -16,14 +16,14 @@ namespace serialization {
 struct Serializable {
   virtual void Serialize(std::ofstream& f) const = 0;
   virtual void Deserialize(std::ifstream& f) = 0;
-  inline void Serialize(const std::string& fn) const {
+  inline void SerializeFn(const std::string& fn) const {
     std::ofstream f(fn, std::ios::out | std::ios::binary);
     if (!f.is_open()) {
       throw std::invalid_argument("cannot open " + fn);
     }
     this->Serialize(f);
   }
-  inline void Deserialize(const std::string& fn) {
+  inline void DeserializeFn(const std::string& fn) {
     std::ifstream f(fn, std::ios::in | std::ios::binary);
     if (!f.is_open()) {
       throw std::invalid_argument("cannot open " + fn);

@@ -670,7 +670,8 @@ static double ComputeCollisionPenaltySegment(const Eigen::Vector3d& A,
                                              double geodesic_contrib,
                                              double inner_dis_contrib,
                                              _SegState& state,
-                                             Debugger* const debugger) {
+                                             Debugger* const debugger,
+                                             const Eigen::RowVector3d& color) {
   EASY_FUNCTION();
 
   const Eigen::MatrixXd& SP_ = mdr.GetSP();
@@ -694,6 +695,10 @@ static double ComputeCollisionPenaltySegment(const Eigen::Vector3d& A,
     state.is_in = is_A_in;
   }
 
+  Eigen::RowVector3d color_inv = Eigen::RowVector3d::Ones() - color;
+
+  Eigen::Vector3d last_hit = A;
+
   double total_dis = 0;
   for (const auto& hit : hits) {
     EASY_BLOCK("ProcessHit");
@@ -715,19 +720,17 @@ static double ComputeCollisionPenaltySegment(const Eigen::Vector3d& A,
 
     if (state.is_in) {
       // --|P
-      if (state.is_first) {
-        // A ----| P
-        if (inner_dis_contrib != 0.) {
-          total_dis += (P - A.transpose()).norm() * inner_dis_contrib;
+      if (inner_dis_contrib != 0.) {
+        total_dis += (P - last_hit.transpose()).norm() * inner_dis_contrib;
+        if (debugger) {
+          debugger->AddEdge(last_hit, P.transpose(), color);
         }
-      } else {
+      }
+
+      if (!state.is_first) {
         // state.last_pos |----| P
         soft_assert(state.last_pos_vid != -1llu);
 
-        if (inner_dis_contrib != 0.) {
-          total_dis +=
-              (P.transpose() - state.last_pos).norm() * inner_dis_contrib;
-        }
         if (geodesic_contrib != 0.) {
           total_dis += (state.last_pos_vid_dis + SP_(state.last_pos_vid, vid) +
                         best_dist) *
@@ -752,27 +755,29 @@ static double ComputeCollisionPenaltySegment(const Eigen::Vector3d& A,
       state.last_pos = P;
       state.last_pos_vid = vid;
       state.last_pos_vid_dis = best_dist;
+
+      if (debugger) {
+        debugger->AddEdge(last_hit, P.transpose(), color_inv);
+      }
     }
     state.is_in = !state.is_in;
     state.is_first = false;
+    last_hit = P;
   }
 
   if (state.is_in) {
     // |-- B
-    if (state.is_first) {
-      // | A --- B |
-      if (inner_dis_contrib != 0.) {
-        total_dis += (B - A).norm() * inner_dis_contrib;
-      }
-    } else {
-      // state.last_pos |--- B
-      soft_assert(state.last_pos_vid != -1llu);
-      if (inner_dis_contrib != 0.) {
-        total_dis += (B - state.last_pos).norm();
+    if (inner_dis_contrib != 0.) {
+      total_dis += (B - last_hit).norm() * inner_dis_contrib;
+      if (debugger) {
+        debugger->AddEdge(B, last_hit, color);
       }
     }
+  } else {
+    if (debugger) {
+      debugger->AddEdge(B, last_hit, color_inv);
+    }
   }
-
   return total_dis;
 }
 
@@ -823,7 +828,8 @@ double ComputeCost_SP(const GripperParams& params,
       [floor, debugger, inner_dis_contrib, geodesic_contrib, &remeshed_mdr](
           const Eigen::RowVector3d& p0,
           const Eigen::RowVector3d& p1,
-          _SegState& state) -> double {
+          _SegState& state,
+          const Eigen::RowVector3d& color) -> double {
     EASY_BLOCK("MyCost", profiler::EasyBlockStatus::OFF_RECURSIVE);
     return ComputeCollisionPenaltySegment(p0,
                                           p1,
@@ -831,7 +837,8 @@ double ComputeCost_SP(const GripperParams& params,
                                           geodesic_contrib,
                                           inner_dis_contrib,
                                           state,
-                                          debugger) +
+                                          debugger,
+                                          color) +
            ComputeFloorCost(p0, p1, floor);
   };
 
@@ -843,7 +850,10 @@ double ComputeCost_SP(const GripperParams& params,
     for (size_t i = 0; i < fingers.size(); i++) {
       state.is_first = true;
       for (size_t j = 0; j < fingers[i].rows() - 1; j++) {
-        cost += MyCost(fingers[i].row(j), fingers[i].row(j + 1), state);
+        cost += MyCost(fingers[i].row(j),
+                       fingers[i].row(j + 1),
+                       state,
+                       Eigen::RowVector3d(1, 0.5, 0));
       }
     }
     return cost;
@@ -916,7 +926,6 @@ double ComputeCost_SP(const GripperParams& params,
       size_t cur_sub = std::ceil(traj_devs[i] / d_sub);
       size_t iters = cur_sub;
       if (i == n_trajectory - 2) iters++;
-      // std::cout << cur_sub << " " << traj_devs[i] << " " << d_sub << std::endl;
       for (long long j = 0; j < iters; j++) {
         double t = (double)j / cur_sub;
         Pose pose = new_trajectory[i] * (1. - t) + new_trajectory[i + 1] * t;
@@ -1017,7 +1026,7 @@ double ComputeCost_SP(const GripperParams& params,
         double cur_cost = 0;
         for (size_t k = 1; k < new_trajectory.size(); k++) {
           Eigen::Vector3d p1 = new_trans[k] * d_fingers[j];
-          cur_cost += MyCost(p0, p1, state);
+          cur_cost += MyCost(p0, p1, state, Eigen::RowVector3d(1, 0, 0.5));
           p0 = p1;
         }
         t_max = std::max(t_max, cur_cost);

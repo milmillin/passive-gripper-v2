@@ -135,11 +135,18 @@ void Optimizer::Optimize(const PassiveGripper& psg) {
   g_min_cost_ = t_min_cost_ = std::numeric_limits<double>::max();
   is_running_ = true;
   is_resumable_ = true;
+  costs_.clear();
   start_time_ = std::chrono::high_resolution_clock::now();
   optimize_future_ = std::async(std::launch::async, [&] {
     double minf; /* minimum objective value, upon return */
+    auto start_time = std::chrono::high_resolution_clock::now();
     nlopt_result result = nlopt_optimize(opt_, x_.get(), &minf);
+    auto stop_time = std::chrono::high_resolution_clock::now();
     is_running_ = false;
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+        stop_time - start_time);
+    std::cerr << "Optimization took " << duration.count() << " ms."
+              << std::endl;
     return result;
   });
 }
@@ -192,11 +199,26 @@ double Optimizer::ComputeCostInternal(unsigned n,
                                       const double* x,
                                       double* grad) {
   EASY_FUNCTION();
-
   MyUnflatten(params_, x);
   GripperParams dCost_dParam;
+
+
+  auto start_time = std::chrono::high_resolution_clock::now();
   double cost = cost_function_.cost_function(
       params_, init_params_, settings_, mdr_, dCost_dParam, nullptr);
+  auto stop_time = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::microseconds>(
+      stop_time - start_time);
+
+  if (debug) {
+    params_.SerializeFn("params" + std::to_string(n_iters_) + ".dbg");
+  }
+  costs_.push_back(cost);
+
+  if (n_iters_ % 1000 == 0) {
+    std::cerr << "Iter: " << n_iters_ + 1 << ", Time: " << duration.count()
+              << " us." << std::endl;
+  }
   if (grad != nullptr) {
     if (cost_function_.has_grad) {
       MyFlattenGrad(dCost_dParam, grad);

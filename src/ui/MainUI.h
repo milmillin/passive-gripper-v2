@@ -113,6 +113,7 @@ class MainUI : public igl::opengl::glfw::imgui::ImGuiMenu {
 
   // Optimization
   Optimizer optimizer_;
+  int selected_iter_ = 0;
 
   // ImGuizmo
   ImGuizmo::OPERATION imguizmo_operation = ImGuizmo::TRANSLATE;

@@ -496,16 +496,17 @@ void MainUI::DrawOptimizationPanel() {
         "Finger Subdivision", (int*)&cost_settings.n_finger_steps, 1);
     cost_update |= ImGui::InputInt(
         "Trajectory Subdivision", (int*)&cost_settings.n_trajectory_steps, 1);
-    cost_update |= ImGui::InputDouble(
-        "Subdivision", &cost_settings.d_subdivision, 1);
+    cost_update |=
+        ImGui::InputDouble("Subdivision", &cost_settings.d_subdivision, 1);
     cost_update |= ImGui::InputDouble(
         "Inner Contrib", &cost_settings.inner_dis_contrib, 1);
     cost_update |= ImGui::InputDouble(
         "Geodesic Contrib", &cost_settings.geodesic_contrib, 1);
-    cost_update |= ImGui::InputDouble(
-        "Gripper Energy", &cost_settings.gripper_energy, 1);
-    cost_update |= ImGui::InputDouble(
-        "Traj Energy", &cost_settings.traj_energy, 1);
+    cost_update |=
+        ImGui::InputDouble("Gripper Energy", &cost_settings.gripper_energy, 1);
+    cost_update |=
+        ImGui::InputDouble("Traj Energy", &cost_settings.traj_energy, 1);
+    ImGui::Checkbox("Debug", &optimizer_.debug);
     if (opt_update) vm_.PSG().SetOptSettings(opt_settings);
     if (cost_update) vm_.PSG().SetCostSettings(cost_settings);
     if (ImGui::Button("Optimize", ImVec2(w, 0))) {
@@ -667,6 +668,29 @@ void MainUI::DrawOptimizationStatusPanel() {
     if (optimizer_.IsResultAvailable()) {
       if (ImGui::Button("Load Result", ImVec2(w, 0))) {
         vm_.PSG().SetParams(optimizer_.GetCurrentParams());
+      }
+      if (optimizer_.debug) {
+        if (ImGui::InputInt("Iter: ", &selected_iter_)) {
+          if (selected_iter_ < 0) selected_iter_ = 0;
+
+          GripperParams params;
+          params.DeserializeFn("params" + std::to_string(selected_iter_) +
+                               ".dbg");
+          vm_.PSG().SetParams(params); 
+
+          CostFunctionItem cost_function =
+              kCostFunctions[(int)vm_.PSG().GetCostSettings().cost_function];
+
+          Debugger debugger;
+          GripperParams dCost_dParam;
+          double cost = cost_function.cost_function(params,
+                                                     params,
+                                                     vm_.PSG().GetSettings(),
+                                                     vm_.PSG().GetRemeshedMDR(),
+                                                     dCost_dParam,
+                                                     &debugger);
+          VisualizeDebugger(debugger);
+        }
       }
     }
   }

@@ -53,6 +53,8 @@ class Optimizer {
   // Internal use
   double ComputeCostInternal(unsigned n, const double* x, double* grad);
 
+  bool debug = false;
+
  private:
   nlopt_opt opt_ = nullptr;
   int dimension_;
@@ -81,8 +83,13 @@ class Optimizer {
 
   CostFunctionItem cost_function_;
 
+  std::vector<double> costs_;
+
  public:
   DECLARE_GETTER(GetIters, n_iters_);
+
+  // not thread-safe
+  DECLARE_GETTER(GetCosts, costs_);
 };
 
 }  // namespace core
