@@ -6,6 +6,7 @@
 
 #include "../Constants.h"
 
+// Statistics for optimization result
 struct Result {
   std::string name;
   size_t cp_idx;

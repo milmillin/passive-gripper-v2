@@ -1,3 +1,6 @@
+// This program will run trajectory and finger optimization for one object.
+// It can be used in a shell script to process multiple objects.
+
 #include <omp.h>
 #include <cstring>
 #include <filesystem>
@@ -9,9 +12,9 @@
 #include <boost/process.hpp>
 
 #include "../Constants.h"
+#include "../core/models/SettingsOverrider.h"
 #include "../utils.h"
 #include "Result.h"
-#include "../core/models/SettingsOverrider.h"
 #include "Testcase.h"
 
 namespace fs = std::filesystem;
@@ -25,6 +28,8 @@ void Usage(char* argv0) {
 
 int main(int argc, char** argv) {
   Log() << "Num threads: " << omp_get_max_threads() << std::endl;
+
+  // Parse arguments
   if (argc < 3) {
     Usage(argv[0]);
     return 1;
@@ -76,11 +81,13 @@ int main(int argc, char** argv) {
     }
   }
 
+  // Create output directory
   if (!fs::is_directory(out_dir) || !fs::exists(out_dir)) {
     fs::create_directory(out_dir);
     Log() << out_dir << " directory created " << std::endl;
   }
 
+  // Try to load checkpoint
   int ckpt_i = 0;
   if (!restart_set) {
     std::ifstream ckpt_file(ckpt_fn);
@@ -96,8 +103,10 @@ int main(int argc, char** argv) {
     Out() << ResultHeader() << std::endl;
   }
 
+  // Create callback function to process the result
   TestcaseCallback cb = [hook_set, &ckpt_fn, &hook_str, &out_dir](
                             size_t i, size_t need, const Result& r) {
+    // Pass the optimization result to the hooked command
     if (hook_set) {
       bp::ipstream out;
       bp::child c(hook_str,
@@ -128,6 +137,8 @@ int main(int argc, char** argv) {
       out_s << std::endl;
       c.wait();
     }
+
+    // Save checkpoint
     std::ofstream ckpt_file(ckpt_fn);
     if (!ckpt_file.is_open()) {
       Error() << "Warning: cannot open checkpoint file: " << ckpt_fn
@@ -139,8 +150,11 @@ int main(int argc, char** argv) {
   };
 
   try {
+    // Load settings override
     psg::core::models::SettingsOverrider stgo;
     if (stgo_set) stgo.Load(stgo_fn);
+
+    // Optimize
     ProcessFrom(raw_fn, out_dir, ckpt_i, ckpt_need, maxiters, stgo, cb);
   } catch (const std::exception& e) {
     Error() << e.what() << std::endl;

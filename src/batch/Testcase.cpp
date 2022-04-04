@@ -28,30 +28,28 @@ void ProcessFrom(std::string raw_fn,
                  size_t maxiters,
                  const SettingsOverrider& stgo,
                  const TestcaseCallback& cb) {
+  // Remove folder name from the file name
   size_t lastslash = raw_fn.rfind('/');
   if (lastslash == std::string::npos) lastslash = raw_fn.rfind('\\');
   std::string wopath_fn = raw_fn.substr(lastslash + 1, std::string::npos);
 
   Log() << "Processing " << raw_fn << std::endl;
 
+  // Load optimization configuration
   std::string psg_fn = raw_fn + ".psg";
   std::ifstream psg_file(psg_fn, std::ios::in | std::ios::binary);
   if (!psg_file.is_open()) {
     throw std::invalid_argument("> Cannot open psg file " + psg_fn);
   }
 
-  std::string cp_fn = raw_fn + ".cpx";
-  std::ifstream cp_file(cp_fn, std::ios::in | std::ios::binary);
-  if (!cp_file.is_open()) {
-    throw std::invalid_argument("> Cannot open cp file " + cp_fn);
-  }
-
   psg::core::PassiveGripper psg;
   psg.Deserialize(psg_file);
   Log() << "> Loaded " << psg_fn << std::endl;
 
+  // Override optimization settings
   stgo.Apply(psg);
 
+  // Try to also apply override settings from the same folder
   try {
     psg::core::models::SettingsOverrider stgo;
     std::string stgo_fn = raw_fn + ".stgo";
@@ -62,20 +60,28 @@ void ProcessFrom(std::string raw_fn,
     ;  // Doesn't contain override file
   }
 
-  psg::core::Optimizer optimizer;
-
   Log() << psg.GetOptSettings() << std::endl;
   Log() << psg.GetTopoOptSettings() << std::endl;
+
+
+  // Load contact points
+  std::string cp_fn = raw_fn + ".cpx";
+  std::ifstream cp_file(cp_fn, std::ios::in | std::ios::binary);
+  if (!cp_file.is_open()) {
+    throw std::invalid_argument("> Cannot open cp file " + cp_fn);
+  }
 
   std::vector<ContactPointMetric> cps;
   psg::core::serialization::Deserialize(cps, cp_file);
   Log() << "> Loaded " << cp_fn << std::endl;
 
+  // Optimize for each grasp candidate
+  psg::core::Optimizer optimizer;
+  size_t n_cps = std::min(cps.size(), maxiters);
   constexpr size_t bufsize = 48;
   char* buf = new char[bufsize];
-
-  size_t n_cps = std::min(cps.size(), maxiters);
   for (size_t i = i_cp; i < n_cps && need > 0; i++) {
+    // Optimize
     Log() << "> Optimizating for " << i << "-th candidate" << std::endl;
     psg.reinit_trajectory = true;
     psg.SetContactPoints(cps[i].contact_points);
@@ -87,6 +93,7 @@ void ProcessFrom(std::string raw_fn,
         stop_time - start_time);
     Log() << "> Optimization took " << duration.count() << " ms." << std::endl;
 
+    // Process optimization result
     psg.SetParams(optimizer.GetCurrentParams());
     bool failed = psg.GetMinDist() < -1e-5;
 
@@ -104,6 +111,7 @@ void ProcessFrom(std::string raw_fn,
     Eigen::MatrixXi neg_F;
 
     if (!failed) {
+      // Generate topology optimization configuration
       Log() << "> Generating TPD file" << std::endl;
       std::string tpd_out_fn = out_fn + ".tpd";
       psg.InitGripperBound();
@@ -127,6 +135,7 @@ void ProcessFrom(std::string raw_fn,
       Log() << "> Done" << std::endl;
     }
 
+    // Save optimization configuration
     std::string psg_out_fn = out_fn + ".psg";
     {
       std::ofstream psg_out_f(psg_out_fn, std::ios::out | std::ios::binary);
@@ -139,6 +148,8 @@ void ProcessFrom(std::string raw_fn,
     }
     Log() << "> Done: Optimized gripper written to " << psg_out_fn << std::endl;
 
+    // Save the trajectory as a CSV file, where each row is a step in time and
+    // each column is the angle for a joint
     std::string csv_out_fn = out_fn + ".csv";
     {
       std::ofstream traj_csv_file(csv_out_fn);

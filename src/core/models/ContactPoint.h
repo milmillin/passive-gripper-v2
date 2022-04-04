@@ -10,8 +10,8 @@ namespace models {
 
 struct ContactPoint : psg::core::serialization::Serializable {
   Eigen::Vector3d position;
-  Eigen::Vector3d normal;  // pointing out of mesh
-  int fid;
+  Eigen::Vector3d normal;  // pointing outwards from the mesh
+  int fid;  // index of a triangle in the mesh containing this contact point
 
   DECL_SERIALIZE() {
     constexpr int version = 1;
