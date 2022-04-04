@@ -168,6 +168,14 @@ void MainUI::draw_viewer_menu() {
         vm_.SaveGripper(filename);
       }
     }
+    if (ImGui::Button("Load Params", ImVec2(w, 0))) {
+      std::string filename = igl::file_dialog_open();
+      if (!filename.empty()) {
+        GripperParams params;
+        params.DeserializeFn(filename);
+        vm_.PSG().SetParams(params);
+      }
+    }
     if (optimizer_.IsRunning() || optimizer_.IsResultAvailable()) {
       DrawOptimizationStatusPanel();
     }
