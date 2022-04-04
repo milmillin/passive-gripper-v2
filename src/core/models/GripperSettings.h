@@ -14,6 +14,7 @@ namespace psg {
 namespace core {
 namespace models {
 
+// Stores the optimization settings
 struct GripperSettings : psg::core::serialization::Serializable {
   ContactSettings contact;
   FingerSettings finger;

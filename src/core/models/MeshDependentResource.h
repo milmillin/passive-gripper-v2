@@ -12,22 +12,23 @@ namespace psg {
 namespace core {
 namespace models {
 
+// Stores the information derived from the object's mesh
 class MeshDependentResource : psg::core::serialization::Serializable {
  public:
-  Eigen::MatrixXd V;
-  Eigen::MatrixXi F;
-  Eigen::MatrixXd FN;
-  Eigen::MatrixXd VN;
-  Eigen::MatrixXd EN;
-  Eigen::MatrixXi E;
-  Eigen::MatrixXi EMAP;
-  Eigen::Vector3d center_of_mass;
-  Eigen::Vector3d minimum;
-  Eigen::Vector3d maximum;
-  Eigen::Vector3d size;
-  igl::AABB<Eigen::MatrixXd, 3> tree;
-  igl::embree::EmbreeIntersector intersector;
-  
+  Eigen::MatrixXd V;     // Vertices (number of vertices * dimension)
+  Eigen::MatrixXi F;     // Triangles (number of faces * 3)
+  Eigen::MatrixXd FN;    // Per-face norm (number of faces * 3)
+  Eigen::MatrixXd VN;    // Per-vertex norm (number of vertices * 3)
+  Eigen::MatrixXd EN;    // Per-edge norm (number of edges * 3)
+  Eigen::MatrixXi E;     // Edges (number of edges * 2)
+  Eigen::MatrixXi EMAP;  // Indices from all edges to E (number of edges * 1)
+  Eigen::Vector3d center_of_mass;      // Estimated center of mass
+  Eigen::Vector3d minimum;             // Minimum coordinate
+  Eigen::Vector3d maximum;             // Maximum coordinate
+  Eigen::Vector3d size;                // Range of coordinate (max - min)
+  igl::AABB<Eigen::MatrixXd, 3> tree;  // AABB tree for the mesh
+  igl::embree::EmbreeIntersector intersector;  // Intersection for the mesh
+
   // curvature
   Eigen::MatrixXd PD1, PD2;
   Eigen::VectorXd PV1, PV2;
@@ -55,18 +56,25 @@ class MeshDependentResource : psg::core::serialization::Serializable {
   void init(const Eigen::MatrixXd& V, const Eigen::MatrixXi& F);
   void init(const MeshDependentResource& other);
 
-  // out_c: closest point
+  // Return signed distance
+  // position: the point to compute
+  // out_c: closest point on mesh
   // out_s: sign
   double ComputeSignedDistance(const Eigen::Vector3d& position,
                                Eigen::RowVector3d& out_c,
                                double& out_s) const;
 
+  // position: the point to compute
+  // out_c: closest point on mesh
+  // out_fid: index of face that contains the closest point
   void ComputeClosestPoint(const Eigen::Vector3d& position,
                            Eigen::RowVector3d& out_c,
                            int& out_fid) const;
 
+  // Returns the index of the closest face
   size_t ComputeClosestFacet(const Eigen::Vector3d& position) const;
 
+  // Returns the index of the closest vertex
   size_t ComputeClosestVertex(const Eigen::Vector3d& position) const;
 
   // Returns the length of non-intersecting path from A to B
@@ -75,6 +83,7 @@ class MeshDependentResource : psg::core::serialization::Serializable {
                                  const Eigen::Vector3d& B,
                                  Debugger* const debugger) const;
 
+  // Returns whether the box intersects with the mesh
   bool Intersects(const Eigen::AlignedBox3d box) const;
 
   // Getters

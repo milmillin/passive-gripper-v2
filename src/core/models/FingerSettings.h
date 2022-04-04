@@ -7,7 +7,7 @@ namespace core {
 namespace models {
 
 struct FingerSettings : psg::core::serialization::Serializable {
-  size_t n_finger_joints = 4;
+  size_t n_finger_joints = 4;  // Number of joints in a finger
 
   DECL_SERIALIZE() {
     constexpr int version = 1;

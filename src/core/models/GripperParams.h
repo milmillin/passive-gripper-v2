@@ -9,6 +9,7 @@ namespace psg {
 namespace core {
 namespace models {
 
+// Stores the gripper and the trajectory
 struct GripperParams : psg::core::serialization::Serializable {
   std::vector<Eigen::MatrixXd> fingers;
   Trajectory trajectory;

@@ -6,6 +6,7 @@ namespace psg {
 namespace core {
 namespace models {
 
+// TODO: add comments
 struct CostSettings : psg::core::serialization::Serializable {
   double floor = 0.0075;
   size_t n_trajectory_steps = 32;
