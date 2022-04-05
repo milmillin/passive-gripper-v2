@@ -204,8 +204,12 @@ double Optimizer::ComputeCostInternal(unsigned n,
 
 
   auto start_time = std::chrono::high_resolution_clock::now();
-  double cost = cost_function_.cost_function(
-      params_, init_params_, settings_, mdr_, dCost_dParam, nullptr);
+  double cost = cost_function_.cost_function(params_,
+                                             init_params_,
+                                             settings_,
+                                             mdr_,
+                                             dCost_dParam,
+                                             CostContext{nullptr, n_iters_});
   auto stop_time = std::chrono::high_resolution_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::microseconds>(
       stop_time - start_time);
@@ -216,7 +220,7 @@ double Optimizer::ComputeCostInternal(unsigned n,
   costs_.push_back(cost);
 
   if (n_iters_ % 1000 == 0) {
-    std::cerr << "Iter: " << n_iters_ + 1 << ", Time: " << duration.count()
+    std::cerr << "Iter: " << n_iters_ << ", Time: " << duration.count()
               << " us." << std::endl;
   }
   if (grad != nullptr) {
@@ -228,7 +232,6 @@ double Optimizer::ComputeCostInternal(unsigned n,
                 << std::endl;
     }
   }
-  n_iters_++;
   if (cost < t_min_cost_) {
     is_result_available_ = true;
     t_min_cost_ = cost;
@@ -240,6 +243,7 @@ double Optimizer::ComputeCostInternal(unsigned n,
     std::cerr << "Iter: " << n_iters_ << ", Current Cost : " << cost
               << std::endl;
   }
+  n_iters_++;
   return cost;
 }
 }  // namespace core

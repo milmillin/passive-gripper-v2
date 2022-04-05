@@ -14,6 +14,11 @@ namespace core {
 
 using namespace models;
 
+struct CostContext {
+  Debugger* debugger;
+  long long cur_iter;
+};
+
 double EvalAt(const Eigen::Vector3d& p,
               const CostSettings& settings,
               const MeshDependentResource& mdr,
@@ -38,7 +43,7 @@ double ComputeCost_SP(const GripperParams& params,
                       const GripperSettings& settings,
                       const MeshDependentResource& remeshed_mdr,
                       GripperParams& out_dCost_dParam, /* unused*/
-                      Debugger* const debugger);
+                      const CostContext& context);
 
 double MinDistance(const GripperParams& params,
                    const GripperSettings& settings,
@@ -53,7 +58,7 @@ typedef double (*CostFunction)(const GripperParams&,
                                const GripperSettings&,
                                const MeshDependentResource&,
                                GripperParams&,
-                               Debugger* const);
+                               const CostContext&);
 
 struct CostFunctionItem {
   const char* name;
@@ -64,7 +69,7 @@ struct CostFunctionItem {
 
 const CostFunctionItem kCostFunctions[] = {
     CostFunctionItem{"Gradient-Based",
-                     &ComputeCost,
+                     nullptr, /* will fail */
                      CostFunctionEnum::kGradientBased,
                      true},
     CostFunctionItem{"SP", &ComputeCost_SP, CostFunctionEnum::kSP, false}};

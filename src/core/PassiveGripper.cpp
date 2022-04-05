@@ -465,7 +465,12 @@ void PassiveGripper::InvalidateCost() {
 
   cost_changed_ = false;
   cost_ = kCostFunctions[(int)settings_.cost.cost_function].cost_function(
-      params_, params_, settings_, mdr_remeshed_, dCost_dParam_, nullptr);
+      params_,
+      params_,
+      settings_,
+      mdr_remeshed_,
+      dCost_dParam_,
+      CostContext{nullptr, -1});
   min_dist_ = MinDistance(params_, settings_, mdr_remeshed_);
   // intersecting_ = Intersects(params_, settings_, mdr_); // TODO: Fails with
   // duplicate trajectory

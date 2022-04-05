@@ -4,6 +4,7 @@
 #include "../easy_profiler_headers.h"
 #include "GeometryUtils.h"
 #include "robots/Robots.h"
+#include "../profiler.h"
 
 namespace psg {
 namespace core {
@@ -802,8 +803,9 @@ double ComputeCost_SP(const GripperParams& params,
                       const GripperSettings& settings,
                       const MeshDependentResource& remeshed_mdr,
                       GripperParams& out_dCost_dParam,
-                      Debugger* const debugger) {
+                      const CostContext& context) {
   EASY_FUNCTION();
+  PROF_OPEN(context.cur_iter, "Cost Func");
 
   struct _SubInfo {
     // Pose pose;
@@ -825,7 +827,7 @@ double ComputeCost_SP(const GripperParams& params,
   const double inner_dis_contrib = settings.cost.inner_dis_contrib;
   const double geodesic_contrib = settings.cost.geodesic_contrib;
   auto MyCost =
-      [floor, debugger, inner_dis_contrib, geodesic_contrib, &remeshed_mdr](
+      [floor, &context, inner_dis_contrib, geodesic_contrib, &remeshed_mdr](
           const Eigen::RowVector3d& p0,
           const Eigen::RowVector3d& p1,
           _SegState& state,
@@ -837,7 +839,7 @@ double ComputeCost_SP(const GripperParams& params,
                                           geodesic_contrib,
                                           inner_dis_contrib,
                                           state,
-                                          debugger,
+                                          context.debugger,
                                           color) +
            ComputeFloorCost(p0, p1, floor);
   };
@@ -861,6 +863,7 @@ double ComputeCost_SP(const GripperParams& params,
 
   // Linearize trajectory
   EASY_BLOCK("Linearize Trajectory");
+  PROF_OPEN(context.cur_iter, "Linearize Trajectory");
   Trajectory new_trajectory;
   std::vector<Fingers> new_fingers;
   std::vector<std::pair<int, double>> traj_contrib;
@@ -875,6 +878,7 @@ double ComputeCost_SP(const GripperParams& params,
   for (size_t i = 0; i < new_trajectory.size(); i++) {
     new_trans[i] = robots::Forward(new_trajectory[i]);
   }
+  PROF_CLOSE(context.cur_iter, "Linearize Trajectory");
   EASY_END_BLOCK;
 
   // ========================
@@ -884,6 +888,7 @@ double ComputeCost_SP(const GripperParams& params,
 
   if (settings.cost.gripper_energy != 0.) {
     EASY_BLOCK("Gripper Energy");
+    PROF_OPEN(context.cur_iter, "Prepare Grip");
 
     // std::vector<bool> traj_skip(n_trajectory - 1, false);
     std::vector<double> traj_devs(n_trajectory - 1);
@@ -933,8 +938,10 @@ double ComputeCost_SP(const GripperParams& params,
       }
     }
     EASY_END_BLOCK;
+    PROF_CLOSE(context.cur_iter, "Prepare Grip");
 
     EASY_BLOCK("Actual Grip");
+    PROF_OPEN(context.cur_iter, "Actual Grip");
     long long n_poses = poses.size();
 
 #pragma omp parallel
@@ -943,41 +950,17 @@ double ComputeCost_SP(const GripperParams& params,
 
 #pragma omp for nowait
       for (long long j = 0; j < n_poses; j++) {
+        PROF_OPEN(context.cur_iter, "Grip Inner");
         auto f = TransformFingers(fingers, robots::Forward(poses[j]));
         t_max = std::max(t_max, ProcessFinger(f));
+        PROF_CLOSE(context.cur_iter, "Grip Inner");
       }
 #pragma omp critical
       gripper_energy = std::max(gripper_energy, t_max);
     }
 
-    /*
-    size_t gripper_subs = 0;
-    for (size_t i = 0; i < n_trajectory - 1; i++) {
-      // if (traj_skip[i]) continue;
-      size_t cur_sub = traj_subs[i];
-      size_t iters = cur_sub;
-      gripper_subs += cur_sub;
-      if (i == n_trajectory - 2) iters++;
-
-#pragma omp parallel
-      {
-        double t_max = 0;
-
-#pragma omp for
-        for (long long j = 0; j < iters; j++) {
-          double t = (double)j / cur_sub;
-          Pose pose = new_trajectory[i] * (1. - t) + new_trajectory[i + 1] * t;
-          auto f = TransformFingers(fingers, robots::Forward(pose));
-          t_max = std::max(t_max, ProcessFinger(f));
-        }
-
-#pragma omp critical
-        gripper_energy = std::max(gripper_energy, t_max);
-      }
-    }
-    */
     EASY_END_BLOCK;
-    // std::cout << "gripper_sub: " << gripper_subs << std::endl;
+    PROF_CLOSE(context.cur_iter, "Actual Grip");
   }
 
   // ========================
@@ -989,6 +972,7 @@ double ComputeCost_SP(const GripperParams& params,
     EASY_BLOCK("Trajectory Energy");
 
     EASY_BLOCK("Prepare Traj");
+    PROF_OPEN(context.cur_iter, "Prepare Traj");
     std::vector<Eigen::Vector3d> d_fingers;
     size_t traj_subs = 0;
     for (size_t i = 0; i < fingers.size(); i++) {
@@ -1011,9 +995,11 @@ double ComputeCost_SP(const GripperParams& params,
         }
       }
     }
+    PROF_CLOSE(context.cur_iter, "Prepare Traj");
     EASY_END_BLOCK;
     // std::cout << "traj_subs: " << traj_subs << std::endl;
     EASY_BLOCK("Actual Traj");
+    PROF_OPEN(context.cur_iter, "Actual Traj");
 #pragma omp parallel
     {
       double t_max = 0;
@@ -1021,6 +1007,7 @@ double ComputeCost_SP(const GripperParams& params,
 
 #pragma omp for
       for (long long j = 0; j < d_fingers.size(); j++) {
+        PROF_OPEN(context.cur_iter, "Traj Inner");
         Eigen::Vector3d p0 = new_trans[0] * d_fingers[j];
         state.is_first = true;
         double cur_cost = 0;
@@ -1030,18 +1017,21 @@ double ComputeCost_SP(const GripperParams& params,
           p0 = p1;
         }
         t_max = std::max(t_max, cur_cost);
+        PROF_CLOSE(context.cur_iter, "Traj Inner");
       }
 
 #pragma omp critical
       trajectory_energy = std::max(trajectory_energy, t_max);
     }
     EASY_END_BLOCK;
+    PROF_CLOSE(context.cur_iter, "Actual Traj");
   }
 
   // ========================
   // Robot floor collision
   // ========================
   EASY_BLOCK("Robot floor collision");
+  PROF_OPEN(context.cur_iter, "Robot Collision");
   double robot_floor = 0;
   double max_penetration = 0;
   constexpr double robot_clearance = 0.05;
@@ -1052,11 +1042,13 @@ double ComputeCost_SP(const GripperParams& params,
   }
   robot_floor = max_penetration;
   EASY_END_BLOCK;
+  PROF_CLOSE(context.cur_iter, "Robot Collision");
 
   // ========================
   // L2 regularization term
   // ========================
   EASY_BLOCK("L2 regularization term");
+  PROF_OPEN(context.cur_iter, "L2 Reg");
   double traj_reg = 0;
   for (size_t i = 1; i < params.trajectory.size() - 1; i++) {
     traj_reg += (params.trajectory[i] - init_params.trajectory[i])
@@ -1064,10 +1056,12 @@ double ComputeCost_SP(const GripperParams& params,
                     .squaredNorm();
   }
   EASY_END_BLOCK;
+  PROF_CLOSE(context.cur_iter, "L2 Reg");
 
   // ========================
   // Total Cost
   // ========================
+  PROF_CLOSE(context.cur_iter, "Cost Func");
   return settings.cost.gripper_energy * gripper_energy +
          settings.cost.traj_energy * trajectory_energy +
          settings.cost.robot_collision * robot_floor +

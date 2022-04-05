@@ -16,6 +16,7 @@
 #include "../core/models/GripperSettings.h"
 #include "../core/robots/Robots.h"
 #include "../core/serialization/Serialization.h"
+#include "../profiler.h"
 #include "Assets.h"
 #include "Components.h"
 
@@ -684,7 +685,7 @@ void MainUI::DrawOptimizationStatusPanel() {
           GripperParams params;
           params.DeserializeFn("params" + std::to_string(selected_iter_) +
                                ".dbg");
-          vm_.PSG().SetParams(params); 
+          vm_.PSG().SetParams(params);
 
           CostFunctionItem cost_function =
               kCostFunctions[(int)vm_.PSG().GetCostSettings().cost_function];
@@ -692,11 +693,11 @@ void MainUI::DrawOptimizationStatusPanel() {
           Debugger debugger;
           GripperParams dCost_dParam;
           double cost = cost_function.cost_function(params,
-                                                     params,
-                                                     vm_.PSG().GetSettings(),
-                                                     vm_.PSG().GetRemeshedMDR(),
-                                                     dCost_dParam,
-                                                     &debugger);
+                                                    params,
+                                                    vm_.PSG().GetSettings(),
+                                                    vm_.PSG().GetRemeshedMDR(),
+                                                    dCost_dParam,
+                                                    CostContext{&debugger, -1});
           VisualizeDebugger(debugger);
         }
       }
@@ -775,8 +776,17 @@ void MainUI::DrawDebugPanel() {
                      vm_.PSG().GetSettings(),
                      vm_.PSG().GetRemeshedMDR(),
                      dCost_dParam,
-                     &debugger);
+                     CostContext{&debugger, -1});
       VisualizeDebugger(debugger);
+    }
+    if (ImGui::Button("Clear Profiler Info", ImVec2(w, 0))) {
+      PROF_CLEAR();
+    }
+    if (ImGui::Button("Dump Profiler Info", ImVec2(w, 0))) {
+      std::string filename = igl::file_dialog_save();
+      if (!filename.empty()) {
+        PROF_DUMP(filename);
+      }
     }
     if (ImGui::Button("Debug CP Seeds", ImVec2(w, 0))) {
       std::vector<int> FI;

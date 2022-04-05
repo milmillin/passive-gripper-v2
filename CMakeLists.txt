@@ -137,7 +137,7 @@ if (ENABLE_EASY_PROFILER)
   add_compile_definitions(COMPILE_WITH_EASY_PROFILER)
 endif()
 
-add_library(core ${CORE_SRCFILES})
+add_library(core ${CORE_SRCFILES} "src/profiler.cpp")
 target_link_libraries(core ${CORE_LINK_LIBS})
 
 add_executable(${PROJECT_NAME} ${UI_SRCFILES})
