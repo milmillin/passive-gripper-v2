@@ -52,6 +52,7 @@ class MainUI : public igl::opengl::glfw::imgui::ImGuiMenu {
   // Draw Panel
   void DrawViewPanel();
 
+  void DrawCostDebugPanel();
   void DrawMetricPanel();
   void DrawToolPanel();
   void DrawContactPointPanel();
@@ -114,6 +115,7 @@ class MainUI : public igl::opengl::glfw::imgui::ImGuiMenu {
   // Optimization
   Optimizer optimizer_;
   int selected_iter_ = 0;
+  std::vector<CostDebugInfo> cost_dbg_infos_;
 
   // ImGuizmo
   ImGuizmo::OPERATION imguizmo_operation = ImGuizmo::TRANSLATE;

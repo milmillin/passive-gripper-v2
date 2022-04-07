@@ -180,6 +180,7 @@ void MainUI::draw_viewer_menu() {
     if (optimizer_.IsRunning() || optimizer_.IsResultAvailable()) {
       DrawOptimizationStatusPanel();
     }
+    DrawCostDebugPanel();
     DrawMetricPanel();
     DrawToolPanel();
     switch (selected_tools_) {
@@ -210,6 +211,49 @@ void MainUI::draw_viewer_menu() {
     }
   }
   DrawViewPanel();
+}
+
+void MainUI::DrawCostDebugPanel() {
+  float w = ImGui::GetContentRegionAvailWidth();
+  if (ImGui::CollapsingHeader("Cost Debug", ImGuiTreeNodeFlags_DefaultOpen)) {
+    if (ImGui::Button("Load dbginfos from file", ImVec2(w, 0))) {
+      std::string filename = igl::file_dialog_open();
+      if (!filename.empty()) {
+        psg::core::serialization::Deserialize(cost_dbg_infos_, filename);
+      }
+    }
+    if (optimizer_.debug) {
+      if (ImGui::Button("Load Debug Info", ImVec2(w, 0))) {
+        cost_dbg_infos_ = optimizer_.GetCostDebugInfos();
+      }
+    }
+
+    ImGui::LabelText("Num Iters: ", "%d", (int)cost_dbg_infos_.size());
+    if (ImGui::InputInt("Iter: ", &selected_iter_)) {
+      if (selected_iter_ < 0) selected_iter_ = 0;
+      if (selected_iter_ > cost_dbg_infos_.size())
+        selected_iter_ = cost_dbg_infos_.size() - 1;
+
+      if (selected_iter_ >= 0) {
+        CostFunctionItem cost_function =
+            kCostFunctions[(int)vm_.PSG().GetCostSettings().cost_function];
+
+        const GripperParams& param = cost_dbg_infos_[selected_iter_].param;
+
+        vm_.PSG().SetParams(param);
+
+        Debugger debugger;
+        GripperParams dCost_dParam;
+        double cost = cost_function.cost_function(param,
+                                                  param,
+                                                  vm_.PSG().GetSettings(),
+                                                  vm_.PSG().GetRemeshedMDR(),
+                                                  dCost_dParam,
+                                                  CostContext{&debugger, -1});
+        VisualizeDebugger(debugger);
+      }
+    }
+  }
 }
 
 void MainUI::DrawMetricPanel() {
@@ -507,6 +551,8 @@ void MainUI::DrawOptimizationPanel() {
         "Trajectory Subdivision", (int*)&cost_settings.n_trajectory_steps, 1);
     cost_update |=
         ImGui::InputDouble("Subdivision", &cost_settings.d_subdivision, 1);
+    cost_update |=
+        ImGui::InputDouble("Linearity", &cost_settings.d_linearity, 1);
     cost_update |= ImGui::InputDouble(
         "Inner Contrib", &cost_settings.inner_dis_contrib, 1);
     cost_update |= ImGui::InputDouble(
@@ -678,29 +724,6 @@ void MainUI::DrawOptimizationStatusPanel() {
       if (ImGui::Button("Load Result", ImVec2(w, 0))) {
         vm_.PSG().SetParams(optimizer_.GetCurrentParams());
       }
-      if (optimizer_.debug) {
-        if (ImGui::InputInt("Iter: ", &selected_iter_)) {
-          if (selected_iter_ < 0) selected_iter_ = 0;
-
-          GripperParams params;
-          params.DeserializeFn("params" + std::to_string(selected_iter_) +
-                               ".dbg");
-          vm_.PSG().SetParams(params);
-
-          CostFunctionItem cost_function =
-              kCostFunctions[(int)vm_.PSG().GetCostSettings().cost_function];
-
-          Debugger debugger;
-          GripperParams dCost_dParam;
-          double cost = cost_function.cost_function(params,
-                                                    params,
-                                                    vm_.PSG().GetSettings(),
-                                                    vm_.PSG().GetRemeshedMDR(),
-                                                    dCost_dParam,
-                                                    CostContext{&debugger, -1});
-          VisualizeDebugger(debugger);
-        }
-      }
     }
   }
   ImGui::PopID();
@@ -786,6 +809,16 @@ void MainUI::DrawDebugPanel() {
       std::string filename = igl::file_dialog_save();
       if (!filename.empty()) {
         PROF_DUMP(filename);
+      }
+    }
+    if (ImGui::Button("Dump Cost Info", ImVec2(w, 0))) {
+      std::string filename = igl::file_dialog_save();
+      if (!filename.empty()) {
+        std::ofstream f(filename);
+
+        for (size_t i = 0; i < cost_dbg_infos_.size(); i++) {
+          f << i << '\t' << cost_dbg_infos_[i].cost << '\n';
+        }
       }
     }
     if (ImGui::Button("Debug CP Seeds", ImVec2(w, 0))) {

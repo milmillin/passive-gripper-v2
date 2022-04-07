@@ -2,9 +2,9 @@
 
 #include <igl/copyleft/cgal/intersect_other.h>
 #include "../easy_profiler_headers.h"
+#include "../profiler.h"
 #include "GeometryUtils.h"
 #include "robots/Robots.h"
-#include "../profiler.h"
 
 namespace psg {
 namespace core {
@@ -687,7 +687,7 @@ static double ComputeCollisionPenaltySegment(const Eigen::Vector3d& A,
 
   EASY_BLOCK("intersectRay");
   mdr.intersector.intersectRay(
-      A.cast<float>(), dir.cast<float>(), hits, num_rays);
+      A.cast<float>(), dir.cast<float>(), hits, num_rays, 0, norm + 1e-6);
   bool is_A_in = hits.size() % 2 == 1;
   EASY_END_BLOCK;
   EASY_BLOCK("After intersectRay");

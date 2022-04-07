@@ -8,9 +8,10 @@
 #include <mutex>
 #include <vector>
 
+#include "../easy_profiler_headers.h"
 #include "CostFunctions.h"
 #include "PassiveGripper.h"
-#include "../easy_profiler_headers.h"
+#include "serialization/Serialization.h"
 
 namespace psg {
 namespace core {
@@ -19,18 +20,39 @@ size_t MyFlattenSize(const GripperParams& meta);
 void MyUnflatten(GripperParams& meta, const double* x);
 void MyFlattenGrad(const GripperParams& meta, double* x);
 
-
-struct _DestructorCompleteMarker{
-  char *foo;
+struct _DestructorCompleteMarker {
+  char* foo;
   ~_DestructorCompleteMarker() {
     EASY_FUNCTION();
     EASY_EVENT("~Optimizer Complete");
   }
 };
 
+struct CostDebugInfo : serialization::Serializable {
+  GripperParams param;
+  double cost;
+
+  DECL_SERIALIZE() {
+    constexpr int version = 1;
+    SERIALIZE(version);
+    SERIALIZE(param);
+    SERIALIZE(cost);
+  }
+
+  DECL_DESERIALIZE() {
+    int version;
+    DESERIALIZE(version);
+    if (version == 1) {
+      DESERIALIZE(param);
+      DESERIALIZE(cost);
+    }
+  }
+};
+
 class Optimizer {
  private:
-  _DestructorCompleteMarker destructor_complete_marker_;  // Destructors are run in reverse order
+  _DestructorCompleteMarker
+      destructor_complete_marker_;  // Destructors are run in reverse order
  public:
   ~Optimizer();
   void Optimize(const PassiveGripper& psg);
@@ -83,13 +105,13 @@ class Optimizer {
 
   CostFunctionItem cost_function_;
 
-  std::vector<double> costs_;
+  std::vector<CostDebugInfo> costs_dbg_infos_;
 
  public:
   DECLARE_GETTER(GetIters, n_iters_);
 
   // not thread-safe
-  DECLARE_GETTER(GetCosts, costs_);
+  DECLARE_GETTER(GetCostDebugInfos, costs_dbg_infos_);
 };
 
 }  // namespace core

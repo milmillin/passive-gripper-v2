@@ -135,7 +135,7 @@ void Optimizer::Optimize(const PassiveGripper& psg) {
   g_min_cost_ = t_min_cost_ = std::numeric_limits<double>::max();
   is_running_ = true;
   is_resumable_ = true;
-  costs_.clear();
+  costs_dbg_infos_.clear();
   start_time_ = std::chrono::high_resolution_clock::now();
   optimize_future_ = std::async(std::launch::async, [&] {
     double minf; /* minimum objective value, upon return */
@@ -215,9 +215,11 @@ double Optimizer::ComputeCostInternal(unsigned n,
       stop_time - start_time);
 
   if (debug) {
-    params_.SerializeFn("params" + std::to_string(n_iters_) + ".dbg");
+    CostDebugInfo dbg_info;
+    dbg_info.param = params_;
+    dbg_info.cost = cost;
+    costs_dbg_infos_.push_back(dbg_info);
   }
-  costs_.push_back(cost);
 
   if (n_iters_ % 1000 == 0) {
     std::cerr << "Iter: " << n_iters_ << ", Time: " << duration.count()

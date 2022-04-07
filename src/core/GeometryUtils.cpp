@@ -42,7 +42,7 @@ struct _AdtTrajData {
 
 static void AdaptiveSubdivideTrajectoryImpl(
     const Fingers& fingers,
-    double flatness,
+    double flatness2,
     std::list<_AdtTrajData>& l,
     std::list<_AdtTrajData>::iterator l_p0,
     std::list<_AdtTrajData>::iterator l_p2) {
@@ -60,15 +60,15 @@ static void AdaptiveSubdivideTrajectoryImpl(
     for (size_t i = 0; i < fingers_p02.rows(); i++) {
       Eigen::RowVector3d p02 = fingers_p02.row(i);
       Eigen::RowVector3d p01 = fingers_p01.row(i);
-      max_deviation = std::max(max_deviation, p01.cross(p02).norm());
+      max_deviation = std::max(max_deviation, p01.cross(p02).squaredNorm());
     }
   }
-  if (max_deviation > flatness) {
+  if (max_deviation > flatness2) {
     auto l_p1 = l.insert(
         l_p2,
         _AdtTrajData{fingers_p1, p1, l_p0->traj_idx, (l_p0->t + t2) / 2.});
-    AdaptiveSubdivideTrajectoryImpl(fingers, flatness, l, l_p0, l_p1);
-    AdaptiveSubdivideTrajectoryImpl(fingers, flatness, l, l_p1, l_p2);
+    AdaptiveSubdivideTrajectoryImpl(fingers, flatness2, l, l_p0, l_p1);
+    AdaptiveSubdivideTrajectoryImpl(fingers, flatness2, l, l_p1, l_p2);
   }
 }
 
@@ -97,10 +97,12 @@ void AdaptiveSubdivideTrajectory(
                      0});
   }
 
+  double flatness2 = flatness * flatness;
+
   std::list<_AdtTrajData>::iterator l_p0 = l.begin();
   std::list<_AdtTrajData>::iterator l_p2 = ++l.begin();
   for (size_t i = 1; i < n_keyframes; i++) {
-    AdaptiveSubdivideTrajectoryImpl(fingers0, flatness, l, l_p0, l_p2);
+    AdaptiveSubdivideTrajectoryImpl(fingers0, flatness2, l, l_p0, l_p2);
     l_p0 = l_p2;
     l_p2++;
   }

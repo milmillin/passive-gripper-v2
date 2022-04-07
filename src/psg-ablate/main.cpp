@@ -24,13 +24,13 @@ char __buf[1024];
 std::string FormatOutput(const psgm::CostSettings& s, int iter) {
   std::snprintf(__buf,
                 1024,
-                "-%02d-%04lld-%.0f-%.0f-%.0f-%.0f",
-                iter,
+                "-%04lld-%.0f-%.0f-%.0f-%.0f-%02d",
                 s.n_trajectory_steps,
                 s.geodesic_contrib,
                 s.inner_dis_contrib,
                 s.gripper_energy,
-                s.traj_energy);
+                s.traj_energy,
+                iter);
   return __buf;
 }
 
@@ -151,6 +151,7 @@ int main(int argc, char** argv) {
     }
 
     psgc::Optimizer optimizer;
+    optimizer.debug = true;
     auto start_time = std::chrono::high_resolution_clock::now();
     optimizer.Optimize(psg);
     optimizer.Wait();
@@ -158,6 +159,11 @@ int main(int argc, char** argv) {
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
         stop_time - start_time);
     Log() << "> Optimization took " << duration.count() << " ms." << std::endl;
+
+    std::vector<psgc::CostDebugInfo> dbg_infos = optimizer.GetCostDebugInfos();
+    psgs::Serialize(dbg_infos,
+        out_raw_fn + FormatOutput(cost_settings, iter) + ".dbginfos");
+    Log() << ">> DbgInfo written" << std::endl;
 
     EASY_BLOCK("Copy params");
     psgm::GripperParams params = optimizer.GetCurrentParams();
