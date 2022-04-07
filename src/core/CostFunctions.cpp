@@ -687,13 +687,17 @@ static double ComputeCollisionPenaltySegment(const Eigen::Vector3d& A,
 
   EASY_BLOCK("intersectRay");
   mdr.intersector.intersectRay(
-      A.cast<float>(), dir.cast<float>(), hits, num_rays, 0, norm + 1e-6);
-  bool is_A_in = hits.size() % 2 == 1;
+      A.cast<float>(),
+      dir.cast<float>(),
+      hits,
+      num_rays,
+      0,
+      state.is_first ? std::numeric_limits<float>::max() : norm + 1e-6);
   EASY_END_BLOCK;
   EASY_BLOCK("After intersectRay");
 
   if (state.is_first) {
-    state.is_in = is_A_in;
+    state.is_in = hits.size() % 2 == 1;
   }
 
   Eigen::RowVector3d color_inv = Eigen::RowVector3d::Ones() - color;
@@ -900,30 +904,19 @@ double ComputeCost_SP(const GripperParams& params,
     // #pragma omp parallel for
     for (long long i = 0; i < n_trajectory - 1; i++) {
       double max_deviation = 0;
-      bool intersects = false;
       for (size_t j = 0; j < new_fingers[i].size(); j++) {
         double dev = (new_fingers[i + 1][j] - new_fingers[i][j])
                          .rowwise()
                          .norm()
                          .maxCoeff();
         max_deviation = std::max(max_deviation, dev);
-        Eigen::RowVector3d p_min =
-            new_fingers[i][j].colwise().minCoeff().cwiseMin(
-                new_fingers[i + 1][j].colwise().minCoeff());
-        Eigen::RowVector3d p_max =
-            new_fingers[i][j].colwise().maxCoeff().cwiseMax(
-                new_fingers[i + 1][j].colwise().maxCoeff());
-        p_min.array() -= settings.cost.d_subdivision;
-        p_max.array() += settings.cost.d_subdivision;
-        intersects = intersects ||
-                     remeshed_mdr.Intersects(Eigen::AlignedBox3d(p_min, p_max));
       }
 
       // if (intersects)
       total_dev += max_deviation;
       traj_devs[i] = max_deviation;
-      // traj_skip[i] = !intersects;
     }
+
     double d_sub = total_dev / settings.cost.n_finger_steps;
     std::vector<Pose> poses;
     poses.reserve(settings.cost.n_finger_steps + 32);
@@ -973,6 +966,20 @@ double ComputeCost_SP(const GripperParams& params,
 
     EASY_BLOCK("Prepare Traj");
     PROF_OPEN(context.cur_iter, "Prepare Traj");
+
+    // HACK: Linearize Trajectory High Res
+    AdaptiveSubdivideTrajectory(params.trajectory,
+                                params.fingers,
+                                1e-6,
+                                new_trajectory,
+                                new_fingers,
+                                traj_contrib);
+    size_t n_trajectory = new_trajectory.size();
+    std::vector<Eigen::Affine3d> new_trans(new_trajectory.size());
+    for (size_t i = 0; i < new_trajectory.size(); i++) {
+      new_trans[i] = robots::Forward(new_trajectory[i]);
+    }
+
     std::vector<Eigen::Vector3d> d_fingers;
     size_t traj_subs = 0;
     for (size_t i = 0; i < fingers.size(); i++) {
