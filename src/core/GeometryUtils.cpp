@@ -140,7 +140,7 @@ void AdaptiveSubdivideTrajectory(
 
       subs = (arc_theta.array() / theta_max.array()).ceil().maxCoeff();
     }
-    std::cerr << "subs: " << subs << std::endl;
+    // std::cerr << "subs: " << subs << std::endl;
     for (long long j = 1; j <= subs; j++) {
       double t = (double)j / subs;
       out_trajectory.push_back(trajectory[i - 1] * (1. - t) +
@@ -149,7 +149,7 @@ void AdaptiveSubdivideTrajectory(
     }
     bb0 = bb2;
   }
-  std::cerr << "sub end ---" << std::endl;
+  // std::cerr << "sub end ---" << std::endl;
 }
 
 /*
