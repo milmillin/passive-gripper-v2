@@ -378,7 +378,7 @@ double ComputeCost1(const GripperParams& params,
                               params.fingers,
                               precision,
                               new_trajectory,
-                              new_fingers,
+                              // new_fingers, // TODO: will fail
                               traj_contrib);
   size_t n_trajectory = new_trajectory.size();
   std::vector<bool> traj_skip(n_trajectory - 1, false);
@@ -607,15 +607,18 @@ double MinDistance(const GripperParams& params,
   // discretize time
   EASY_BLOCK("discretize time")
   Trajectory new_trajectory;
-  std::vector<std::vector<Eigen::MatrixXd>> new_fingers;
   std::vector<std::pair<int, double>> traj_contrib;
   AdaptiveSubdivideTrajectory(params.trajectory,
                               params.fingers,
                               precision,
                               new_trajectory,
-                              new_fingers,
                               traj_contrib);
   size_t n_trajectory = new_trajectory.size();
+  std::vector<Fingers> new_fingers(n_trajectory);
+  for (size_t i = 0; i < n_trajectory; i++) {
+    new_fingers[i] =
+        TransformFingers(fingers, robots::Forward(new_trajectory[i]));
+  }
 
   double min_dist = 0;
 
@@ -687,13 +690,17 @@ static double ComputeCollisionPenaltySegment(const Eigen::Vector3d& A,
 
   EASY_BLOCK("intersectRay");
   mdr.intersector.intersectRay(
-      A.cast<float>(), dir.cast<float>(), hits, num_rays, 0, norm + 1e-6);
-  bool is_A_in = hits.size() % 2 == 1;
+      A.cast<float>(),
+      dir.cast<float>(),
+      hits,
+      num_rays,
+      0,
+      state.is_first ? std::numeric_limits<float>::max() : norm + 1e-6);
   EASY_END_BLOCK;
   EASY_BLOCK("After intersectRay");
 
   if (state.is_first) {
-    state.is_in = is_A_in;
+    state.is_in = hits.size() % 2 == 1;
   }
 
   Eigen::RowVector3d color_inv = Eigen::RowVector3d::Ones() - color;
@@ -865,18 +872,18 @@ double ComputeCost_SP(const GripperParams& params,
   EASY_BLOCK("Linearize Trajectory");
   PROF_OPEN(context.cur_iter, "Linearize Trajectory");
   Trajectory new_trajectory;
-  std::vector<Fingers> new_fingers;
   std::vector<std::pair<int, double>> traj_contrib;
   AdaptiveSubdivideTrajectory(params.trajectory,
                               params.fingers,
                               settings.cost.d_linearity,
                               new_trajectory,
-                              new_fingers,
                               traj_contrib);
   size_t n_trajectory = new_trajectory.size();
-  std::vector<Eigen::Affine3d> new_trans(new_trajectory.size());
+  std::vector<Fingers> new_fingers(n_trajectory);
+  std::vector<Eigen::Affine3d> new_trans(n_trajectory);
   for (size_t i = 0; i < new_trajectory.size(); i++) {
     new_trans[i] = robots::Forward(new_trajectory[i]);
+    new_fingers[i] = TransformFingers(fingers, new_trans[i]);
   }
   PROF_CLOSE(context.cur_iter, "Linearize Trajectory");
   EASY_END_BLOCK;

@@ -750,14 +750,12 @@ void MainUI::DrawDebugPanel() {
       vm_.ComputeInitParams();
     }
     if (ImGui::Button("Adaptive Subdivide Trajectory", ImVec2(w, 0))) {
-      std::vector<std::vector<Eigen::MatrixXd>> t_fingers;
       Trajectory trajectory;
       std::vector<std::pair<int, double>> contrib;
       AdaptiveSubdivideTrajectory(vm_.PSG().GetTrajectory(),
                                   vm_.PSG().GetFingers(),
                                   0.001,
                                   trajectory,
-                                  t_fingers,
                                   contrib);
       std::cerr << "New Trajectory: " << trajectory.size() << std::endl;
       vm_.PSG().SetTrajectory(trajectory);

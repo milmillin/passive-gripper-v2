@@ -16,8 +16,8 @@
 #include <libqhullcpp/RboxPoints.h>
 #include <list>
 
-#include "robots/Robots.h"
 #include "../easy_profiler_headers.h"
+#include "robots/Robots.h"
 
 #include "UnionFind.h"
 
@@ -34,42 +34,59 @@ Fingers TransformFingers(const Fingers& fingers, const Eigen::Affine3d& trans) {
 }
 
 struct _AdtTrajData {
-  Fingers fingers;
+  Eigen::Matrix<double, 8, 3> bb;
   Pose pose;
   size_t traj_idx;
   double t;
 };
 
 static void AdaptiveSubdivideTrajectoryImpl(
-    const Fingers& fingers,
+    const Eigen::Matrix<double, 8, 3>& bb,
     double flatness2,
     std::list<_AdtTrajData>& l,
     std::list<_AdtTrajData>::iterator l_p0,
     std::list<_AdtTrajData>::iterator l_p2) {
   Pose p1 = (l_p0->pose + l_p2->pose) / 2.;
-  Fingers fingers_p1 = TransformFingers(fingers, robots::Forward(p1));
+  Eigen::Matrix<double, 8, 3> bb_p1 = TransformMatrix(bb, robots::Forward(p1));
 
   double t2 = l_p2->t;
   if (l_p2->traj_idx != l_p0->traj_idx) t2 = 1;
 
   double max_deviation = 0;
-  for (size_t j = 0; j < fingers_p1.size(); j++) {
-    Eigen::MatrixXd fingers_p02 =
-        (l_p2->fingers[j] - l_p0->fingers[j]).rowwise().normalized();
-    Eigen::MatrixXd fingers_p01 = (fingers_p1[j] - l_p0->fingers[j]);
-    for (size_t i = 0; i < fingers_p02.rows(); i++) {
-      Eigen::RowVector3d p02 = fingers_p02.row(i);
-      Eigen::RowVector3d p01 = fingers_p01.row(i);
-      max_deviation = std::max(max_deviation, p01.cross(p02).squaredNorm());
-    }
+  Eigen::Matrix<double, 8, 3> bb_p02 =
+      (l_p2->bb - l_p0->bb).rowwise().normalized();
+  Eigen::Matrix<double, 8, 3> bb_p01 = (bb_p1 - l_p0->bb);
+  for (int i = 0; i < bb_p01.rows(); i++) {
+    max_deviation = std::max(max_deviation,
+                             bb_p01.row(i).cross(bb_p02.row(i)).squaredNorm());
   }
   if (max_deviation > flatness2) {
     auto l_p1 = l.insert(
-        l_p2,
-        _AdtTrajData{fingers_p1, p1, l_p0->traj_idx, (l_p0->t + t2) / 2.});
-    AdaptiveSubdivideTrajectoryImpl(fingers, flatness2, l, l_p0, l_p1);
-    AdaptiveSubdivideTrajectoryImpl(fingers, flatness2, l, l_p1, l_p2);
+        l_p2, _AdtTrajData{bb_p1, p1, l_p0->traj_idx, (l_p0->t + t2) / 2.});
+    AdaptiveSubdivideTrajectoryImpl(bb, flatness2, l, l_p0, l_p1);
+    AdaptiveSubdivideTrajectoryImpl(bb, flatness2, l, l_p1, l_p2);
   }
+}
+
+Eigen::Matrix<double, 8, 3> ComputeBoundingBox(const Fingers& fingers) {
+  Eigen::Matrix<double, 8, 3> bb;
+  Eigen::RowVector3d pmin;
+  Eigen::RowVector3d pmax;
+  pmin.setConstant(std::numeric_limits<double>::max());
+  pmax.setConstant(std::numeric_limits<double>::min());
+  for (const auto& finger : fingers) {
+    pmin = pmin.cwiseMin(finger.colwise().minCoeff());
+    pmax = pmax.cwiseMax(finger.colwise().maxCoeff());
+  }
+  bb.row(0) << pmin;
+  bb.row(1) << pmin.x(), pmin.y(), pmax.z();
+  bb.row(2) << pmin.x(), pmax.y(), pmin.z();
+  bb.row(3) << pmin.x(), pmax.y(), pmax.z();
+  bb.row(4) << pmax.x(), pmin.y(), pmin.z();
+  bb.row(5) << pmax.x(), pmin.y(), pmax.z();
+  bb.row(6) << pmax.x(), pmax.y(), pmin.z();
+  bb.row(7) << pmax;
+  return bb;
 }
 
 void AdaptiveSubdivideTrajectory(
@@ -77,7 +94,70 @@ void AdaptiveSubdivideTrajectory(
     const Fingers& fingers,
     double flatness,
     Trajectory& out_trajectory,
-    std::vector<Fingers>& out_t_fingers,
+    std::vector<std::pair<int, double>>& out_traj_contrib) {
+  size_t n_keyframes = trajectory.size();
+  out_trajectory.clear();
+  out_traj_contrib.clear();
+  if (n_keyframes == 0) return;
+
+  Eigen::Affine3d finger_trans_inv =
+      robots::Forward(trajectory.front()).inverse();
+
+  Fingers fingers0 = TransformFingers(fingers, finger_trans_inv);
+  Eigen::Matrix<double, 8, 3> bb = ComputeBoundingBox(fingers0);
+  Eigen::Matrix<double, 8, 3> bb0 =
+      TransformMatrix(bb, robots::Forward(trajectory[0]));
+
+  out_trajectory.push_back(trajectory[0]);
+  out_traj_contrib.push_back({0, 0.});
+
+  for (size_t i = 1; i < n_keyframes; i++) {
+    Eigen::Matrix<double, 8, 3> bb1 = TransformMatrix(
+        bb, robots::Forward((trajectory[i - 1] + trajectory[i]) / 2.));
+    Eigen::Matrix<double, 8, 3> bb2 =
+        TransformMatrix(bb, robots::Forward(trajectory[i]));
+
+    long long subs = 1;
+
+    if ((trajectory[i] - trajectory[i - 1]).matrix().squaredNorm() > 1e-14) {
+      // approximate cirve as circle arc and use closed-form to subdivide
+      Eigen::Matrix<double, 8, 1> a = (bb1 - bb0).rowwise().norm();
+      Eigen::Matrix<double, 8, 1> b = (bb2 - bb1).rowwise().norm();
+      Eigen::Matrix<double, 8, 1> c = (bb2 - bb0).rowwise().norm();
+
+      Eigen::Matrix<double, 8, 1> s = (a + b + c) / 2.;
+
+      Eigen::Matrix<double, 8, 1> r =
+          (a.array() * b.array() * c.array()) /
+          ((s.array() * (s - a).array() * (s - b).array() * (s - c).array())
+               .sqrt() *
+           4.);
+
+      Eigen::Matrix<double, 8, 1> arc_theta =
+          (c.array() / (2. * r).array()).asin() * 2;
+      Eigen::Matrix<double, 8, 1> theta_max =
+          (1. - (flatness / r.array())).acos() * 2.;
+
+      subs = (arc_theta.array() / theta_max.array()).ceil().maxCoeff();
+    }
+    std::cerr << "subs: " << subs << std::endl;
+    for (long long j = 1; j <= subs; j++) {
+      double t = (double)j / subs;
+      out_trajectory.push_back(trajectory[i - 1] * (1. - t) +
+                               trajectory[i] * t);
+      out_traj_contrib.push_back({i, t});
+    }
+    bb0 = bb2;
+  }
+  std::cerr << "sub end ---" << std::endl;
+}
+
+/*
+void AdaptiveSubdivideTrajectory(
+    const Trajectory& trajectory,
+    const Fingers& fingers,
+    double flatness,
+    Trajectory& out_trajectory,
     std::vector<std::pair<int, double>>& out_traj_contrib) {
   EASY_FUNCTION();
 
@@ -85,13 +165,14 @@ void AdaptiveSubdivideTrajectory(
       robots::Forward(trajectory.front()).inverse();
 
   Fingers fingers0 = TransformFingers(fingers, finger_trans_inv);
+  Eigen::Matrix<double, 8, 3> bb = ComputeBoundingBox(fingers0);
 
   std::list<_AdtTrajData> l;
 
   size_t n_keyframes = trajectory.size();
   for (size_t i = 0; i < n_keyframes; i++) {
     l.push_back(
-        _AdtTrajData{TransformFingers(fingers0, robots::Forward(trajectory[i])),
+        _AdtTrajData{TransformMatrix(bb, robots::Forward(trajectory[i])),
                      trajectory[i],
                      i,
                      0});
@@ -102,22 +183,24 @@ void AdaptiveSubdivideTrajectory(
   std::list<_AdtTrajData>::iterator l_p0 = l.begin();
   std::list<_AdtTrajData>::iterator l_p2 = ++l.begin();
   for (size_t i = 1; i < n_keyframes; i++) {
-    AdaptiveSubdivideTrajectoryImpl(fingers0, flatness2, l, l_p0, l_p2);
+    AdaptiveSubdivideTrajectoryImpl(bb, flatness2, l, l_p0, l_p2);
     l_p0 = l_p2;
     l_p2++;
   }
   size_t n_new_keyframes = l.size();
   out_trajectory.resize(n_new_keyframes);
-  out_t_fingers.resize(n_new_keyframes);
   out_traj_contrib.resize(n_new_keyframes);
   std::list<_AdtTrajData>::iterator l_it = l.begin();
   for (size_t i = 0; i < n_new_keyframes; i++) {
     out_trajectory[i] = l_it->pose;
-    out_t_fingers[i] = l_it->fingers;
     out_traj_contrib[i] = {l_it->traj_idx, l_it->t};
+    std::cerr << "traj id: " << l_it->traj_idx << " t: " << l_it->t
+              << std::endl;
     l_it++;
   }
+  std::cerr << "---" << std::endl;
 }
+*/
 
 bool Remesh(const Eigen::MatrixXd& V,
             const Eigen::MatrixXi& F,

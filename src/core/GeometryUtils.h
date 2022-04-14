@@ -20,12 +20,13 @@ inline auto TransformMatrix(const Eigen::MatrixXd& mat,
   return (trans * mat.transpose().colwise().homogeneous()).transpose();
 }
 
+Eigen::Matrix<double, 8, 3> ComputeBoundingBox(const Fingers& fingers);
+
 void AdaptiveSubdivideTrajectory(
     const Trajectory& trajectory,
     const Fingers& fingers,
     double flatness,
     Trajectory& out_trajectory,
-    std::vector<Fingers>& out_t_fingers,
     std::vector<std::pair<int, double>>& out_traj_contrib);
 
 bool Remesh(const Eigen::MatrixXd& V,
