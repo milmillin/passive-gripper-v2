@@ -87,6 +87,7 @@ class Optimizer {
 
  public:
   DECLARE_GETTER(GetIters, n_iters_);
+  DECLARE_GETTER(GetSettings, settings_);
 
   // not thread-safe
   DECLARE_GETTER(GetCosts, costs_);

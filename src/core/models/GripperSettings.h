@@ -14,6 +14,28 @@ namespace psg {
 namespace core {
 namespace models {
 
+struct _DebugHit {
+  size_t traj_cnt_missing = 0;
+  size_t traj_cnt_extra = 0;
+  size_t gripper_cnt_missing = 0;
+  size_t gripper_cnt_extra = 0;
+  mutable std::mutex lock;
+
+  _DebugHit(){}
+
+  _DebugHit(const psg::core::models::_DebugHit& other) {
+    *this = other;
+  }
+
+  _DebugHit &operator=(const _DebugHit& other) {
+    traj_cnt_missing = other.traj_cnt_missing;
+    traj_cnt_extra = other.traj_cnt_extra;
+    gripper_cnt_missing = other.gripper_cnt_missing;
+    gripper_cnt_extra = other.gripper_cnt_extra;
+  }
+
+};
+
 struct GripperSettings : psg::core::serialization::Serializable {
   ContactSettings contact;
   FingerSettings finger;
@@ -21,6 +43,7 @@ struct GripperSettings : psg::core::serialization::Serializable {
   OptSettings opt;
   TopoOptSettings topo_opt;
   CostSettings cost;
+  mutable _DebugHit debug_hit;
 
   DECL_SERIALIZE() {
     constexpr int version = 1;

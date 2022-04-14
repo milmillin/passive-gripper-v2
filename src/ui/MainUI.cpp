@@ -819,6 +819,10 @@ void MainUI::DrawDebugPanel() {
         }
       }
     }
+    ImGui::Text("Traj hit extra: %zu", optimizer_.GetSettings().debug_hit.traj_cnt_extra);
+    ImGui::Text("Traj hit missing: %zu", optimizer_.GetSettings().debug_hit.traj_cnt_missing);
+    ImGui::Text("Gripper hit extra: %zu", optimizer_.GetSettings().debug_hit.gripper_cnt_extra);
+    ImGui::Text("Gripper hit missing: %zu", optimizer_.GetSettings().debug_hit.gripper_cnt_missing);
   }
   ImGui::PopID();
 }

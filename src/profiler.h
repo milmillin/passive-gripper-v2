@@ -74,7 +74,12 @@ inline void ProfClear() {
   gInfos.clear();
 }
 
-#define PROF_OPEN(x, y) ProfOpen({x, y})
-#define PROF_CLOSE(x, y) ProfClose({x, y})
-#define PROF_DUMP(x) ProfDumpToFile(x)
-#define PROF_CLEAR() ProfClear();
+// #define PROF_OPEN(x, y) ProfOpen({x, y})
+// #define PROF_CLOSE(x, y) ProfClose({x, y})
+// #define PROF_DUMP(x) ProfDumpToFile(x)
+// #define PROF_CLEAR() ProfClear();
+
+#define PROF_OPEN(x, y)
+#define PROF_CLOSE(x, y)
+#define PROF_DUMP(x)
+#define PROF_CLEAR()

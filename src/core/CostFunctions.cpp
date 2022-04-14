@@ -1,5 +1,6 @@
 #include "CostFunctions.h"
 
+#include <mutex>
 #include <igl/copyleft/cgal/intersect_other.h>
 #include "../easy_profiler_headers.h"
 #include "GeometryUtils.h"
@@ -660,6 +661,11 @@ struct _SegState {
   size_t last_pos_vid;
   double last_pos_vid_dis;
   Eigen::Vector3d last_pos;  // last intersection entering the mesh
+  Eigen::Vector3d last_valid_hit;  // last hit that is not duplicate
+
+  // Debug information
+  size_t debug_cnt_missing = 0;
+  size_t debug_cnt_extra = 0;
 };
 
 #define soft_assert(x) \
@@ -674,6 +680,8 @@ static double ComputeCollisionPenaltySegment(const Eigen::Vector3d& A,
                                              Debugger* const debugger,
                                              const Eigen::RowVector3d& color) {
   EASY_FUNCTION();
+
+  constexpr float HIT_LOC_EPSILON = 1e-6;  // Max distance that will be considered as duplicated hit
 
   const Eigen::MatrixXd& SP_ = mdr.GetSP();
   const Eigen::MatrixXi& SP_par_ = mdr.GetSPPar();
@@ -701,10 +709,24 @@ static double ComputeCollisionPenaltySegment(const Eigen::Vector3d& A,
   Eigen::Vector3d last_hit = A;
 
   double total_dis = 0;
+
+  size_t debug_original_hit_cnt = 0;  // Count the number of hits in the original algorithm
+  size_t debug_now_hit_cnt = 0;  // Count the number of hits in the new algorithm
+  for (const auto& hit : hits) {
+    if (hit.t >= norm) break;
+    debug_original_hit_cnt++;
+  }
+
   for (const auto& hit : hits) {
     EASY_BLOCK("ProcessHit");
-    if (hit.t >= norm) break;
+    if (hit.t > norm + HIT_LOC_EPSILON) break;
     Eigen::RowVector3d P = A.transpose() + dir * hit.t;
+    if (!state.is_first
+        && (P - state.last_valid_hit.transpose()).squaredNorm() < HIT_LOC_EPSILON * HIT_LOC_EPSILON)
+      break;
+
+    debug_now_hit_cnt++;
+    state.last_valid_hit = P.transpose();
 
     // find closest vertex for P
     size_t vid = -1;
@@ -779,6 +801,10 @@ static double ComputeCollisionPenaltySegment(const Eigen::Vector3d& A,
       debugger->AddEdge(B, last_hit, color_inv);
     }
   }
+  if (debug_now_hit_cnt > debug_original_hit_cnt)
+    state.debug_cnt_extra++;
+  else
+    state.debug_cnt_missing++;
   return total_dis;
 }
 
@@ -845,7 +871,7 @@ double ComputeCost_SP(const GripperParams& params,
   };
 
   // Gripper energy at particular time
-  auto ProcessFinger = [&MyCost](const Fingers& fingers) -> double {
+  auto ProcessFinger = [&MyCost, &settings](const Fingers& fingers) -> double {
     // EASY_BLOCK("ProcessFinger");
     double cost = 0;
     _SegState state;
@@ -858,6 +884,9 @@ double ComputeCost_SP(const GripperParams& params,
                        Eigen::RowVector3d(1, 0.5, 0));
       }
     }
+    std::lock_guard<std::mutex> lk(settings.debug_hit.lock);
+    settings.debug_hit.gripper_cnt_extra += state.debug_cnt_extra;
+    settings.debug_hit.gripper_cnt_missing += state.debug_cnt_missing;
     return cost;
   };
 
@@ -1022,6 +1051,8 @@ double ComputeCost_SP(const GripperParams& params,
 
 #pragma omp critical
       trajectory_energy = std::max(trajectory_energy, t_max);
+      settings.debug_hit.traj_cnt_extra += state.debug_cnt_extra;
+      settings.debug_hit.traj_cnt_missing += state.debug_cnt_missing;
     }
     EASY_END_BLOCK;
     PROF_CLOSE(context.cur_iter, "Actual Traj");
