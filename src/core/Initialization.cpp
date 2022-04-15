@@ -75,6 +75,9 @@ Eigen::MatrixXd InitializeFinger(const ContactPoint contact_point,
   int fid;
   mdr.ComputeClosestPoint(contact_point.position, closest_point, fid);
 
+  // HACK
+  closest_point += mdr.FN.row(fid) * 1e-5;
+
   size_t vid = -1;
   double bestDist = std::numeric_limits<double>::max();
   double curDist;
