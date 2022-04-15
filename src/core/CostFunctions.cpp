@@ -1012,7 +1012,7 @@ double ComputeCost_SP(const GripperParams& params,
       double t_max = 0;
       _SegState state;
 
-#pragma omp for
+#pragma omp for nowait
       for (long long j = 0; j < d_fingers.size(); j++) {
         PROF_OPEN(context.cur_iter, "Traj Inner");
         Eigen::Vector3d p0 = new_trans[0] * d_fingers[j];
