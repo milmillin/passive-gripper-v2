@@ -881,7 +881,9 @@ double ComputeCost_SP(const GripperParams& params,
   size_t n_trajectory = new_trajectory.size();
   std::vector<Fingers> new_fingers(n_trajectory);
   std::vector<Eigen::Affine3d> new_trans(n_trajectory);
-  for (size_t i = 0; i < new_trajectory.size(); i++) {
+
+#pragma omp parallel for
+  for (long long i = 0; i < new_trajectory.size(); i++) {
     new_trans[i] = robots::Forward(new_trajectory[i]);
     new_fingers[i] = TransformFingers(fingers, new_trans[i]);
   }
@@ -907,24 +909,15 @@ double ComputeCost_SP(const GripperParams& params,
     // #pragma omp parallel for
     for (long long i = 0; i < n_trajectory - 1; i++) {
       double max_deviation = 0;
-      bool intersects = false;
       for (size_t j = 0; j < new_fingers[i].size(); j++) {
         double dev = (new_fingers[i + 1][j] - new_fingers[i][j])
                          .rowwise()
-                         .norm()
+                         .squaredNorm()
                          .maxCoeff();
         max_deviation = std::max(max_deviation, dev);
-        Eigen::RowVector3d p_min =
-            new_fingers[i][j].colwise().minCoeff().cwiseMin(
-                new_fingers[i + 1][j].colwise().minCoeff());
-        Eigen::RowVector3d p_max =
-            new_fingers[i][j].colwise().maxCoeff().cwiseMax(
-                new_fingers[i + 1][j].colwise().maxCoeff());
-        p_min.array() -= settings.cost.d_subdivision;
-        p_max.array() += settings.cost.d_subdivision;
-        intersects = intersects ||
-                     remeshed_mdr.Intersects(Eigen::AlignedBox3d(p_min, p_max));
       }
+
+      max_deviation = sqrt(max_deviation);
 
       // if (intersects)
       total_dev += max_deviation;
