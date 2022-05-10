@@ -366,7 +366,7 @@ void MainUI::DrawContactPointPanel() {
       ImGui::SameLine();
       ImGui::Text("(%d) dist: %d mw: %.4e, pmw: %.4e",
                   i,
-                  contact_point_candidates_[i].finger_distance,
+                  (int)contact_point_candidates_[i].finger_distance,
                   contact_point_candidates_[i].min_wrench,
                   contact_point_candidates_[i].partial_min_wrench);
       ImGui::PopID();
