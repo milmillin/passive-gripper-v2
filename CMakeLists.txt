@@ -157,3 +157,6 @@ target_link_libraries(psg-proc core igl::core Boost::filesystem Boost::system)
 
 add_executable(psg-ablate "src/psg-ablate/main.cpp")
 target_link_libraries(psg-ablate ${BATCH_LINK_LIBS})
+
+add_executable(psg-cp-test "src/psg-cp-test/main.cpp")
+target_link_libraries(psg-cp-test ${BATCH_LINK_LIBS})
