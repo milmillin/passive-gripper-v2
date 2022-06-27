@@ -9,9 +9,11 @@
 #include <boost/process.hpp>
 
 #include "../Constants.h"
-#include "../utils.h"
-#include "Result.h"
+#include "../core/models/ContactPointMetric.h"
 #include "../core/models/SettingsOverrider.h"
+#include "../utils.h"
+#include "PipelineStages.h"
+#include "Result.h"
 #include "Testcase.h"
 
 namespace fs = std::filesystem;
@@ -19,7 +21,7 @@ namespace bp = boost::process;
 
 void Usage(char* argv0) {
   Error() << "Usage: " << argv0
-          << " psg output_dir [-s stgo] [-h hook] [-x] [-m maxiters]"
+          << " stl output_dir [-s stgo] [-h hook] [-x] [-m maxiters]"
           << std::endl;
 }
 
@@ -30,11 +32,8 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  // psg_fn
-  std::string psg_fn = argv[1];
-  size_t lastdot = psg_fn.rfind('.');
-  std::string raw_fn = psg_fn.substr(0, lastdot);
-  std::string ckpt_fn = raw_fn + ".ckpt";
+  // stl_fn
+  std::string stl_fn = argv[1];
 
   // output_dir
   std::string out_dir = argv[2];
@@ -81,23 +80,31 @@ int main(int argc, char** argv) {
     Log() << out_dir << " directory created " << std::endl;
   }
 
-  int ckpt_i = 0;
-  if (!restart_set) {
-    std::ifstream ckpt_file(ckpt_fn);
-    if (!ckpt_file.is_open()) {
-      Error() << "Warning: cannot open checkpoint file: " << ckpt_fn
-              << std::endl;
-    } else {
-      ckpt_file >> ckpt_i >> ckpt_need;
-      Log() << "Checkpoint loaded: " << ckpt_i << ' ' << ckpt_need << std::endl;
-      ckpt_i++;
-    }
-  } else {
-    Out() << ResultHeader() << std::endl;
-  }
+  // infer file names
+  size_t lastdot = stl_fn.rfind('.');
+  std::string raw_fn = stl_fn.substr(0, lastdot);
 
-  TestcaseCallback cb = [hook_set, &ckpt_fn, &hook_str, &out_dir](
+  std::string psg_fn = raw_fn + ".psg";
+  std::string ckpt_fn = raw_fn + ".ckpt";
+  std::string cpx_fn = raw_fn + ".cpx";
+
+  size_t lastslash = raw_fn.rfind('/');
+  if (lastslash == std::string::npos) lastslash = raw_fn.rfind('\\');
+  std::string wopath_fn = raw_fn.substr(lastslash + 1, std::string::npos);
+
+  std::string output_fn = out_dir + "/" + wopath_fn + "-results.txt";
+
+  // set callback
+  TestcaseCallback cb = [hook_set, &ckpt_fn, &hook_str, &out_dir, &output_fn](
                             size_t i, size_t need, const Result& r) {
+    {
+      std::ofstream output_f(output_fn, std::ios::out | std::ios::app);
+      if (!output_f.is_open()) {
+        Error() << "Warning: cannot open output file: " << output_fn
+                << std::endl;
+      }
+      output_f << r << std::endl;
+    }
     if (hook_set) {
       bp::ipstream out;
       bp::child c(hook_str,
@@ -128,22 +135,59 @@ int main(int argc, char** argv) {
       out_s << std::endl;
       c.wait();
     }
-    std::ofstream ckpt_file(ckpt_fn);
-    if (!ckpt_file.is_open()) {
-      Error() << "Warning: cannot open checkpoint file: " << ckpt_fn
-              << std::endl;
-    } else {
-      ckpt_file << i << ' ' << need << std::endl;
-      Log() << "Checkpoint updated: " << i << ' ' << need << std::endl;
+    {
+      std::ofstream ckpt_file(ckpt_fn);
+      if (!ckpt_file.is_open()) {
+        Error() << "Warning: cannot open checkpoint file: " << ckpt_fn
+                << std::endl;
+      } else {
+        ckpt_file << i << ' ' << need << std::endl;
+        Log() << "Checkpoint updated: " << i << ' ' << need << std::endl;
+      }
     }
   };
 
+  // START PROCESS
   try {
+    // generates psg if not exist
+    Log() << "Checking PSG file: " << psg_fn << std::endl;
+    if (!fs::exists(psg_fn)) {
+      Log() << "> Generating PSG file..." << std::endl;
+      psg_batch::GeneratePSG(stl_fn, psg_fn);
+    }
+
+    psg::core::PassiveGripper psg;
+    psg.DeserializeFn(psg_fn);
+    Log() << "PSG file loaded" << std::endl;
+
+    // generate cpx if not exist
+    Log() << "Checking CPX file: " << cpx_fn << std::endl;
+    if (!fs::exists(cpx_fn)) {
+      Log() << "> Generating CPX file..." << std::endl;
+      psg_batch::GenerateCPX(psg, cpx_fn);
+    }
+
+    // load checkpoint
+    int ckpt_i = 0;
+    if (!restart_set) {
+      std::ifstream ckpt_file(ckpt_fn);
+      if (!ckpt_file.is_open()) {
+        Error() << "Warning: No checkpoint file; start from the beginning "
+                << ckpt_fn << std::endl;
+      } else {
+        ckpt_file >> ckpt_i >> ckpt_need;
+        Log() << "Checkpoint loaded: " << ckpt_i << ' ' << ckpt_need
+              << std::endl;
+        ckpt_i++;
+      }
+    }
+
     psg::core::models::SettingsOverrider stgo;
     if (stgo_set) stgo.Load(stgo_fn);
     ProcessFrom(raw_fn, out_dir, ckpt_i, ckpt_need, maxiters, stgo, cb);
   } catch (const std::exception& e) {
     Error() << e.what() << std::endl;
   }
+
   return 0;
 }

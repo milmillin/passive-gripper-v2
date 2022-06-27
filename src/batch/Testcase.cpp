@@ -32,7 +32,8 @@ void ProcessFrom(std::string raw_fn,
   if (lastslash == std::string::npos) lastslash = raw_fn.rfind('\\');
   std::string wopath_fn = raw_fn.substr(lastslash + 1, std::string::npos);
 
-  Log() << "Processing " << raw_fn << std::endl;
+  Log() << "Processing " << raw_fn << " from " << i_cp << "(max: " << maxiters
+        << ", still requires " << need << " more." << std::endl;
 
   std::string psg_fn = raw_fn + ".psg";
   std::ifstream psg_file(psg_fn, std::ios::in | std::ios::binary);
@@ -49,8 +50,6 @@ void ProcessFrom(std::string raw_fn,
   psg::core::PassiveGripper psg;
   psg.Deserialize(psg_file);
   Log() << "> Loaded " << psg_fn << std::endl;
-
-  stgo.Apply(psg);
 
   try {
     psg::core::models::SettingsOverrider stgo;
@@ -94,7 +93,7 @@ void ProcessFrom(std::string raw_fn,
 
     snprintf(buf, bufsize, "%s-optd-%03d", wopath_fn.c_str(), (int)i);
     std::string out_raw_fn = buf;
-    if (failed) out_raw_fn = "__failed-" + out_raw_fn;
+    if (failed) out_raw_fn = out_raw_fn + "-failed";
     std::string out_fn = output_dir + '/' + out_raw_fn;
 
     double traj_complexity = 0;
@@ -127,7 +126,7 @@ void ProcessFrom(std::string raw_fn,
       Log() << "> Done" << std::endl;
     }
 
-    std::string psg_out_fn = out_fn + ".psg";
+    std::string psg_out_fn = out_fn + ".params";
     {
       std::ofstream psg_out_f(psg_out_fn, std::ios::out | std::ios::binary);
       if (!psg_out_f.is_open()) {
@@ -135,9 +134,9 @@ void ProcessFrom(std::string raw_fn,
         Error() << ">> Skipping" << std::endl;
         continue;
       }
-      psg.Serialize(psg_out_f);
+      psg.GetParams().Serialize(psg_out_f);
     }
-    Log() << "> Done: Optimized gripper written to " << psg_out_fn << std::endl;
+    Log() << "> Done: Optimized params written to " << psg_out_fn << std::endl;
 
     std::string csv_out_fn = out_fn + ".csv";
     {
