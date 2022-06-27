@@ -8,15 +8,15 @@ namespace models {
 
 struct CostSettings : psg::core::serialization::Serializable {
   double floor = 0.0075;
-  size_t n_trajectory_steps = 32;
-  size_t n_finger_steps = 32;
+  size_t n_trajectory_steps = 768;
+  size_t n_finger_steps = 128;
   double ang_velocity = kDegToRad * 60.;
   CostFunctionEnum cost_function = CostFunctionEnum::kSP;
   double regularization = 1e-6;
   double robot_collision = 1000;
-  double traj_energy = 1.;
+  double traj_energy = 0.;
   double gripper_energy = 1.;
-  double geodesic_contrib = 1.;
+  double geodesic_contrib = 0.;
   double inner_dis_contrib = 1.;
   double d_subdivision = 0.001;
   double d_linearity = 0.001;
