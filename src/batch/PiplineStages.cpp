@@ -55,7 +55,7 @@ void GenerateCPX(const psg::core::PassiveGripper& psg,
 
   auto start_time = std::chrono::high_resolution_clock::now();
   auto cps = psg::core::InitializeContactPoints(
-      psg, cp_filter, CPX_N_SEEDS, CPX_N_CANDIDATES);
+      psg, cp_filter, CPX_N_CANDIDATES, CPX_N_SEEDS);
   auto stop_time = std::chrono::high_resolution_clock::now();
   long long duration = std::chrono::duration_cast<std::chrono::milliseconds>(
                            stop_time - start_time)
